@@ -17,9 +17,11 @@ autoload();
 
 function autoload() {
     require_once WINSHIRT_PATH . 'includes/class-winshirt-product-customization.php';
+    require_once WINSHIRT_PATH . 'includes/class-winshirt-modal.php';
 }
 
 function winshirt_init() {
     new WinShirt_Product_Customization();
+    new WinShirt_Modal();
 }
 add_action('plugins_loaded', 'winshirt_init');
