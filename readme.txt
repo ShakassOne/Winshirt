@@ -6,4 +6,5 @@ Testé jusqu'à : 6.5
 Version stable : 1.0
 Licence : GPLv2 ou ultérieure
 
+
 WinShirt permet de personnaliser les produits WooCommerce via une interface modale et pose les bases de la gestion de loteries.

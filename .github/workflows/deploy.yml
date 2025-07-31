@@ -20,8 +20,8 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           port: ${{ secrets.SFTP_PORT }}
           script: |
-            rm -rf /Winshirt/wp-content/plugins/winshirt/*
-            mkdir -p /Winshirt/wp-content/plugins/winshirt
+            rm -rf wp-content/plugins/winshirt/*
+            mkdir -p wp-content/plugins/winshirt
 
       - name: Upload plugin via SFTP
         uses: appleboy/scp-action@v0.1.4
@@ -31,5 +31,5 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           port: ${{ secrets.SFTP_PORT }}
           source: "**"
-          target: "/Winshirt/wp-content/plugins/winshirt"
+          target: "wp-content/plugins/winshirt"
           strip_components: 1
