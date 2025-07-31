@@ -1,5 +1,5 @@
 === WinShirt ===
-Contributors: alanvalensi
+Contributors: Shakass
 Tags: woocommerce, customization, lottery
 Requires at least: 6.5
 Tested up to: 6.5
