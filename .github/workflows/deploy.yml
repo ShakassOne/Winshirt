@@ -13,7 +13,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 1) Debug : lister le répertoire courant côté SSH
       - name: Debug: list remote home
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -27,7 +26,6 @@ jobs:
             echo "=== Home content ==="
             ls -la
 
-      # 2) Nettoyage au bon endroit (chemin à ajuster selon l'étape de debug)
       - name: Clean remote plugin directory
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -36,13 +34,12 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           port: ${{ secrets.SFTP_PORT }}
           script: |
-            # Si ton plugin est dans ~/Winshirt/wp-content/plugins/winshirt :
-            rm -rf ~/Winshirt/wp-content/plugins/winshirt/*
-            mkdir -p ~/Winshirt/wp-content/plugins/winshirt
+            echo "Cleaning wp-content/plugins/winshirt"
+            rm -rf wp-content/plugins/winshirt/*
+            mkdir -p wp-content/plugins/winshirt
             echo "=== After clean ==="
-            ls -la ~/Winshirt/wp-content/plugins/
+            ls -la wp-content/plugins
 
-      # 3) Upload
       - name: Upload plugin via SFTP
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -51,11 +48,9 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           port: ${{ secrets.SFTP_PORT }}
           source: "**"
-          # Même chemin absolu que ci-dessus
-          target: "~/Winshirt/wp-content/plugins/winshirt"
+          target: "wp-content/plugins/winshirt"
           strip_components: 1
 
-      # 4) Vérification post-upload
       - name: Debug: list plugin dir after upload
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -65,4 +60,4 @@ jobs:
           port: ${{ secrets.SFTP_PORT }}
           script: |
             echo "=== After upload ==="
-            ls -la ~/Winshirt/wp-content/plugins/winshirt
+            ls -la wp-content/plugins/winshirt
