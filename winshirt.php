@@ -3,8 +3,8 @@
  * Plugin Name: WinShirt
  * Description: Plugin WordPress pour personnalisation textile et gestion de loteries.
  * Version: 1.0
- * Author: Alan Valensi
- */
+ * Author: Shakass
+*/
 
 if (!defined('ABSPATH')) {
     exit;

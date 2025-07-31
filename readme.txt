@@ -1,9 +1,9 @@
 === WinShirt ===
-Contributors: Shakass
-Tags: woocommerce, customization, lottery
-Requires at least: 6.5
-Tested up to: 6.5
-Stable tag: 1.0
-License: GPLv2 or later
+Contributeurs: Shakass
+Tags: woocommerce, personnalisation, loterie
+Nécessite au minimum : 6.5
+Testé jusqu'à : 6.5
+Version stable : 1.0
+Licence : GPLv2 ou ultérieure
 
-WinShirt allows WooCommerce products to be customized with a modal interface and lays the groundwork for lottery management.
+WinShirt permet de personnaliser les produits WooCommerce via une interface modale et pose les bases de la gestion de loteries.
