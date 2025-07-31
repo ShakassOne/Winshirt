@@ -1,5 +1,4 @@
 name: Deploy WinShirt Plugin
-
 on:
   push:
     branches:
@@ -9,7 +8,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
@@ -48,7 +46,7 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           port: ${{ secrets.SFTP_PORT }}
           source: "**"
-          target: "wp-content/plugins/winshirt"
+          target: wp-content/plugins/winshirt
           strip_components: 1
 
       - name: Debug: list plugin dir after upload
