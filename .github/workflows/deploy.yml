@@ -39,5 +39,6 @@ jobs:
           password:         ${{ secrets.SFTP_PASSWORD }}
           port:             ${{ secrets.SFTP_PORT }}
           source:           "./"
-          target:           "wp-content/plugins/winshirt"
+          # Chemin absolu identique à celui utilisé pour le nettoyage
+          target:           "/homepages/45/d408430562/htdocs/wp-content/plugins/winshirt"
           strip_components: 1
