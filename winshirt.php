@@ -23,7 +23,7 @@ function autoload() {
 
 function winshirt_init() {
     new WinShirt_Product_Customization();
-    new WinShirt_Modal();
+    WinShirt_Modal::init();             // ← appel statique
     new WinShirt_Admin();
 }
 add_action('plugins_loaded', 'winshirt_init');
