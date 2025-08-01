@@ -10,12 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: List local files to upload
+      - name: 📂 List local files
         run: |
-          echo ">>> Local tree:"
-          find . -maxdepth 2 | sed 's/^\./  /'
+          echo ">>> Local files to upload:"
+          find . -type f | sed 's/^\.\///'
 
-      - name: Clean remote plugin directory
+      - name: 🧹 Clean remote plugin directory
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SFTP_HOST }}
@@ -24,24 +24,24 @@ jobs:
           port: ${{ secrets.SFTP_PORT }}
           script: |
             echo ">>> Remote before clean:"
-            ls -R wp-content/plugins/winshirt || true
+            ls -R wp-content/plugins/winshirt || echo "(not exists)"
             rm -rf wp-content/plugins/winshirt/*
             mkdir -p wp-content/plugins/winshirt
             echo ">>> Remote after clean:"
-            ls -R wp-content/plugins/winshirt || true
+            ls -R wp-content/plugins/winshirt
 
-      - name: Upload plugin via SFTP
+      - name: 🚀 Upload plugin via SFTP
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
           password: ${{ secrets.SFTP_PASSWORD }}
           port: ${{ secrets.SFTP_PORT }}
-          source: "**/*"
+          source: "./"
           target: "wp-content/plugins/winshirt"
           strip_components: 1
 
-      - name: List remote files after upload
+      - name: 📂 List remote files after upload
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SFTP_HOST }}
