@@ -10,24 +10,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      # 1) On récupère le code
-      - name: Checkout repository
+      # 1️⃣ On récupère le code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2) On nettoie le dossier distant, en chemin relatif
-      - name: Clean remote plugin directory
+      # 2️⃣ On se connecte et on debug le répertoire courant
+      - name: Debug remote working directory
         uses: appleboy/ssh-action@v1.0.0
         with:
           host:     ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
           password: ${{ secrets.SFTP_PASSWORD }}
           port:     ${{ secrets.SFTP_PORT }}
-          # Attention : chemins relatifs (pas de slash devant)
           script: |
+            echo ">>> REMOTE PWD:"
+            pwd
+            echo ">>> REMOTE ROOT LISTING:"
+            ls -la
+
+      # 3️⃣ On tente de nettoyer le dossier du plugin (chemin relatif tel qu’on l’avait)
+      - name: Clean remote plugin directory (and debug)
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host:     ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          port:     ${{ secrets.SFTP_PORT }}
+          script: |
+            echo ">>> BEFORE CLEAN, ls wp-content/plugins:"
+            ls -la wp-content/plugins || echo "(folder not found)"
             rm -rf wp-content/plugins/winshirt/*
             mkdir -p wp-content/plugins/winshirt
+            echo ">>> AFTER CLEAN, ls wp-content/plugins:"
+            ls -la wp-content/plugins
 
-      # 3) On pousse tout le dossier local sur ce chemin relatif
+      # 4️⃣ On crée un fichier test pour vérifier qu’on est au bon endroit
+      - name: Create remote deploy-test.txt
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host:     ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          port:     ${{ secrets.SFTP_PORT }}
+          script: |
+            echo "TEST AT $(date)" > wp-content/plugins/winshirt/deploy-test.txt
+
+      # 5️⃣ On upload tout le plugin
       - name: Upload plugin via SFTP
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -35,9 +63,18 @@ jobs:
           username:         ${{ secrets.SFTP_USERNAME }}
           password:         ${{ secrets.SFTP_PASSWORD }}
           port:             ${{ secrets.SFTP_PORT }}
-          # On copie le contenu du repo
           source:           "./"
-          # Vers le même chemin relatif
           target:           "wp-content/plugins/winshirt"
-          # On enlève la racine du repo pour ne pas créer un dossier Winshirt/Winshirt
           strip_components: 1
+
+      # 6️⃣ On liste le contenu final pour confirmer
+      - name: List remote plugin directory
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host:     ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USERNAME }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          port:     ${{ secrets.SFTP_PORT }}
+          script: |
+            echo ">>> FINAL LS of wp-content/plugins/winshirt:"
+            ls -la wp-content/plugins/winshirt
