@@ -27,3 +27,12 @@ function winshirt_init() {
     new WinShirt_Admin();
 }
 add_action('plugins_loaded', 'winshirt_init');
+
+function winshirt_plugin_row_meta($links, $file) {
+    if ($file === plugin_basename(__FILE__)) {
+        $links[] = '<a href="https://shakass.com/" target="_blank">' . esc_html__('Site Web', 'winshirt') . '</a>';
+        $links[] = '<a href="' . esc_url(plugins_url('readme.txt', __FILE__)) . '" target="_blank">' . esc_html__('Readme', 'winshirt') . '</a>';
+    }
+    return $links;
+}
+add_filter('plugin_row_meta', 'winshirt_plugin_row_meta', 10, 2);
