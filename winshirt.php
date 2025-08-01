@@ -18,10 +18,12 @@ autoload();
 function autoload() {
     require_once WINSHIRT_PATH . 'includes/class-winshirt-product-customization.php';
     require_once WINSHIRT_PATH . 'includes/class-winshirt-modal.php';
+    require_once WINSHIRT_PATH . 'includes/class-winshirt-admin.php';
 }
 
 function winshirt_init() {
     new WinShirt_Product_Customization();
     new WinShirt_Modal();
+    new WinShirt_Admin();
 }
 add_action('plugins_loaded', 'winshirt_init');
