@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+      # 1) On récupère le code
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      # 2) On nettoie le dossier distant, en chemin relatif
       - name: Clean remote plugin directory
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -20,10 +22,12 @@ jobs:
           username: ${{ secrets.SFTP_USERNAME }}
           password: ${{ secrets.SFTP_PASSWORD }}
           port:     ${{ secrets.SFTP_PORT }}
+          # Attention : chemins relatifs (pas de slash devant)
           script: |
-            rm -rf /wp-content/plugins/winshirt/*
-            mkdir -p /wp-content/plugins/winshirt
+            rm -rf wp-content/plugins/winshirt/*
+            mkdir -p wp-content/plugins/winshirt
 
+      # 3) On pousse tout le dossier local sur ce chemin relatif
       - name: Upload plugin via SFTP
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -31,6 +35,9 @@ jobs:
           username:         ${{ secrets.SFTP_USERNAME }}
           password:         ${{ secrets.SFTP_PASSWORD }}
           port:             ${{ secrets.SFTP_PORT }}
+          # On copie le contenu du repo
           source:           "./"
-          target:           "/wp-content/plugins/winshirt"
+          # Vers le même chemin relatif
+          target:           "wp-content/plugins/winshirt"
+          # On enlève la racine du repo pour ne pas créer un dossier Winshirt/Winshirt
           strip_components: 1
