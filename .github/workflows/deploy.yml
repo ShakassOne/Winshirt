@@ -2,29 +2,35 @@ name: Deploy WinShirt Plugin
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Sync to FTP via rsync
-        uses: appleboy/rsync-action@v0.1.6
+      - name: Clean remote plugin directory
+        uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SFTP_HOST }}
+          host:     ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USERNAME }}
           password: ${{ secrets.SFTP_PASSWORD }}
-          port: ${{ secrets.SFTP_PORT }}
-          source: "./"
-          target: "/wp-content/plugins/winshirt/"
-          args: >
-            -avz
-            --delete
-            --exclude='.git'
-            --exclude='.github'
-            --exclude='.DS_Store'
-            --exclude='README.md'
-            --exclude='*.yml'
+          port:     ${{ secrets.SFTP_PORT }}
+          script: |
+            rm -rf /wp-content/plugins/winshirt/*
+            mkdir -p /wp-content/plugins/winshirt
+
+      - name: Upload plugin via SFTP
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host:             ${{ secrets.SFTP_HOST }}
+          username:         ${{ secrets.SFTP_USERNAME }}
+          password:         ${{ secrets.SFTP_PASSWORD }}
+          port:             ${{ secrets.SFTP_PORT }}
+          source:           "./"
+          target:           "/wp-content/plugins/winshirt"
+          strip_components: 1
