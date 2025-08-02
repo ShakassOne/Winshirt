@@ -30,8 +30,8 @@ class WinShirt_Modal {
 
     public function enqueue_assets() {
         if ( is_product() ) {
-            global $product;
-            if ( 'yes' === get_post_meta( $product->get_id(), '_winshirt_personnalisable', true ) ) {
+            $product_id = get_queried_object_id();
+            if ( $product_id && 'yes' === get_post_meta( $product_id, '_winshirt_personnalisable', true ) ) {
                 wp_enqueue_style(
                     'winshirt-modal',
                     plugins_url( 'assets/css/winshirt-modal.css', WINSHIRT_PATH . 'winshirt.php' ),
