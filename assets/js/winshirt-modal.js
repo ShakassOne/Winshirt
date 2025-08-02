@@ -1,27 +1,22 @@
-document.addEventListener('DOMContentLoaded', function() {
-  const openBtn  = document.getElementById('winshirt-open-modal');
-  const closeBtn = document.getElementById('winshirt-close-modal');
-  const modal    = document.getElementById('winshirt-customizer-modal');
+jQuery(function($){
+  var $overlay = $('#winshirt-modal-overlay'),
+      $open    = $('#winshirt-open-modal'),
+      $close   = $('#winshirt-modal-close');
 
-  if (!openBtn || !modal) return;
-
-  openBtn.addEventListener('click', () => {
-    modal.style.display = 'flex';
-    document.body.style.overflow = 'hidden'; // bloque scroll arrière-plan
+  $open.on('click', function(e){
+    e.preventDefault();
+    $overlay.fadeIn(200);
+    // TODO: ici lancer init de la librairie de personnalisation (canvas/SVG)
   });
 
-  closeBtn.addEventListener('click', () => {
-    modal.style.display = 'none';
-    document.body.style.overflow = '';
+  $close.on('click', function(){
+    $overlay.fadeOut(200);
   });
 
-  // Fermer au clic hors du contenu
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) {
-      modal.style.display = 'none';
-      document.body.style.overflow = '';
+  // fermer au clic en dehors du container
+  $overlay.on('click', function(e){
+    if ( e.target === this ) {
+      $overlay.fadeOut(200);
     }
   });
-
-  // (Pour la suite : intégrer interact.js, html2canvas, drag/resize…)
 });

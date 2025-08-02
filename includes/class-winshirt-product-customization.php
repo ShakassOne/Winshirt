@@ -1,44 +1,102 @@
 <?php
-if (!defined('ABSPATH')) {
-    exit;
-}
+// includes/class-winshirt-product-customization.php
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 class WinShirt_Product_Customization {
+
+    const META_KEY = '_winshirt_personnalisable';
+
     public function __construct() {
-        // add product option
-        add_action('woocommerce_product_options_general_product_data', array($this, 'add_custom_option')); 
-        add_action('woocommerce_process_product_meta', array($this, 'save_custom_option'));
-        // display button
-        add_action('woocommerce_single_product_summary', array($this, 'display_customize_button'), 35);
-        // enqueue assets
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_assets'));
+        // Ajout de la méta-box produit
+        add_action( 'add_meta_boxes',     [ $this, 'add_personalizable_metabox' ] );
+        add_action( 'save_post_product',   [ $this, 'save_personalizable_meta' ], 10, 2 );
+
+        // Front-end : bouton + modal
+        add_action( 'woocommerce_before_add_to_cart_button', [ $this, 'print_personalize_button' ] );
+        add_action( 'wp_footer',                                [ $this, 'print_modal' ] );
+        add_action( 'wp_enqueue_scripts',                       [ $this, 'enqueue_assets' ] );
     }
 
-    public function add_custom_option() {
-        woocommerce_wp_checkbox(array(
-            'id' => '_winshirt_enable_custom',
-            'label' => __('Enable WinShirt customization', 'winshirt'),
-        ));
+    /** 1️⃣ Méta-box “Personnalisable” dans l’admin produit */
+    public function add_personalizable_metabox() {
+        add_meta_box(
+            'winshirt_personalizable',
+            __( 'WinShirt : personnalisable ?', 'winshirt' ),
+            [ $this, 'render_personalizable_metabox' ],
+            'product',
+            'side',
+            'default'
+        );
     }
 
-    public function save_custom_option($post_id) {
-        $value = isset($_POST['_winshirt_enable_custom']) ? 'yes' : 'no';
-        update_post_meta($post_id, '_winshirt_enable_custom', $value);
+    public function render_personalizable_metabox( $post ) {
+        wp_nonce_field( 'winshirt_save_personalizable', 'winshirt_personalizable_nonce' );
+        $checked = get_post_meta( $post->ID, self::META_KEY, true ) === 'yes' ? 'checked' : '';
+        echo '<label><input type="checkbox" name="winshirt_personnalisable" value="yes" ' . $checked . '/> '
+            . esc_html__( 'Produit personnalisable', 'winshirt' )
+            . '</label>';
     }
 
-    public function display_customize_button() {
+    public function save_personalizable_meta( $post_id, $post ) {
+        if (
+            ! isset( $_POST['winshirt_personnalisable_nonce'] )
+            || ! wp_verify_nonce( $_POST['winshirt_personnalisable_nonce'], 'winshirt_save_personalizable' )
+            || $post->post_type !== 'product'
+        ) {
+            return;
+        }
+        $value = (isset($_POST['winshirt_personnalisable']) && $_POST['winshirt_personnalisable'] === 'yes') ? 'yes' : 'no';
+        update_post_meta( $post_id, self::META_KEY, $value );
+    }
+
+    /** 2️⃣ Front-end : n’affiche le bouton QUE si le produit est personnalisable */
+    public function print_personalize_button() {
+        if ( ! is_product() ) {
+            return;
+        }
         global $product;
-        $enabled = get_post_meta($product->get_id(), '_winshirt_enable_custom', true);
-        if ($enabled === 'yes') {
-            echo '<button id="winshirt-customize" class="button">' . esc_html__('Customize this product', 'winshirt') . '</button>';
-            echo '<div id="winshirt-modal" style="display:none;" class="winshirt-modal"><div class="winshirt-modal-content"><span class="winshirt-close">&times;</span><p>' . esc_html__('Customization interface coming soon...', 'winshirt') . '</p></div></div>';
+        $yes = get_post_meta( $product->get_id(), self::META_KEY, true );
+        if ( $yes !== 'yes' ) {
+            return;
         }
+        echo '<button id="winshirt-open-modal" class="button alt">'
+             . esc_html__( 'Personnaliser ce produit', 'winshirt' )
+             . '</button>';
     }
 
+    /** 3️⃣ Print le conteneur modal (vide pour l’instant) en bas de la page */
+    public function print_modal() {
+        if ( ! is_product() ) return;
+        global $product;
+        $yes = get_post_meta( $product->get_id(), self::META_KEY, true );
+        if ( $yes !== 'yes' ) return;
+        ?>
+        <div id="winshirt-modal-overlay" style="display:none;">
+          <div id="winshirt-modal-container">
+            <button id="winshirt-modal-close">&times;</button>
+            <div id="winshirt-modal-content">
+              <!-- Ici on injectera le HTML/CANVAS de personnalisation -->
+              <p><?php esc_html_e( 'Chargement de l’interface de personnalisation…', 'winshirt' ); ?></p>
+            </div>
+          </div>
+        </div>
+        <?php
+    }
+
+    /** 4️⃣ Enqueue CSS + JS du modal */
     public function enqueue_assets() {
-        if (is_product()) {
-            wp_enqueue_style('winshirt-styles', plugins_url('../assets/css/winshirt.css', __FILE__));
-            wp_enqueue_script('winshirt-script', plugins_url('../assets/js/winshirt.js', __FILE__), array('jquery'), null, true);
-        }
+        if ( ! is_product() ) return;
+        global $product;
+        $yes = get_post_meta( $product->get_id(), self::META_KEY, true );
+        if ( $yes !== 'yes' ) return;
+
+        // CSS minimal pour le modal
+        wp_enqueue_style( 'winshirt-modal-css', plugins_url( 'assets/css/winshirt-modal.css', WINSHIRT_PATH . 'winshirt.php' ), [], WINSHIRT_VERSION );
+
+        // JS pour ouvrir/fermer le modal
+        wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), ['jquery'], WINSHIRT_VERSION, true );
     }
 }
+
+// Instanciation
+new WinShirt_Product_Customization();

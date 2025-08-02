@@ -22,11 +22,6 @@ function autoload() {
     require_once WINSHIRT_PATH . 'includes/class-winshirt-lottery.php';
 }
 
-function winshirt_init() {
-    new WinShirt_Product_Customization();
-}
-add_action('plugins_loaded', 'winshirt_init');
-
 function winshirt_plugin_row_meta($links, $file) {
     if ($file === plugin_basename(__FILE__)) {
         $links[] = '<a href="https://shakass.com/" target="_blank">' . esc_html__('Site Web', 'winshirt') . '</a>';
