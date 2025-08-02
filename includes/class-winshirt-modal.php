@@ -1,62 +1,55 @@
 <?php
-if (!defined('ABSPATH')) {
-    exit;
-}
+// includes/class-winshirt-modal.php
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 class WinShirt_Modal {
-    /**
-     * Initialise les hooks du module.
-     *
-     * @return self
-     */
-    public static function init() {
-        return new self();
-    }
 
     public function __construct() {
-        add_action('woocommerce_single_product_summary', array($this, 'insert_button'), 31);
-        add_action('wp_footer', array($this, 'add_modal_template'));
-        add_action('wp_enqueue_scripts', array($this, 'enqueue_assets'));
+        add_action( 'woocommerce_before_add_to_cart_button', [ $this, 'add_button' ] );
+        add_action( 'wp_footer',                           [ $this, 'print_modal' ] );
+        add_action( 'wp_enqueue_scripts',                  [ $this, 'enqueue_assets' ] );
     }
 
-    private function is_customizable_product() {
-        if (!is_product()) {
-            return false;
-        }
-        global $product;
-        if (!$product) {
-            return false;
-        }
-        return get_post_meta($product->get_id(), '_winshirt_personnalisable', true) === 'yes';
-    }
-
-    public function insert_button() {
-        if ($this->is_customizable_product()) {
-            echo '<button type="button" class="btn-personnaliser">' . esc_html__( 'Personnaliser ce produit', 'winshirt' ) . '</button>';
+    public function add_button() {
+        if ( is_product() ) {
+            global $product;
+            if ( 'yes' === get_post_meta( $product->get_id(), '_winshirt_personnalisable', true ) ) {
+                echo '<button class="btn-personnaliser" id="winshirt-open-modal">Personnaliser ce produit</button>';
+            }
         }
     }
 
-    public function add_modal_template() {
-        if ($this->is_customizable_product()) {
-            include WINSHIRT_PATH . 'templates/modal-customizer.php';
+    public function print_modal() {
+        if ( is_product() ) {
+            global $product;
+            if ( 'yes' === get_post_meta( $product->get_id(), '_winshirt_personnalisable', true ) ) {
+                include WINSHIRT_PATH . 'templates/modal-customizer.php';
+            }
         }
     }
 
     public function enqueue_assets() {
-        if ($this->is_customizable_product()) {
-            wp_enqueue_style(
-                'winshirt-modal',
-                plugins_url('../assets/css/winshirt-modal.css', __FILE__),
-                array(),
-                WINSHIRT_VERSION
-            );
-            wp_enqueue_script(
-                'winshirt-modal',
-                plugins_url('../assets/js/winshirt-modal.js', __FILE__),
-                array(),
-                WINSHIRT_VERSION,
-                true
-            );
+        if ( is_product() ) {
+            global $product;
+            if ( 'yes' === get_post_meta( $product->get_id(), '_winshirt_personnalisable', true ) ) {
+                wp_enqueue_style(
+                    'winshirt-modal',
+                    plugins_url( 'assets/css/winshirt-modal.css', WINSHIRT_PATH . 'winshirt.php' ),
+                    [],
+                    WINSHIRT_VERSION
+                );
+                wp_enqueue_script(
+                    'winshirt-modal',
+                    plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ),
+                    [],
+                    WINSHIRT_VERSION,
+                    true
+                );
+            }
         }
     }
 }
+
+// Instanciation
+new WinShirt_Modal();
+

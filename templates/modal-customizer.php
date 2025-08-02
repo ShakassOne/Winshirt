@@ -1,15 +1,17 @@
-<?php
-if (!defined('ABSPATH')) {
-    exit;
-}
-?>
-<div id="winshirt-customizer-modal" style="display: none;">
-    <div class="modal-overlay">
-        <div class="modal-content">
-            <button type="button" class="winshirt-modal-close">&times;</button>
-            <div class="winshirt-customizer-body">
-                <p><?php esc_html_e('Interface de personnalisation', 'winshirt'); ?></p>
-            </div>
-        </div>
+<div id="winshirt-customizer-modal" class="winshirt-modal-overlay" style="display:none;">
+  <div class="winshirt-modal-content">
+    <button class="winshirt-modal-close" id="winshirt-close-modal">&times;</button>
+    <div class="header"></div>
+    <div class="main-container">
+      <aside class="left-sidebar">
+        <!-- … tes tool-icons … -->
+      </aside>
+      <main class="central-area">
+        <!-- … tes view-controls, tshirt, zones … -->
+      </main>
+      <aside class="right-sidebar">
+        <!-- … galerie, upload … -->
+      </aside>
     </div>
+  </div>
 </div>
