@@ -3,7 +3,7 @@ Contributeurs: Shakass
 Tags: woocommerce, personnalisation, loterie
 Nécessite au minimum : 6.5
 Testé jusqu'à : 6.5
-Version stable : 2.0
+Version stable : 3.0
 Licence : GPLv2 ou ultérieure
 
 
