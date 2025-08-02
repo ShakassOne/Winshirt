@@ -4,6 +4,14 @@ if (!defined('ABSPATH')) {
 }
 
 class WinShirt_Modal {
+    /**
+     * Initialise les hooks du module.
+     *
+     * @return self
+     */
+    public static function init() {
+        return new self();
+    }
 
     public function __construct() {
         add_action('woocommerce_single_product_summary', array($this, 'insert_button'), 31);
