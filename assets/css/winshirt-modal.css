@@ -1,36 +1,29 @@
-#winshirt-customizer-modal {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 9999;
-    background: rgba(0,0,0,0.6);
-    display: none;
-    overflow: auto;
+.winshirt-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-#winshirt-customizer-modal .modal-overlay {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.winshirt-modal-content {
+  background: white;
+  width: 90%;
+  max-width: 1200px;
+  height: 90%;
+  overflow: auto;
+  border-radius: 8px;
+  position: relative;
 }
-#winshirt-customizer-modal .modal-content {
-    background: #fff;
-    width: 90%;
-    max-width: 1000px;
-    margin: auto;
-    position: relative;
-    padding: 1rem;
-    box-sizing: border-box;
+/* Bouton fermer */
+.winshirt-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: transparent;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
 }
-#winshirt-customizer-modal .winshirt-modal-close {
-    position: absolute;
-    right: 1rem;
-    top: 1rem;
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-}
+/* Réintègre ici tout le CSS que tu avais dans <style>, en préfixant chaque sélecteur par #winshirt-customizer-modal ou .winshirt-modal-content */
