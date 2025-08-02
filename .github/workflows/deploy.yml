@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
-      # 1) Checkout du code
+      # 1) Récupérer le code de GitHub
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2) Clean & préparer en partant de la racine WP
+      # 2) Nettoyer l’ancien plugin sur le site Winshirt
       - name: Clean remote plugin directory
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -23,14 +23,14 @@ jobs:
           password: ${{ secrets.SFTP_PASSWORD }}
           port:     ${{ secrets.SFTP_PORT }}
           script: |
-            # On se place dans la racine WordPress
-            cd /homepages/45/d408430562/htdocs
-            # On supprime tout dans winshirt
+            # Se placer dans la racine de l'installation Winshirt
+            cd /homepages/45/d408430562/htdocs/Winshirt
+            # Supprimer tout le contenu du dossier winshirt
             rm -rf wp-content/plugins/winshirt/*
-            # On recrée le dossier
+            # Recréer le dossier vide
             mkdir -p wp-content/plugins/winshirt
 
-      # 3) Upload via SCP vers wp-content/plugins/winshirt
+      # 3) Envoyer tous les fichiers du dépôt via SFTP
       - name: Upload plugin via SFTP
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -39,6 +39,5 @@ jobs:
           password:         ${{ secrets.SFTP_PASSWORD }}
           port:             ${{ secrets.SFTP_PORT }}
           source:           "./"
-          # Chemin absolu identique à celui utilisé pour le nettoyage
-          target:           "/homepages/45/d408430562/htdocs/wp-content/plugins/winshirt"
+          target:           "Winshirt/wp-content/plugins/winshirt"
           strip_components: 1
