@@ -54,11 +54,12 @@ class WinShirt_Product_Customization {
         if ( ! is_product() ) {
             return;
         }
-        global $product;
-        $yes = get_post_meta( $product->get_id(), self::META_KEY, true );
-        if ( $yes !== 'yes' ) {
+
+        $product_id = get_queried_object_id();
+        if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
             return;
         }
+
         echo '<button id="winshirt-open-modal" class="button alt">'
              . esc_html__( 'Personnaliser ce produit', 'winshirt' )
              . '</button>';
@@ -66,10 +67,14 @@ class WinShirt_Product_Customization {
 
     /** 3️⃣ Print le conteneur modal (vide pour l’instant) en bas de la page */
     public function print_modal() {
-        if ( ! is_product() ) return;
-        global $product;
-        $yes = get_post_meta( $product->get_id(), self::META_KEY, true );
-        if ( $yes !== 'yes' ) return;
+        if ( ! is_product() ) {
+            return;
+        }
+
+        $product_id = get_queried_object_id();
+        if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
+            return;
+        }
         ?>
         <div id="winshirt-modal-overlay" style="display:none;">
           <div id="winshirt-modal-container">
@@ -85,16 +90,20 @@ class WinShirt_Product_Customization {
 
     /** 4️⃣ Enqueue CSS + JS du modal */
     public function enqueue_assets() {
-        if ( ! is_product() ) return;
-        global $product;
-        $yes = get_post_meta( $product->get_id(), self::META_KEY, true );
-        if ( $yes !== 'yes' ) return;
+        if ( ! is_product() ) {
+            return;
+        }
+
+        $product_id = get_queried_object_id();
+        if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
+            return;
+        }
 
         // CSS minimal pour le modal
         wp_enqueue_style( 'winshirt-modal-css', plugins_url( 'assets/css/winshirt-modal.css', WINSHIRT_PATH . 'winshirt.php' ), [], WINSHIRT_VERSION );
 
         // JS pour ouvrir/fermer le modal
-        wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), ['jquery'], WINSHIRT_VERSION, true );
+        wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery' ], WINSHIRT_VERSION, true );
     }
 }
 
