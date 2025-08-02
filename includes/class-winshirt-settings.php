@@ -91,6 +91,15 @@ class WinShirt_Settings {
             self::PAGE_SLUG,
             'winshirt_section_main'
         );
+
+        // Champs : Email huissier
+        add_settings_field(
+            'bailiff_email',
+            __( 'Email huissier', 'winshirt' ),
+            [ __CLASS__, 'field_bailiff_email_cb' ],
+            self::PAGE_SLUG,
+            'winshirt_section_main'
+        );
     }
 
     // 3. Sanitize
@@ -102,6 +111,7 @@ class WinShirt_Settings {
         $output['prefix_export']     = sanitize_text_field( $input['prefix_export'] ?? '' );
         $output['path_export_json']  = sanitize_text_field( $input['path_export_json'] ?? '' );
         $output['path_export_xml']   = sanitize_text_field( $input['path_export_xml'] ?? '' );
+        $output['bailiff_email']     = sanitize_email( $input['bailiff_email'] ?? '' );
         return $output;
     }
 
@@ -157,6 +167,15 @@ class WinShirt_Settings {
             '<input type="text" name="%1$s[path_export_xml]" value="%2$s" placeholder="/exports/xml/" class="regular-text" />',
             esc_attr( self::OPTION_KEY ),
             esc_attr( $opts['path_export_xml'] ?? '' )
+        );
+    }
+
+    public static function field_bailiff_email_cb() {
+        $opts = get_option( self::OPTION_KEY );
+        printf(
+            '<input type="email" name="%1$s[bailiff_email]" value="%2$s" class="regular-text" />',
+            esc_attr( self::OPTION_KEY ),
+            esc_attr( $opts['bailiff_email'] ?? '' )
         );
     }
 
