@@ -9,7 +9,7 @@ class WinShirt_Product_Customization {
     public function __construct() {
         // Ajout de la méta-box produit
         add_action( 'add_meta_boxes',     [ $this, 'add_personalizable_metabox' ] );
-        add_action( 'save_post_product',   [ $this, 'save_personalizable_meta' ], 10, 2 );
+        add_action( 'save_post',           [ $this, 'save_personalizable_meta' ], 10, 2 );
 
         // Front-end : bouton + modal
         add_action( 'woocommerce_before_add_to_cart_button', [ $this, 'print_personalize_button' ] );
@@ -39,13 +39,15 @@ class WinShirt_Product_Customization {
 
     public function save_personalizable_meta( $post_id, $post ) {
         if (
-            ! isset( $_POST['winshirt_personnalisable_nonce'] )
+            $post->post_type !== 'product'
+            || ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE )
+            || wp_is_post_revision( $post_id )
+            || ! isset( $_POST['winshirt_personnalisable_nonce'] )
             || ! wp_verify_nonce( $_POST['winshirt_personnalisable_nonce'], 'winshirt_save_personalizable' )
-            || $post->post_type !== 'product'
         ) {
             return;
         }
-        $value = (isset($_POST['winshirt_personnalisable']) && $_POST['winshirt_personnalisable'] === 'yes') ? 'yes' : 'no';
+        $value = ( isset( $_POST['winshirt_personnalisable'] ) && $_POST['winshirt_personnalisable'] === 'yes' ) ? 'yes' : 'no';
         update_post_meta( $post_id, self::META_KEY, $value );
     }
 
