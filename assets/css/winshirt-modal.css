@@ -13,10 +13,10 @@
 .winshirt-modal-content {
   background: #fff;
   border-radius: 8px;
-  width: 90%;
-  max-width: 1300px;
-  max-height: 90vh;
-  overflow: auto;
+  width: 90vw;
+  max-width: 90vw;
+  height: 90vh;
+  overflow: hidden;
   position: relative;
   padding: 20px;
 }
@@ -97,7 +97,8 @@
   justify-content: center;
   padding: 20px;
   background: white;
-  overflow: auto;
+  overflow: hidden;
+
 }
 
 .view-controls {
