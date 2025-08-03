@@ -67,7 +67,7 @@ class WinShirt_Product_Customization {
              . '</button>';
     }
 
-    /** 3️⃣ Print le conteneur modal (vide pour l’instant) en bas de la page */
+    /** 3️⃣ Affiche le conteneur modal de personnalisation */
     public function print_modal() {
         if ( ! is_product() ) {
             return;
@@ -77,17 +77,8 @@ class WinShirt_Product_Customization {
         if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
             return;
         }
-        ?>
-        <div id="winshirt-modal-overlay" style="display:none;">
-          <div id="winshirt-modal-container">
-            <button id="winshirt-modal-close">&times;</button>
-            <div id="winshirt-modal-content">
-              <!-- Ici on injectera le HTML/CANVAS de personnalisation -->
-              <p><?php esc_html_e( 'Chargement de l’interface de personnalisation…', 'winshirt' ); ?></p>
-            </div>
-          </div>
-        </div>
-        <?php
+
+        include WINSHIRT_PATH . 'templates/modal-customizer.php';
     }
 
     /** 4️⃣ Enqueue CSS + JS du modal */
