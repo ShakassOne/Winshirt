@@ -155,6 +155,18 @@
   color: #6c757d;
   font-size: 18px;
   background: rgba(248, 249, 250, 0.4);
+  position: relative;
+}
+
+.layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .size-controls {
@@ -325,6 +337,50 @@
   background: #2d2d2d;
   color: white;
   border-color: #2d2d2d;
+}
+
+/* Layers */
+.layer-item {
+  padding: 8px 12px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: background 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layer-item.active {
+  background: #2d2d2d;
+  color: #fff;
+}
+
+.layer-actions button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  margin-left: 5px;
+}
+
+.pos-btn {
+  padding: 8px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pos-btn:hover {
+  background: #f0f0f0;
+}
+
+/* QR preview */
+.qr-preview img {
+  max-width: 100%;
+  height: auto;
 }
 
 /* Icons SVG */
