@@ -62,7 +62,7 @@ class WinShirt_Product_Customization {
             return;
         }
 
-        echo '<button id="winshirt-open-modal" class="button alt">'
+        echo '<button id="winshirt-open-modal" class="button alt" type="button">'
              . esc_html__( 'Personnaliser ce produit', 'winshirt' )
              . '</button>';
     }
