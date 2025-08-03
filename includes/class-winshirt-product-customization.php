@@ -30,7 +30,7 @@ class WinShirt_Product_Customization {
     }
 
     public function render_personalizable_metabox( $post ) {
-        wp_nonce_field( 'winshirt_save_personalizable', 'winshirt_personalizable_nonce' );
+        wp_nonce_field( 'winshirt_save_personalizable', 'winshirt_personnalisable_nonce' );
         $checked = get_post_meta( $post->ID, self::META_KEY, true ) === 'yes' ? 'checked' : '';
         echo '<label><input type="checkbox" name="winshirt_personnalisable" value="yes" ' . $checked . '/> '
             . esc_html__( 'Produit personnalisable', 'winshirt' )
