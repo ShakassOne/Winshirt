@@ -1,3 +1,22 @@
+<?php
+$mockup_id = get_post_meta( get_queried_object_id(), WinShirt_Product_Customization::MOCKUP_META_KEY, true );
+$front = $back = '';
+$colors = [];
+$zones  = [];
+if ( $mockup_id ) {
+    $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
+    $back  = get_post_meta( $mockup_id, '_ws_mockup_back', true );
+    $color_string = get_post_meta( $mockup_id, '_ws_mockup_colors', true );
+    if ( $color_string ) {
+        $colors = array_filter( array_map( 'trim', explode( ',', $color_string ) ) );
+    }
+    $zones = get_post_meta( $mockup_id, '_ws_mockup_zones', true );
+    if ( ! is_array( $zones ) ) {
+        $zones = [];
+    }
+}
+$default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
+?>
 <div id="winshirt-customizer-modal" class="winshirt-modal-overlay" style="display:none;">
   <div class="winshirt-modal-content">
     <button class="winshirt-modal-close" id="winshirt-close-modal">&times;</button>
@@ -42,13 +61,23 @@
       <!-- Central Area -->
       <main class="central-area">
         <div class="view-controls">
-          <button class="view-btn active">Front</button>
-          <button class="view-btn">Back</button>
+          <button class="view-btn active" data-img="<?php echo esc_url( $front ); ?>">Front</button>
+          <?php if ( $back ) : ?>
+          <button class="view-btn" data-img="<?php echo esc_url( $back ); ?>">Back</button>
+          <?php endif; ?>
         </div>
 
+        <?php if ( ! empty( $colors ) ) : ?>
+        <div class="color-controls">
+          <?php foreach ( $colors as $color ) : ?>
+            <button class="color-btn" data-color="<?php echo esc_attr( $color ); ?>" style="background: <?php echo esc_attr( $color ); ?>;"></button>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
         <div class="tshirt-container">
-          <div class="tshirt">
-            <div class="design-area" id="design-area">
+          <div class="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
+            <div class="design-area" id="design-area" style="width:<?php echo esc_attr( $default_zone['width'] ); ?>px;height:<?php echo esc_attr( $default_zone['height'] ); ?>px;top:<?php echo esc_attr( $default_zone['top'] ); ?>px;left:<?php echo esc_attr( $default_zone['left'] ); ?>px;">
               <div class="layer" id="layer-design">Design Principal</div>
               <div class="layer" id="layer-text"></div>
               <div class="layer" id="layer-qr"></div>
@@ -57,11 +86,11 @@
         </div>
 
         <div class="size-controls">
-          <button class="size-btn">A4</button>
-          <button class="size-btn">A3</button>
-          <button class="size-btn">Cœur</button>
-          <button class="size-btn">Poche</button>
-          <button class="size-btn">Full</button>
+          <?php foreach ( $zones as $zone ) : ?>
+            <button class="size-btn" data-width="<?php echo esc_attr( $zone['width'] ); ?>" data-height="<?php echo esc_attr( $zone['height'] ); ?>" data-top="<?php echo esc_attr( $zone['top'] ); ?>" data-left="<?php echo esc_attr( $zone['left'] ); ?>" data-price="<?php echo esc_attr( $zone['price'] ); ?>">
+              <?php echo esc_html( $zone['name'] ); ?>
+            </button>
+          <?php endforeach; ?>
         </div>
       </main>
 
