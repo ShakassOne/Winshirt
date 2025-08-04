@@ -74,7 +74,7 @@ class WinShirt_Admin {
             __( 'Mockups', 'winshirt' ),
             __( 'Mockups', 'winshirt' ),
             'edit_posts',
-            'edit.php?post_type=ws-mockup'
+            'post-new.php?post_type=ws-mockup'
         );
 
         // Sous-menu Paramètres (Settings API)
