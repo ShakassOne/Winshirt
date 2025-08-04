@@ -77,6 +77,15 @@ class WinShirt_Admin {
             'edit.php?post_type=ws-mockup'
         );
 
+        // Sous-menu pour créer un nouveau mockup
+        add_submenu_page(
+            'winshirt',
+            __( 'Ajouter un mockup', 'winshirt' ),
+            __( 'Ajouter un mockup', 'winshirt' ),
+            'edit_posts',
+            'post-new.php?post_type=ws-mockup'
+        );
+
         // Sous-menu Paramètres (Settings API)
         add_submenu_page(
             'winshirt',
