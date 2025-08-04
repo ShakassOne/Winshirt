@@ -19,6 +19,10 @@ function autoload() {
     require_once WINSHIRT_PATH . 'includes/class-winshirt-product-customization.php';
     require_once WINSHIRT_PATH . 'includes/class-winshirt-settings.php';
     require_once WINSHIRT_PATH . 'includes/class-winshirt-lottery.php';
+    if (is_admin()) {
+        require_once WINSHIRT_PATH . 'includes/class-winshirt-admin.php';
+        new WinShirt_Admin();
+    }
 }
 
 function winshirt_plugin_row_meta($links, $file) {
