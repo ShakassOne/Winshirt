@@ -21,7 +21,9 @@ function autoload() {
     require_once WINSHIRT_PATH . 'includes/class-winshirt-lottery.php';
     if (is_admin()) {
         require_once WINSHIRT_PATH . 'includes/class-winshirt-admin.php';
-        new WinShirt_Admin();
+        add_action('plugins_loaded', function () {
+            new WinShirt_Admin();
+        });
     }
 }
 
