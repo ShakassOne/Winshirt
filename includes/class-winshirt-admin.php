@@ -29,25 +29,18 @@ class WinShirt_Admin {
             __('WinShirt', 'winshirt'),
             'manage_options',
             'winshirt',
-            array($this, 'settings_page'),
+            array($this, 'progress_page'),
             'dashicons-admin-generic'
         );
 
         add_submenu_page(
             'winshirt',
-            __('Avancement', 'winshirt'),
-            __('Avancement', 'winshirt'),
+            __('Paramètres', 'winshirt'),
+            __('Paramètres', 'winshirt'),
             'manage_options',
-            'winshirt-progress',
-            array($this, 'progress_page')
+            'winshirt-settings',
+            ['WinShirt_Settings', 'render_settings_page']
         );
-    }
-
-    public function settings_page() {
-        echo '<div class="wrap">';
-        echo '<h1>' . esc_html__('WinShirt Settings', 'winshirt') . '</h1>';
-        echo '<p>' . esc_html__('Admin interface coming soon...', 'winshirt') . '</p>';
-        echo '</div>';
     }
 
     public function progress_page() {
