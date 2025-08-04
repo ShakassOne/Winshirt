@@ -68,6 +68,15 @@ class WinShirt_Admin {
             'dashicons-admin-generic'
         );
 
+        // Sous-menu Mockups
+        add_submenu_page(
+            'winshirt',
+            __( 'Mockups', 'winshirt' ),
+            __( 'Mockups', 'winshirt' ),
+            'edit_posts',
+            'edit.php?post_type=ws-mockup'
+        );
+
         // Sous-menu Paramètres (Settings API)
         add_submenu_page(
             'winshirt',
