@@ -1,5 +1,18 @@
 <?php
-$mockup_id = get_post_meta( get_queried_object_id(), WinShirt_Product_Customization::MOCKUP_META_KEY, true );
+// templates/modal-customizer.php
+
+// Récupère de manière fiable l'ID du produit courant
+$product_id = get_queried_object_id();
+if ( ! $product_id ) {
+    global $product;
+    if ( $product instanceof WC_Product ) {
+        $product_id = $product->get_id();
+    }
+}
+
+// ID du mockup associé au produit
+$mockup_id = $product_id ? get_post_meta( $product_id, WinShirt_Product_Customization::MOCKUP_META_KEY, true ) : 0;
+
 $front = $back = '';
 $colors = [];
 $zones  = [];
