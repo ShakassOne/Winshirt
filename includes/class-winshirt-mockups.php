@@ -33,14 +33,16 @@ class WinShirt_Mockups {
             'labels'           => $labels,
             'public'           => false,
             'show_ui'          => true,
-            'show_in_menu'     => 'winshirt',
+            // L'édition des mockups est liée à un sous-menu personnalisé
+            // de WinShirt. On désactive donc l'ajout automatique dans le
+            // menu pour éviter les doublons.
+            'show_in_menu'     => false,
             'supports'         => [ 'title' ],
             'menu_position'    => 5,
-            'capability_type'  => 'ws_mockup',
-            'map_meta_cap'     => true,
-            'capabilities'     => [
-                'create_posts' => 'edit_posts',
-            ],
+            // Utilise les capacités standards des articles pour que les
+            // administrateurs puissent accéder aux pages sans droits
+            // supplémentaires.
+            'capability_type'  => 'post',
         ];
 
         register_post_type( 'ws-mockup', $args );
