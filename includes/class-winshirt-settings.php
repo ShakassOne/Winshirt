@@ -8,24 +8,12 @@ class WinShirt_Settings {
     const PAGE_SLUG  = 'winshirt-settings';
 
     public static function init() {
-        add_action( 'admin_menu',   [ __CLASS__, 'add_settings_page' ] );
-        add_action( 'admin_init',   [ __CLASS__, 'register_settings' ] );
+        // Register settings without adding a separate top-level menu. The menu
+        // entry is provided by \WinShirt_Admin.
+        add_action( 'admin_init', [ __CLASS__, 'register_settings' ] );
     }
 
-    // 1. Ajouter le menu et la page
-    public static function add_settings_page() {
-        add_menu_page(
-            __( 'WinShirt Settings', 'winshirt' ),    // page title
-            __( 'WinShirt', 'winshirt' ),             // menu title
-            'manage_options',                         // capability
-            self::PAGE_SLUG,                          // menu slug
-            [ __CLASS__, 'render_settings_page' ],    // callback
-            'dashicons-admin-generic',                // icon
-            60                                        // position
-        );
-    }
-
-    // 2. Enregistrer les réglages (Settings API)
+    // Enregistrer les réglages (Settings API)
     public static function register_settings() {
         register_setting(
             'winshirt_settings_group',                // option group
