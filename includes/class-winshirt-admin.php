@@ -29,17 +29,17 @@ class WinShirt_Admin {
             __('WinShirt', 'winshirt'),
             'manage_options',
             'winshirt',
-            array($this, 'settings_page'),
+            array($this, 'progress_page'),
             'dashicons-admin-generic'
         );
 
         add_submenu_page(
             'winshirt',
-            __('Avancement', 'winshirt'),
-            __('Avancement', 'winshirt'),
+            __('Paramètres', 'winshirt'),
+            __('Paramètres', 'winshirt'),
             'manage_options',
-            'winshirt-progress',
-            array($this, 'progress_page')
+            'winshirt-settings',
+            array($this, 'settings_page')
         );
     }
 
