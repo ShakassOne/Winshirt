@@ -83,80 +83,157 @@ class WinShirt_Mockups {
      */
     public function images_box( $post ) {
         wp_nonce_field( 'ws_mockup_save', 'ws_mockup_nonce' );
+        wp_enqueue_media();
         $front = get_post_meta( $post->ID, '_ws_mockup_front', true );
         $back  = get_post_meta( $post->ID, '_ws_mockup_back', true );
-        echo '<p><label>' . esc_html__( 'Image avant URL', 'winshirt' ) . '</label>';
-        echo '<input type="text" class="widefat" name="ws_mockup_front" value="' . esc_attr( $front ) . '"/></p>';
-        echo '<p><label>' . esc_html__( 'Image arrière URL', 'winshirt' ) . '</label>';
-        echo '<input type="text" class="widefat" name="ws_mockup_back" value="' . esc_attr( $back ) . '"/></p>';
+        echo '<p><label>' . esc_html__( 'Image avant', 'winshirt' ) . '</label><br />';
+        echo '<input type="text" class="widefat" id="ws_mockup_front" name="ws_mockup_front" value="' . esc_attr( $front ) . '"/>';
+        echo '<button class="button ws-upload-image" data-target="#ws_mockup_front">' . esc_html__( 'Téléverser', 'winshirt' ) . '</button></p>';
+        echo '<p><label>' . esc_html__( 'Image arrière', 'winshirt' ) . '</label><br />';
+        echo '<input type="text" class="widefat" id="ws_mockup_back" name="ws_mockup_back" value="' . esc_attr( $back ) . '"/>';
+        echo '<button class="button ws-upload-image" data-target="#ws_mockup_back">' . esc_html__( 'Téléverser', 'winshirt' ) . '</button></p>';
+        ?>
+        <script>
+        jQuery(function($){
+            $('.ws-upload-image').on('click', function(e){
+                e.preventDefault();
+                var target = $($(this).data('target'));
+                var frame = wp.media({
+                    title: '<?php echo esc_js( __( 'Sélectionner une image', 'winshirt' ) ); ?>',
+                    button: { text: '<?php echo esc_js( __( 'Utiliser cette image', 'winshirt' ) ); ?>' },
+                    multiple: false
+                });
+                frame.on('select', function(){
+                    var attachment = frame.state().get('selection').first().toJSON();
+                    target.val(attachment.url);
+                });
+                frame.open();
+            });
+        });
+        </script>
+        <?php
     }
 
     /**
      * Render meta box Colors
      */
     public function colors_box( $post ) {
-        $colors = get_post_meta( $post->ID, '_ws_mockup_colors', true );
+        wp_enqueue_media();
+        $colors       = get_post_meta( $post->ID, '_ws_mockup_colors', true );
+        $color_images = get_post_meta( $post->ID, '_ws_mockup_color_images', true );
         echo '<p><label>' . esc_html__( 'Couleurs (hex, séparées par des virgules)', 'winshirt' ) . '</label>';
         echo '<input type="text" class="widefat" name="ws_mockup_colors" value="' . esc_attr( $colors ) . '"/></p>';
+        echo '<p><label>' . esc_html__( 'Visuels de couleurs', 'winshirt' ) . '</label>';
+        echo '<input type="text" class="widefat" id="ws_mockup_color_images" name="ws_mockup_color_images" value="' . esc_attr( $color_images ) . '"/>';
+        echo '<button class="button ws-upload-colors" data-target="#ws_mockup_color_images">' . esc_html__( 'Téléverser', 'winshirt' ) . '</button></p>';
+        ?>
+        <script>
+        jQuery(function($){
+            $('.ws-upload-colors').on('click', function(e){
+                e.preventDefault();
+                var target = $($(this).data('target'));
+                var frame = wp.media({
+                    title: '<?php echo esc_js( __( 'Sélectionner des images', 'winshirt' ) ); ?>',
+                    button: { text: '<?php echo esc_js( __( 'Utiliser ces images', 'winshirt' ) ); ?>' },
+                    multiple: true
+                });
+                frame.on('select', function(){
+                    var urls = [];
+                    frame.state().get('selection').each(function(att){ urls.push(att.toJSON().url); });
+                    target.val(urls.join(','));
+                });
+                frame.open();
+            });
+        });
+        </script>
+        <?php
     }
 
     /**
      * Render meta box Zones d'impression
      */
     public function zones_box( $post ) {
+        wp_enqueue_script( 'jquery-ui-draggable' );
+        wp_enqueue_script( 'jquery-ui-resizable' );
+        $front = get_post_meta( $post->ID, '_ws_mockup_front', true );
         $zones = get_post_meta( $post->ID, '_ws_mockup_zones', true );
         if ( ! is_array( $zones ) ) {
             $zones = [];
         }
-        echo '<table class="widefat" id="ws-mockup-zones-table">';
-        echo '<thead><tr>' .
-             '<th>' . esc_html__( 'Nom', 'winshirt' ) . '</th>' .
-             '<th>' . esc_html__( 'Largeur', 'winshirt' ) . '</th>' .
-             '<th>' . esc_html__( 'Hauteur', 'winshirt' ) . '</th>' .
-             '<th>' . esc_html__( 'Top', 'winshirt' ) . '</th>' .
-             '<th>' . esc_html__( 'Left', 'winshirt' ) . '</th>' .
-             '<th>' . esc_html__( 'Prix', 'winshirt' ) . '</th>' .
-             '<th></th>' .
-             '</tr></thead><tbody>';
+        echo '<div id="ws-mockup-zone-wrapper">';
+        if ( $front ) {
+            echo '<img src="' . esc_url( $front ) . '" id="ws-mockup-base" />';
+        } else {
+            echo '<p>' . esc_html__( 'Veuillez définir une image avant pour le mockup.', 'winshirt' ) . '</p>';
+        }
         foreach ( $zones as $index => $zone ) {
             $name   = esc_attr( $zone['name']   ?? '' );
-            $width  = esc_attr( $zone['width']  ?? '' );
-            $height = esc_attr( $zone['height'] ?? '' );
-            $top    = esc_attr( $zone['top']    ?? '' );
-            $left   = esc_attr( $zone['left']   ?? '' );
-            $price  = esc_attr( $zone['price']  ?? '' );
-            echo '<tr>' .
-                 '<td><input type="text" name="ws_mockup_zones[' . $index . '][name]" value="' . $name . '" /></td>' .
-                 '<td><input type="number" step="0.01" name="ws_mockup_zones[' . $index . '][width]" value="' . $width . '" /></td>' .
-                 '<td><input type="number" step="0.01" name="ws_mockup_zones[' . $index . '][height]" value="' . $height . '" /></td>' .
-                 '<td><input type="number" step="0.01" name="ws_mockup_zones[' . $index . '][top]" value="' . $top . '" /></td>' .
-                 '<td><input type="number" step="0.01" name="ws_mockup_zones[' . $index . '][left]" value="' . $left . '" /></td>' .
-                 '<td><input type="number" step="0.01" name="ws_mockup_zones[' . $index . '][price]" value="' . $price . '" /></td>' .
-                 '<td><button class="button ws-remove-zone">' . esc_html__( 'Supprimer', 'winshirt' ) . '</button></td>' .
-                 '</tr>';
+            $width  = esc_attr( $zone['width']  ?? 100 );
+            $height = esc_attr( $zone['height'] ?? 100 );
+            $top    = esc_attr( $zone['top']    ?? 0 );
+            $left   = esc_attr( $zone['left']   ?? 0 );
+            $price  = esc_attr( $zone['price']  ?? 0 );
+            echo '<div class="ws-zone" data-index="' . esc_attr( $index ) . '" style="width:' . $width . 'px;height:' . $height . 'px;top:' . $top . 'px;left:' . $left . 'px;">';
+            echo '<span class="ws-zone-remove">&times;</span>';
+            echo '<span class="ws-zone-label">' . esc_html( $name ) . ' (' . esc_html( $price ) . ')</span>';
+            echo '<input type="hidden" name="ws_mockup_zones[' . $index . '][name]" value="' . $name . '" />';
+            echo '<input type="hidden" class="zone-width" name="ws_mockup_zones[' . $index . '][width]" value="' . $width . '" />';
+            echo '<input type="hidden" class="zone-height" name="ws_mockup_zones[' . $index . '][height]" value="' . $height . '" />';
+            echo '<input type="hidden" class="zone-top" name="ws_mockup_zones[' . $index . '][top]" value="' . $top . '" />';
+            echo '<input type="hidden" class="zone-left" name="ws_mockup_zones[' . $index . '][left]" value="' . $left . '" />';
+            echo '<input type="hidden" class="zone-price" name="ws_mockup_zones[' . $index . '][price]" value="' . $price . '" />';
+            echo '</div>';
         }
-        echo '</tbody></table>';
+        echo '</div>';
         echo '<p><button class="button" id="ws-add-zone">' . esc_html__( 'Ajouter une zone', 'winshirt' ) . '</button></p>';
         ?>
+        <style>
+        #ws-mockup-zone-wrapper{position:relative;display:inline-block;}
+        #ws-mockup-zone-wrapper img{max-width:100%;height:auto;display:block;}
+        .ws-zone{position:absolute;border:2px dashed #007cba;background:rgba(0,124,186,0.15);}
+        .ws-zone-label{position:absolute;bottom:-20px;left:0;background:rgba(0,0,0,0.6);color:#fff;padding:2px 4px;font-size:11px;}
+        .ws-zone-remove{position:absolute;top:-8px;right:-8px;background:#d63638;color:#fff;border-radius:50%;width:16px;height:16px;text-align:center;line-height:16px;font-size:12px;cursor:pointer;}
+        </style>
         <script>
         jQuery(function($){
+            var index = $('#ws-mockup-zone-wrapper .ws-zone').length;
+            function initZone(zone){
+                zone.draggable({ containment:'#ws-mockup-zone-wrapper', stop:updateInputs });
+                zone.resizable({ containment:'#ws-mockup-zone-wrapper', stop:updateInputs });
+            }
+            function updateInputs(){
+                var zone = $(this);
+                zone.find('.zone-width').val(zone.width());
+                zone.find('.zone-height').val(zone.height());
+                zone.find('.zone-top').val(zone.position().top);
+                zone.find('.zone-left').val(zone.position().left);
+            }
             $('#ws-add-zone').on('click', function(e){
                 e.preventDefault();
-                var rowCount = $('#ws-mockup-zones-table tbody tr').length;
-                var row = '<tr>' +
-                    '<td><input type="text" name="ws_mockup_zones['+rowCount+'][name]" /></td>' +
-                    '<td><input type="number" step="0.01" name="ws_mockup_zones['+rowCount+'][width]" /></td>' +
-                    '<td><input type="number" step="0.01" name="ws_mockup_zones['+rowCount+'][height]" /></td>' +
-                    '<td><input type="number" step="0.01" name="ws_mockup_zones['+rowCount+'][top]" /></td>' +
-                    '<td><input type="number" step="0.01" name="ws_mockup_zones['+rowCount+'][left]" /></td>' +
-                    '<td><input type="number" step="0.01" name="ws_mockup_zones['+rowCount+'][price]" /></td>' +
-                    '<td><button class="button ws-remove-zone"><?php echo esc_js( __( 'Supprimer', 'winshirt' ) ); ?></button></td>' +
-                    '</tr>';
-                $('#ws-mockup-zones-table tbody').append(row);
+                var name = prompt('<?php echo esc_js( __( 'Nom de la zone', 'winshirt' ) ); ?>');
+                if(!name){return;}
+                var price = prompt('<?php echo esc_js( __( 'Prix de la zone', 'winshirt' ) ); ?>','0');
+                if(price === null){return;}
+                var zone = $('<div class="ws-zone"><span class="ws-zone-remove">&times;</span><span class="ws-zone-label"></span></div>');
+                zone.attr('data-index', index);
+                zone.css({width:100,height:100,top:0,left:0});
+                zone.find('.ws-zone-label').text(name+' ('+price+')');
+                var inputs = '<input type="hidden" name="ws_mockup_zones['+index+'][name]" value="'+name+'" />'
+                    +'<input type="hidden" class="zone-width" name="ws_mockup_zones['+index+'][width]" value="100" />'
+                    +'<input type="hidden" class="zone-height" name="ws_mockup_zones['+index+'][height]" value="100" />'
+                    +'<input type="hidden" class="zone-top" name="ws_mockup_zones['+index+'][top]" value="0" />'
+                    +'<input type="hidden" class="zone-left" name="ws_mockup_zones['+index+'][left]" value="0" />'
+                    +'<input type="hidden" class="zone-price" name="ws_mockup_zones['+index+'][price]" value="'+price+'" />';
+                zone.append(inputs);
+                $('#ws-mockup-zone-wrapper').append(zone);
+                initZone(zone);
+                index++;
             });
-            $('#ws-mockup-zones-table').on('click', '.ws-remove-zone', function(e){
-                e.preventDefault();
-                $(this).closest('tr').remove();
+            $('#ws-mockup-zone-wrapper').on('click', '.ws-zone-remove', function(){
+                $(this).closest('.ws-zone').remove();
+            });
+            $('#ws-mockup-zone-wrapper .ws-zone').each(function(){
+                initZone($(this));
             });
         });
         </script>
@@ -181,6 +258,7 @@ class WinShirt_Mockups {
         update_post_meta( $post_id, '_ws_mockup_back',  sanitize_text_field( $_POST['ws_mockup_back']  ?? '' ) );
         // Couleurs
         update_post_meta( $post_id, '_ws_mockup_colors', sanitize_text_field( $_POST['ws_mockup_colors'] ?? '' ) );
+        update_post_meta( $post_id, '_ws_mockup_color_images', sanitize_text_field( $_POST['ws_mockup_color_images'] ?? '' ) );
         // Zones
         $zones = $_POST['ws_mockup_zones'] ?? [];
         $clean = [];
