@@ -6,22 +6,55 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WinShirt_Admin {
 
     /** Les étapes de la roadmap */
-    private $roadmap_steps = array(
-        'initialization' => 'Initialisation & structure de base',
-        'configuration'  => 'Configuration globale',
-        'customization'  => 'Personnalisation produit',
-        'modal'          => 'Modal de personnalisation (prestations frontend)',
-        'editor'         => 'Éditeur d’éléments',
-        'capture'        => 'Capture & sauvegarde',
-        'mockups'        => 'Mockups produits',
-        'visuals'        => 'Visuels clients',
-        'orders'         => 'Commandes DTF',
-        'tests'          => 'Tests & validation',
-        'documentation'  => 'Documentation & publication'
-    );
+    private $roadmap_steps = array();
 
     public function __construct() {
+        $this->roadmap_steps = $this->load_roadmap_steps();
         add_action( 'admin_menu', array( $this, 'add_menu' ) );
+    }
+
+    /**
+     * Charge toutes les étapes depuis le fichier roadmap.txt.
+     *
+     * @return array
+     */
+    private function load_roadmap_steps() {
+        $file = WINSHIRT_PATH . 'roadmap.txt';
+
+        if ( ! file_exists( $file ) ) {
+            return array();
+        }
+
+        $lines   = file( $file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
+        $steps   = array();
+        $section = '';
+        $started = false;
+
+        foreach ( $lines as $line ) {
+            $line = trim( $line );
+
+            if ( ! $started ) {
+                if ( stripos( $line, 'Roadmap détaillée' ) !== false ) {
+                    $started = true;
+                }
+                continue;
+            }
+
+            if ( preg_match( '/^\d+\.\s*(.+)$/', $line, $matches ) ) {
+                $section = $matches[1];
+                continue;
+            }
+
+            if ( '' === $line ) {
+                continue;
+            }
+
+            $label = $section ? $section . ' — ' . $line : $line;
+            $key   = 'step_' . md5( $label );
+            $steps[ $key ] = $label;
+        }
+
+        return $steps;
     }
 
     public function add_menu() {
