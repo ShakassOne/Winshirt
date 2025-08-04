@@ -5,6 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WinShirt_Product_Customization {
 
     const META_KEY = '_winshirt_personnalisable';
+    const MOCKUP_META_KEY = '_winshirt_mockup_id';
 
     public function __construct() {
         // Ajout de la méta-box produit
@@ -32,9 +33,24 @@ class WinShirt_Product_Customization {
     public function render_personalizable_metabox( $post ) {
         wp_nonce_field( 'winshirt_save_personalizable', 'winshirt_personnalisable_nonce' );
         $checked = get_post_meta( $post->ID, self::META_KEY, true ) === 'yes' ? 'checked' : '';
-        echo '<label><input type="checkbox" name="winshirt_personnalisable" value="yes" ' . $checked . '/> '
+        echo '<p><label><input type="checkbox" name="winshirt_personnalisable" value="yes" ' . $checked . '/> '
             . esc_html__( 'Produit personnalisable', 'winshirt' )
-            . '</label>';
+            . '</label></p>';
+
+        $mockups = get_posts( [
+            'post_type'      => 'ws-mockup',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+        ] );
+        $current_mockup = get_post_meta( $post->ID, self::MOCKUP_META_KEY, true );
+        echo '<p><label for="winshirt_mockup_id">' . esc_html__( 'Mockup associé', 'winshirt' ) . '</label>';
+        echo '<select name="winshirt_mockup_id" id="winshirt_mockup_id" class="widefat">';
+        echo '<option value="">' . esc_html__( 'Aucun', 'winshirt' ) . '</option>';
+        foreach ( $mockups as $m ) {
+            $selected = (int) $current_mockup === $m->ID ? 'selected' : '';
+            echo '<option value="' . esc_attr( $m->ID ) . '" ' . $selected . '>' . esc_html( $m->post_title ) . '</option>';
+        }
+        echo '</select></p>';
     }
 
     public function save_personalizable_meta( $post_id, $post ) {
@@ -49,6 +65,9 @@ class WinShirt_Product_Customization {
         }
         $value = ( isset( $_POST['winshirt_personnalisable'] ) && $_POST['winshirt_personnalisable'] === 'yes' ) ? 'yes' : 'no';
         update_post_meta( $post_id, self::META_KEY, $value );
+
+        $mockup_id = isset( $_POST['winshirt_mockup_id'] ) ? intval( $_POST['winshirt_mockup_id'] ) : 0;
+        update_post_meta( $post_id, self::MOCKUP_META_KEY, $mockup_id );
     }
 
     /** 2️⃣ Front-end : n’affiche le bouton QUE si le produit est personnalisable */

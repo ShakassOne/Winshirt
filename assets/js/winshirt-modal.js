@@ -38,10 +38,14 @@ jQuery(function($){
   });
 
   const viewBtns = document.querySelectorAll('.view-btn');
+  const tshirt = document.querySelector('.tshirt');
   viewBtns.forEach(btn => {
     btn.addEventListener('click', function(){
       viewBtns.forEach(b => b.classList.remove('active'));
       this.classList.add('active');
+      if (tshirt && this.dataset.img) {
+        tshirt.style.backgroundImage = `url('${this.dataset.img}')`;
+      }
     });
   });
 
@@ -78,6 +82,7 @@ jQuery(function($){
   const colorOptions = document.querySelectorAll('.color-option');
   const styleBtns = document.querySelectorAll('.style-btn');
   const addTextBtn = document.getElementById('add-text-btn');
+  const mockupColors = document.querySelectorAll('.color-btn');
 
   let currentTextStyle = {
     text: '',
@@ -119,6 +124,12 @@ jQuery(function($){
       this.classList.add('active');
       currentTextStyle.color = this.dataset.color;
       updateTextPreview();
+    });
+  });
+  mockupColors.forEach(btn => {
+    btn.addEventListener('click', function(){
+      mockupColors.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
     });
   });
 
@@ -351,28 +362,19 @@ jQuery(function($){
   // Size controls
   const designArea = document.querySelector('.design-area');
   const sizeBtns = document.querySelectorAll('.size-btn');
-  const sizes = {
-    'A4': { w: 550, h: 650 },
-    'A3': { w: 600, h: 750 },
-    'Cœur': { w: 300, h: 300, radius: '50%' },
-    'Poche': { w: 200, h: 200 },
-    'Full': { w: 650, h: 750 }
-  };
-
   sizeBtns.forEach(btn => {
     btn.addEventListener('click', function(){
       sizeBtns.forEach(b => b.classList.remove('active'));
       this.classList.add('active');
-      const label = this.textContent.trim();
-      const opt = sizes[label];
-      if (opt) {
-        designArea.style.width = opt.w + 'px';
-        designArea.style.height = opt.h + 'px';
-        designArea.style.borderRadius = opt.radius || '20px';
+      if (designArea) {
+        designArea.style.width = this.dataset.width + 'px';
+        designArea.style.height = this.dataset.height + 'px';
+        designArea.style.top = this.dataset.top + 'px';
+        designArea.style.left = this.dataset.left + 'px';
+        designArea.style.borderRadius = '20px';
       }
     });
   });
-
   const defaultSizeBtn = document.querySelector('.size-btn');
-  if (defaultSizeBtn) defaultSizeBtn.classList.add('active');
+  if (defaultSizeBtn) defaultSizeBtn.click();
 });
