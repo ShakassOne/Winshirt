@@ -199,4 +199,4 @@ class WinShirt_Mockups {
 }
 
 // Instanciation
-new WinShirt_Mockups
+new WinShirt_Mockups();
