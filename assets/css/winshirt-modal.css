@@ -169,6 +169,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: move;
+}
+
+.layer.selected {
+  outline: 2px dashed #007bff;
+}
+
+.layer .ui-resizable-handle,
+.layer .ui-rotatable-handle {
+  width: 12px;
+  height: 12px;
+  background: #007bff;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  display: none;
+}
+
+.layer .ui-rotatable-handle {
+  position: absolute;
+  top: -25px;
+  left: 50%;
+  margin-left: -6px;
+  cursor: pointer;
+}
+
+.layer.selected .ui-resizable-handle,
+.layer.selected .ui-rotatable-handle {
+  display: block;
 }
 
 .size-controls {

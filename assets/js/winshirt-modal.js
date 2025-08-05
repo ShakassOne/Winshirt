@@ -59,12 +59,37 @@ jQuery(function($){
 
   const designItems = document.querySelectorAll('.design-item');
   const baseLayer = document.getElementById('layer-design');
+
+  function initLayerInteractions($el){
+    if(!$el.length) return;
+    $el.draggable({ containment: '#design-area' })
+       .resizable({
+         handles: 'n,e,s,w,ne,se,sw,nw',
+         containment: '#design-area'
+       })
+       .rotatable();
+    $el.on('mousedown', function(e){
+      e.stopPropagation();
+      $('.layer').removeClass('selected');
+      $(this).addClass('selected');
+    });
+  }
+
+  initLayerInteractions($('#layer-design'));
+  initLayerInteractions($('#layer-text'));
+  initLayerInteractions($('#layer-qr'));
+
+  $('#design-area').on('mousedown', function(){
+    $('.layer').removeClass('selected');
+  });
+
   designItems.forEach(item => {
     item.addEventListener('click', function(){
       baseLayer.innerHTML = this.innerHTML;
       baseLayer.style.fontSize = '200px';
       baseLayer.style.color = '#333';
       baseLayer.style.display = 'flex';
+      $('#layer-design').trigger('mousedown');
     });
   });
 

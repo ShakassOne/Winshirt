@@ -113,9 +113,13 @@ class WinShirt_Product_Customization {
 
         // CSS minimal pour le modal
         wp_enqueue_style( 'winshirt-modal-css', plugins_url( 'assets/css/winshirt-modal.css', WINSHIRT_PATH . 'winshirt.php' ), [], WINSHIRT_VERSION );
+        wp_enqueue_style( 'jquery-ui-css', 'https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css', [], '1.13.2' );
 
         // JS pour ouvrir/fermer le modal
-        wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery' ], WINSHIRT_VERSION, true );
+        wp_enqueue_script( 'jquery-ui-draggable' );
+        wp_enqueue_script( 'jquery-ui-resizable' );
+        wp_enqueue_script( 'jquery-ui-rotatable', 'https://cdn.jsdelivr.net/npm/jquery-ui-rotatable@1.1.2/jquery.ui.rotatable.min.js', [ 'jquery-ui-draggable', 'jquery-ui-resizable' ], '1.1.2', true );
+        wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable', 'jquery-ui-rotatable' ], WINSHIRT_VERSION, true );
     }
 }
 
