@@ -6,11 +6,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WinShirt_Designs {
 
     public function __construct() {
-        add_action( 'init', [ $this, 'register_post_type' ] );
-        add_action( 'init', [ $this, 'register_taxonomy' ] );
+        add_action( 'init',              [ $this, 'register_post_type' ] );
+        add_action( 'init',              [ $this, 'register_taxonomy' ] );
         add_action( 'after_setup_theme', [ $this, 'ensure_thumbnails' ] );
     }
 
+    /**
+     * Enregistre le Custom Post Type ws-design (Visuels)
+     */
     public function register_post_type() {
         $labels = [
             'name'               => __( 'Visuels', 'winshirt' ),
@@ -30,19 +33,17 @@ class WinShirt_Designs {
             'labels'          => $labels,
             'public'          => false,
             'show_ui'         => true,
-            // Ajout automatique sous le menu WinShirt.
-            'show_in_menu'    => 'winshirt',
+            'show_in_menu'    => 'winshirt', // Place sous le menu principal WinShirt
             'supports'        => [ 'title', 'thumbnail' ],
             'capability_type' => 'post',
-            'map_meta_cap'    => true,
-            'capabilities'    => [
-                'create_posts' => 'edit_posts',
-            ],
         ];
 
         register_post_type( 'ws-design', $args );
     }
 
+    /**
+     * Enregistre la taxonomie ws-design-category (Catégories de visuels)
+     */
     public function register_taxonomy() {
         $labels = [
             'name'              => __( 'Catégories de visuels', 'winshirt' ),
@@ -68,9 +69,13 @@ class WinShirt_Designs {
         register_taxonomy( 'ws-design-category', [ 'ws-design' ], $args );
     }
 
+    /**
+     * Active le support des vignettes pour ce CPT
+     */
     public function ensure_thumbnails() {
         add_theme_support( 'post-thumbnails', [ 'ws-design' ] );
     }
 }
 
+// Instanciation
 new WinShirt_Designs();
