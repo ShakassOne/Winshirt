@@ -17,6 +17,7 @@ autoload();
 
 function autoload() {
     require_once WINSHIRT_PATH . 'includes/class-winshirt-mockups.php';
+    require_once WINSHIRT_PATH . 'includes/class-winshirt-designs.php';
     require_once WINSHIRT_PATH . 'includes/class-winshirt-product-customization.php';
     require_once WINSHIRT_PATH . 'includes/class-winshirt-settings.php';
     require_once WINSHIRT_PATH . 'includes/class-winshirt-lottery.php';
