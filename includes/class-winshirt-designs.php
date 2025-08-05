@@ -6,15 +6,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WinShirt_Designs {
 
     public function __construct() {
-        add_action( 'init',              [ $this, 'register_post_type' ] );
-        add_action( 'init',              [ $this, 'register_taxonomy' ] );
+        // Enregistre le CPT et la taxonomie lors de l'init
+        add_action( 'init', [ $this, 'register_post_type_and_taxonomy' ] );
+        // Ajoute le support des vignettes pour ce CPT
         add_action( 'after_setup_theme', [ $this, 'ensure_thumbnails' ] );
     }
 
     /**
-     * Enregistre le Custom Post Type ws-design (Visuels)
+     * Enregistre le CPT 'ws-design' (Visuels)
+     * et sa taxonomie 'ws-design-category'
      */
-    public function register_post_type() {
+    public function register_post_type_and_taxonomy() {
+        // --- CPT Visuels ---
         $labels = [
             'name'               => __( 'Visuels', 'winshirt' ),
             'singular_name'      => __( 'Visuel', 'winshirt' ),
@@ -30,22 +33,20 @@ class WinShirt_Designs {
         ];
 
         $args = [
-            'labels'          => $labels,
-            'public'          => false,
-            'show_ui'         => true,
-            'show_in_menu'    => 'winshirt', // Place sous le menu principal WinShirt
-            'supports'        => [ 'title', 'thumbnail' ],
-            'capability_type' => 'post',
+            'labels'             => $labels,
+            'public'             => false,
+            'show_ui'            => true,
+            // Place ce CPT sous le menu WinShirt principal
+            'show_in_menu'       => 'winshirt',
+            'supports'           => [ 'title', 'thumbnail' ],
+            'capability_type'    => 'post',
+            'map_meta_cap'       => true,
         ];
 
         register_post_type( 'ws-design', $args );
-    }
 
-    /**
-     * Enregistre la taxonomie ws-design-category (Catégories de visuels)
-     */
-    public function register_taxonomy() {
-        $labels = [
+        // --- Taxonomie Catégories de visuels ---
+        $tax_labels = [
             'name'              => __( 'Catégories de visuels', 'winshirt' ),
             'singular_name'     => __( 'Catégorie de visuel', 'winshirt' ),
             'search_items'      => __( 'Rechercher des catégories', 'winshirt' ),
@@ -57,16 +58,18 @@ class WinShirt_Designs {
             'menu_name'         => __( 'Catégories de visuels', 'winshirt' ),
         ];
 
-        $args = [
+        $tax_args = [
             'hierarchical'      => true,
-            'labels'            => $labels,
+            'labels'            => $tax_labels,
             'show_ui'           => true,
             'show_admin_column' => true,
             'query_var'         => true,
             'rewrite'           => [ 'slug' => 'ws-design-category' ],
+            // Ne pas créer de sous-menu séparé
+            'show_in_menu'      => false,
         ];
 
-        register_taxonomy( 'ws-design-category', [ 'ws-design' ], $args );
+        register_taxonomy( 'ws-design-category', [ 'ws-design' ], $tax_args );
     }
 
     /**
