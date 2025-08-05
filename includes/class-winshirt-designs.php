@@ -33,7 +33,7 @@ class WinShirt_Designs {
             'labels'          => $labels,
             'public'          => false,
             'show_ui'         => true,
-            'show_in_menu'    => 'winshirt',            // Place sous le menu WinShirt
+            'show_in_menu'    => 'winshirt', // Place sous le menu principal WinShirt
             'supports'        => [ 'title', 'thumbnail' ],
             'capability_type' => 'post',
         ];
