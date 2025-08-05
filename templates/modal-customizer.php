@@ -108,17 +108,25 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
       </main>
 
       <!-- Image Panel -->
+      <?php
+        $design_categories = get_terms([
+          'taxonomy'   => 'ws-design-category',
+          'hide_empty' => false,
+        ]);
+        $designs = get_posts([
+          'post_type'      => 'ws-design',
+          'numberposts'    => -1,
+          'post_status'    => 'publish',
+        ]);
+      ?>
       <aside class="right-sidebar" id="image-panel">
         <div class="sidebar-header">
           <h2 class="sidebar-title">Galerie de designs</h2>
           <div class="filter-tabs">
-            <div class="filter-tab active">Tous</div>
-            <div class="filter-tab">Animaux</div>
-            <div class="filter-tab">Nature</div>
-            <div class="filter-tab">Humour</div>
-            <div class="filter-tab">Abstrait</div>
-            <div class="filter-tab">Sport</div>
-            <div class="filter-tab">Vintage</div>
+            <div class="filter-tab active" data-term="all"><?php esc_html_e( 'Tous', 'winshirt' ); ?></div>
+            <?php foreach ( $design_categories as $cat ) : ?>
+              <div class="filter-tab" data-term="<?php echo esc_attr( $cat->slug ); ?>"><?php echo esc_html( $cat->name ); ?></div>
+            <?php endforeach; ?>
           </div>
         </div>
 
@@ -126,21 +134,19 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
           <button class="upload-btn">Upload your own design</button>
 
           <div class="design-grid">
-            <div class="design-item">🦁</div>
-            <div class="design-item">🌲</div>
-            <div class="design-item">😂</div>
-            <div class="design-item">🎨</div>
-            <div class="design-item">⚽</div>
-            <div class="design-item">🎸</div>
-            <div class="design-item">🌙</div>
-            <div class="design-item">🔥</div>
-            <div class="design-item">💎</div>
-            <div class="design-item">🚀</div>
-            <div class="design-item">🌊</div>
-            <div class="design-item">⭐</div>
-            <div class="design-item">🎯</div>
-            <div class="design-item">🌺</div>
-            <div class="design-item">🎭</div>
+            <?php foreach ( $designs as $design ) :
+              $thumb = get_the_post_thumbnail_url( $design->ID, 'thumbnail' );
+              $terms = get_the_terms( $design->ID, 'ws-design-category' );
+              $slugs = $terms ? wp_list_pluck( $terms, 'slug' ) : [];
+            ?>
+              <div class="design-item" data-terms="<?php echo esc_attr( implode( ' ', $slugs ) ); ?>" data-img="<?php echo esc_url( $thumb ); ?>">
+                <?php if ( $thumb ) : ?>
+                  <img src="<?php echo esc_url( $thumb ); ?>" alt="<?php echo esc_attr( get_the_title( $design ) ); ?>" />
+                <?php else : ?>
+                  <?php echo esc_html( get_the_title( $design ) ); ?>
+                <?php endif; ?>
+              </div>
+            <?php endforeach; ?>
           </div>
         </div>
       </aside>

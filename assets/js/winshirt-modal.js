@@ -50,15 +50,24 @@ jQuery(function($){
   });
 
   const filterTabs = document.querySelectorAll('.filter-tab');
+  const designItems = document.querySelectorAll('.design-item');
+  const baseLayer = document.getElementById('layer-design');
+
   filterTabs.forEach(tab => {
     tab.addEventListener('click', function(){
       filterTabs.forEach(t => t.classList.remove('active'));
       this.classList.add('active');
+      const term = this.dataset.term;
+      designItems.forEach(item => {
+        const terms = item.dataset.terms ? item.dataset.terms.split(' ') : [];
+        if (!term || term === 'all' || terms.includes(term)) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
     });
   });
-
-  const designItems = document.querySelectorAll('.design-item');
-  const baseLayer = document.getElementById('layer-design');
 
   function initLayerInteractions($el){
     if(!$el.length) return;
@@ -85,11 +94,12 @@ jQuery(function($){
 
   designItems.forEach(item => {
     item.addEventListener('click', function(){
-      baseLayer.innerHTML = this.innerHTML;
-      baseLayer.style.fontSize = '200px';
-      baseLayer.style.color = '#333';
-      baseLayer.style.display = 'flex';
-      $('#layer-design').trigger('mousedown');
+      const img = this.dataset.img;
+      if (img) {
+        baseLayer.innerHTML = `<img src="${img}" alt="" />`;
+        baseLayer.style.display = 'flex';
+        $('#layer-design').trigger('mousedown');
+      }
     });
   });
 
