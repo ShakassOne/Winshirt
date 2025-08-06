@@ -37,7 +37,8 @@ class WinShirt_Designs {
             'public'             => false,
             'show_ui'            => true,
             // Place ce CPT sous le menu WinShirt principal
-            'show_in_menu'       => 'winshirt',
+            // L'affichage du CPT dans le menu est géré manuellement
+            'show_in_menu'       => false,
             'supports'           => [ 'title', 'thumbnail' ],
             'capability_type'    => 'post',
             'map_meta_cap'       => true,
