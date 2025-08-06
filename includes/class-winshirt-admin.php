@@ -69,13 +69,38 @@ class WinShirt_Admin {
             'dashicons-admin-generic'
         );
 
-        // Sous-menu Mockups
+        // Sous-menus Mockups
         add_submenu_page(
             'winshirt',
-            __( 'Mockups', 'winshirt' ),
-            __( 'Mockups', 'winshirt' ),
+            __( 'Tous les mockups', 'winshirt' ),
+            __( 'Tous les mockups', 'winshirt' ),
+            'edit_posts',
+            'edit.php?post_type=ws-mockup'
+        );
+
+        add_submenu_page(
+            'winshirt',
+            __( 'Ajouter un mockup', 'winshirt' ),
+            __( 'Ajouter un mockup', 'winshirt' ),
             'edit_posts',
             'post-new.php?post_type=ws-mockup'
+        );
+
+        // Sous-menus Visuels
+        add_submenu_page(
+            'winshirt',
+            __( 'Visuels', 'winshirt' ),
+            __( 'Visuels', 'winshirt' ),
+            'edit_posts',
+            'edit.php?post_type=ws-design'
+        );
+
+        add_submenu_page(
+            'winshirt',
+            __( 'Ajouter un visuel', 'winshirt' ),
+            __( 'Ajouter un visuel', 'winshirt' ),
+            'edit_posts',
+            'post-new.php?post_type=ws-design'
         );
 
         // Sous-menu Paramètres (Settings API)
