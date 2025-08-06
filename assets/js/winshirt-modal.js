@@ -23,17 +23,54 @@ jQuery(function($){
   // Interactive functionality
   const toolIcons = document.querySelectorAll('.tool-icon');
   const panels = document.querySelectorAll('.right-sidebar');
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
+  let activePanel = null;
+
+  function openPanel(panel){
+    if (!panel) return;
+    if (isMobile) {
+      activePanel = panel;
+      panel.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    } else {
+      panels.forEach(p => p.style.display = 'none');
+      panel.style.display = 'flex';
+    }
+  }
+
+  function closeActivePanel(){
+    if (!isMobile) return;
+    if (activePanel){
+      activePanel.classList.remove('open');
+      document.body.style.overflow = '';
+      activePanel = null;
+    }
+  }
+
+  if (isMobile) {
+    panels.forEach(p => {
+      p.classList.add('mobile-panel');
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'panel-close';
+      closeBtn.innerHTML = '&times;';
+      closeBtn.addEventListener('click', closeActivePanel);
+      p.prepend(closeBtn);
+      let startY = 0;
+      p.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
+      p.addEventListener('touchend', e => {
+        const dy = e.changedTouches[0].clientY - startY;
+        if (dy > 50) closeActivePanel();
+      });
+    });
+  }
 
   toolIcons.forEach(icon => {
     icon.addEventListener('click', function(){
       toolIcons.forEach(i => i.classList.remove('active'));
       this.classList.add('active');
-      panels.forEach(p => p.style.display = 'none');
       const target = this.dataset.target;
-      if (target) {
-        const panel = document.querySelector(target);
-        if (panel) panel.style.display = 'flex';
-      }
+      const panel = target ? document.querySelector(target) : null;
+      openPanel(panel);
     });
   });
 
@@ -52,6 +89,7 @@ jQuery(function($){
   const filterTabs = document.querySelectorAll('.filter-tab');
   const designItems = document.querySelectorAll('.design-item');
   const designArea  = document.getElementById('design-area');
+  const designImg   = document.getElementById('design-item');
 
   filterTabs.forEach(tab => {
     tab.addEventListener('click', function(){
@@ -144,8 +182,10 @@ jQuery(function($){
     item.addEventListener('click', function(){
       const img = this.dataset.img;
       if (img) {
+        if (designImg) designImg.src = img;
         const evt = new CustomEvent('winshirt:load-design', { detail: { src: img } });
         document.dispatchEvent(evt);
+        if (isMobile) closeActivePanel();
       }
     });
   });
@@ -262,6 +302,7 @@ jQuery(function($){
         currentTextLayer = createLayer('Texte', '');
       }
       updateTextPreview();
+      if (isMobile) closeActivePanel();
     });
   }
 
@@ -402,6 +443,7 @@ jQuery(function($){
       } else {
         currentQrLayer.innerHTML = qrPreview.innerHTML;
       }
+      if (isMobile) closeActivePanel();
     });
   }
 
