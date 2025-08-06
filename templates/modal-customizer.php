@@ -19,6 +19,13 @@ $zones  = [];
 if ( $mockup_id ) {
     $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
     $back  = get_post_meta( $mockup_id, '_ws_mockup_back', true );
+    // Accepte un ID de pièce jointe ou une URL directe
+    if ( $front && ! filter_var( $front, FILTER_VALIDATE_URL ) ) {
+        $front = wp_get_attachment_url( $front );
+    }
+    if ( $back && ! filter_var( $back, FILTER_VALIDATE_URL ) ) {
+        $back = wp_get_attachment_url( $back );
+    }
     $color_string = get_post_meta( $mockup_id, '_ws_mockup_colors', true );
     if ( $color_string ) {
         $colors = array_filter( array_map( 'trim', explode( ',', $color_string ) ) );
@@ -90,11 +97,7 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
         <div class="tshirt-container">
           <div class="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div class="design-area" id="design-area" style="width:<?php echo esc_attr( $default_zone['width'] ); ?>px;height:<?php echo esc_attr( $default_zone['height'] ); ?>px;top:<?php echo esc_attr( $default_zone['top'] ); ?>px;left:<?php echo esc_attr( $default_zone['left'] ); ?>px;">
-              <div class="layer" id="layer-design">Design Principal</div>
-              <div class="layer" id="layer-text"></div>
-              <div class="layer" id="layer-qr"></div>
-            </div>
+            <div class="design-area" id="design-area" style="width:<?php echo esc_attr( $default_zone['width'] ); ?>px;height:<?php echo esc_attr( $default_zone['height'] ); ?>px;top:<?php echo esc_attr( $default_zone['top'] ); ?>px;left:<?php echo esc_attr( $default_zone['left'] ); ?>px;"></div>
           </div>
         </div>
 
@@ -272,32 +275,7 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
           <h2 class="sidebar-title">Calques</h2>
         </div>
         <div class="gallery-content">
-          <ul id="layers-list" style="list-style:none; padding:0; margin:0;">
-            <li class="layer-item" data-layer="layer-design">
-              <span class="layer-name">Design Principal</span>
-              <div class="layer-actions">
-                <button class="layer-vis">👁️</button>
-                <button class="layer-lock">🔒</button>
-                <button class="layer-del">🗑️</button>
-              </div>
-            </li>
-            <li class="layer-item" data-layer="layer-text">
-              <span class="layer-name">Texte</span>
-              <div class="layer-actions">
-                <button class="layer-vis">👁️</button>
-                <button class="layer-lock">🔒</button>
-                <button class="layer-del">🗑️</button>
-              </div>
-            </li>
-            <li class="layer-item" data-layer="layer-qr">
-              <span class="layer-name">QR Code</span>
-              <div class="layer-actions">
-                <button class="layer-vis">👁️</button>
-                <button class="layer-lock">🔒</button>
-                <button class="layer-del">🗑️</button>
-              </div>
-            </li>
-          </ul>
+          <ul id="layers-list" style="list-style:none; padding:0; margin:0;"></ul>
 
           <div class="text-option" style="margin-top:20px;">
             <label>Opacité :</label>
@@ -338,10 +316,7 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
               <option value="image">Image</option>
             </select>
           </div>
-          <div class="text-option" id="qr-input-wrapper">
-            <label>Données :</label>
-            <input type="text" id="qr-data" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-          </div>
+          <div class="text-option" id="qr-input-wrapper"></div>
           <div class="text-option">
             <label>Taille :</label>
             <input type="range" id="qr-size" min="100" max="400" value="200" style="width:100%; margin-bottom:10px;">
