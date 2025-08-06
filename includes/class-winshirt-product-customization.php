@@ -133,7 +133,8 @@ class WinShirt_Product_Customization {
         $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
 
         wp_localize_script( 'winshirt-design-area', 'winshirtDesign', [
-            'zone' => $default_zone,
+            'zone'  => $default_zone,
+            'zones' => array_values( $zones ),
         ] );
     }
 }
