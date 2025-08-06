@@ -225,6 +225,12 @@
   border-color: #007bff;
 }
 
+.size-btn.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
 .color-controls {
   display: flex;
   gap: 10px;
