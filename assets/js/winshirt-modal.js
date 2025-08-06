@@ -51,7 +51,7 @@ jQuery(function($){
 
   const filterTabs = document.querySelectorAll('.filter-tab');
   const designItems = document.querySelectorAll('.design-item');
-  const baseLayer = document.getElementById('layer-design');
+  const designArea  = document.getElementById('design-area');
 
   filterTabs.forEach(tab => {
     tab.addEventListener('click', function(){
@@ -69,6 +69,20 @@ jQuery(function($){
     });
   });
 
+  let activeLayerId = null;
+
+  function setActiveLayer(id){
+    activeLayerId = id;
+    document.querySelectorAll('.layer').forEach(l => l.classList.toggle('selected', l.id === id));
+    layerItems.forEach(li => li.classList.toggle('active', li.dataset.layer === id));
+    const layer = document.getElementById(id);
+    if (layer && layerOpacity) {
+      layerOpacity.value = Math.round((parseFloat(layer.style.opacity) || 1) * 100);
+    } else if(layerOpacity){
+      layerOpacity.value = 100;
+    }
+  }
+
   function initLayerInteractions($el){
     if(!$el.length) return;
     $el.draggable({ containment: '#design-area' })
@@ -79,29 +93,86 @@ jQuery(function($){
        .rotatable();
     $el.on('mousedown', function(e){
       e.stopPropagation();
-      $('.layer').removeClass('selected');
-      $(this).addClass('selected');
+      setActiveLayer(this.id);
     });
   }
 
-  initLayerInteractions($('#layer-design'));
-  initLayerInteractions($('#layer-text'));
-  initLayerInteractions($('#layer-qr'));
-
   $('#design-area').on('mousedown', function(){
-    $('.layer').removeClass('selected');
+    setActiveLayer(null);
   });
+
+  function addLayerItemListeners(li, layerDiv){
+    li.addEventListener('click', function(){ setActiveLayer(layerDiv.id); });
+    const visBtn = li.querySelector('.layer-vis');
+    const lockBtn = li.querySelector('.layer-lock');
+    const delBtn = li.querySelector('.layer-del');
+    if (visBtn) visBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.style.display = layerDiv.style.display === 'none' ? 'flex' : 'none'; });
+    if (lockBtn) lockBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.style.pointerEvents = layerDiv.style.pointerEvents === 'none' ? 'auto' : 'none'; });
+    if (delBtn) delBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.remove(); li.remove(); refreshLayerItems(); setActiveLayer(null); });
+  }
+
+  const layersList = document.getElementById('layers-list');
+  let layerItems = document.querySelectorAll('.layer-item');
+  const layerOpacity = document.getElementById('layer-opacity');
+  const posBtns = document.querySelectorAll('.pos-btn');
+  const newLayerBtn = document.getElementById('new-layer-btn');
+
+  function refreshLayerItems(){
+    layerItems = document.querySelectorAll('.layer-item');
+  }
+
+  function createLayer(name, content){
+    const id = 'layer-' + Date.now();
+    const layerDiv = document.createElement('div');
+    layerDiv.className = 'layer';
+    layerDiv.id = id;
+    layerDiv.innerHTML = content;
+    designArea.appendChild(layerDiv);
+    initLayerInteractions($(layerDiv));
+    const li = document.createElement('li');
+    li.className = 'layer-item';
+    li.dataset.layer = id;
+    li.innerHTML = `<span class="layer-name">${name}</span><div class="layer-actions"><button class="layer-vis">👁️</button><button class="layer-lock">🔒</button><button class="layer-del">🗑️</button></div>`;
+    layersList.appendChild(li);
+    addLayerItemListeners(li, layerDiv);
+    refreshLayerItems();
+    setActiveLayer(id);
+    return layerDiv;
+  }
 
   designItems.forEach(item => {
     item.addEventListener('click', function(){
       const img = this.dataset.img;
       if (img) {
-        baseLayer.innerHTML = `<img src="${img}" alt="" />`;
-        baseLayer.style.display = 'flex';
-        $('#layer-design').trigger('mousedown');
+        createLayer('Image', `<img src="${img}" alt="" />`);
       }
     });
   });
+
+  if (layerOpacity) {
+    layerOpacity.addEventListener('input', function(){
+      const layer = document.getElementById(activeLayerId);
+      if (layer) layer.style.opacity = this.value / 100;
+    });
+  }
+
+  posBtns.forEach(btn => {
+    btn.addEventListener('click', function(){
+      const layer = document.getElementById(activeLayerId);
+      if (!layer) return;
+      const pos = this.dataset.pos;
+      const v = pos.charAt(0);
+      const h = pos.charAt(1);
+      layer.style.alignItems = v === 't' ? 'flex-start' : v === 'c' ? 'center' : 'flex-end';
+      layer.style.justifyContent = h === 'l' ? 'flex-start' : h === 'c' ? 'center' : 'flex-end';
+    });
+  });
+
+  if (newLayerBtn) {
+    newLayerBtn.addEventListener('click', function(){
+      createLayer('Nouveau calque', '');
+    });
+  }
 
   const uploadBtn = document.querySelector('#image-panel .upload-btn');
   if (uploadBtn) {
@@ -129,20 +200,22 @@ jQuery(function($){
     underline: false
   };
 
+  let currentTextLayer = null;
+
   function updateTextPreview(){
-    const layer = document.getElementById('layer-text');
+    if (!currentTextLayer) return;
     const text = textInput.value || 'Exemple de texte';
     const fontWeight = currentTextStyle.bold ? 'bold' : 'normal';
     const fontStyle = currentTextStyle.italic ? 'italic' : 'normal';
     const textDecoration = currentTextStyle.underline ? 'underline' : 'none';
-    layer.innerHTML = text;
-    layer.style.fontSize = currentTextStyle.size + 'px';
-    layer.style.color = currentTextStyle.color;
-    layer.style.fontFamily = fontSelect.value;
-    layer.style.fontWeight = fontWeight;
-    layer.style.fontStyle = fontStyle;
-    layer.style.textDecoration = textDecoration;
-    layer.style.display = text ? 'flex' : 'none';
+    currentTextLayer.innerHTML = text;
+    currentTextLayer.style.fontSize = currentTextStyle.size + 'px';
+    currentTextLayer.style.color = currentTextStyle.color;
+    currentTextLayer.style.fontFamily = fontSelect.value;
+    currentTextLayer.style.fontWeight = fontWeight;
+    currentTextLayer.style.fontStyle = fontStyle;
+    currentTextLayer.style.textDecoration = textDecoration;
+    currentTextLayer.style.display = text ? 'flex' : 'none';
   }
 
   if (fontSize) {
@@ -184,6 +257,9 @@ jQuery(function($){
 
   if (addTextBtn) {
     addTextBtn.addEventListener('click', function(){
+      if (!currentTextLayer) {
+        currentTextLayer = createLayer('Texte', '');
+      }
       updateTextPreview();
     });
   }
@@ -238,86 +314,15 @@ jQuery(function($){
     });
   }
 
-  // Layers panel
-  const layersList = document.getElementById('layers-list');
-  let layerItems = document.querySelectorAll('.layer-item');
-  const layerOpacity = document.getElementById('layer-opacity');
-  const posBtns = document.querySelectorAll('.pos-btn');
-  const newLayerBtn = document.getElementById('new-layer-btn');
-  let activeLayerId = 'layer-design';
-
-  function setActiveLayer(id){
-    activeLayerId = id;
-    layerItems.forEach(li => li.classList.toggle('active', li.dataset.layer === id));
-    const layer = document.getElementById(id);
-    if (layer && layerOpacity) {
-      layerOpacity.value = Math.round((parseFloat(layer.style.opacity) || 1) * 100);
-    }
-  }
-
-  layerItems.forEach(li => {
-    li.addEventListener('click', function(){ setActiveLayer(this.dataset.layer); });
-    const layerId = li.dataset.layer;
-    const layer = document.getElementById(layerId);
-    const visBtn = li.querySelector('.layer-vis');
-    const lockBtn = li.querySelector('.layer-lock');
-    const delBtn = li.querySelector('.layer-del');
-    if (visBtn) visBtn.addEventListener('click', function(e){ e.stopPropagation(); layer.style.display = layer.style.display === 'none' ? 'flex' : 'none'; });
-    if (lockBtn) lockBtn.addEventListener('click', function(e){ e.stopPropagation(); layer.style.pointerEvents = layer.style.pointerEvents === 'none' ? 'auto' : 'none'; });
-    if (delBtn) delBtn.addEventListener('click', function(e){ e.stopPropagation(); layer.innerHTML = ''; layer.style.display = 'none'; });
-  });
-
-  if (layerOpacity) {
-    layerOpacity.addEventListener('input', function(){
-      const layer = document.getElementById(activeLayerId);
-      if (layer) layer.style.opacity = this.value / 100;
-    });
-  }
-
-  posBtns.forEach(btn => {
-    btn.addEventListener('click', function(){
-      const layer = document.getElementById(activeLayerId);
-      if (!layer) return;
-      const pos = this.dataset.pos;
-      const v = pos.charAt(0); // t,c,b
-      const h = pos.charAt(1); // l,c,r
-      layer.style.alignItems = v === 't' ? 'flex-start' : v === 'c' ? 'center' : 'flex-end';
-      layer.style.justifyContent = h === 'l' ? 'flex-start' : h === 'c' ? 'center' : 'flex-end';
-    });
-  });
-
-  if (newLayerBtn) {
-    newLayerBtn.addEventListener('click', function(){
-      const id = 'layer-custom-' + Date.now();
-      const layerDiv = document.createElement('div');
-      layerDiv.className = 'layer';
-      layerDiv.id = id;
-      document.getElementById('design-area').appendChild(layerDiv);
-      const li = document.createElement('li');
-      li.className = 'layer-item';
-      li.dataset.layer = id;
-      li.innerHTML = '<span class="layer-name">Nouveau calque</span><div class="layer-actions"><button class="layer-vis">👁️</button><button class="layer-lock">🔒</button><button class="layer-del">🗑️</button></div>';
-      layersList.appendChild(li);
-      layerItems = document.querySelectorAll('.layer-item');
-      li.addEventListener('click', function(){ setActiveLayer(id); });
-      const visBtn = li.querySelector('.layer-vis');
-      const lockBtn = li.querySelector('.layer-lock');
-      const delBtn = li.querySelector('.layer-del');
-      visBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.style.display = layerDiv.style.display === 'none' ? 'flex' : 'none'; });
-      lockBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.style.pointerEvents = layerDiv.style.pointerEvents === 'none' ? 'auto' : 'none'; });
-      delBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.remove(); li.remove(); });
-    });
-  }
-
-  setActiveLayer('layer-design');
-
   // QR Code panel
+  let qrDataInput;
   const qrType = document.getElementById('qr-type');
-  const qrDataInput = document.getElementById('qr-data');
   const qrSize = document.getElementById('qr-size');
   const qrColor = document.getElementById('qr-color');
   const qrPreview = document.getElementById('qr-preview');
   const applyQrBtn = document.getElementById('apply-qr-btn');
+  const qrInputWrapper = document.getElementById('qr-input-wrapper');
+  let currentQrLayer = null;
 
   function hexToRgb(hex){
     const bigint = parseInt(hex.slice(1), 16);
@@ -327,37 +332,77 @@ jQuery(function($){
     return r + '-' + g + '-' + b;
   }
 
+  function getQrData(){
+    if (!qrType) return '';
+    if (qrType.value === 'vcard') {
+      const name = document.getElementById('qr-name')?.value || '';
+      const phone = document.getElementById('qr-phone')?.value || '';
+      const mail = document.getElementById('qr-mail')?.value || '';
+      return `BEGIN:VCARD\nVERSION:3.0\nN:${name}\nTEL:${phone}\nEMAIL:${mail}\nEND:VCARD`;
+    }
+    return qrDataInput && qrDataInput.value ? qrDataInput.value : '';
+  }
+
   function updateQRPreview(){
     if (!qrPreview) return;
-    const data = qrDataInput.value || ' '; // avoid empty
     const size = qrSize.value;
+    if (qrType.value === 'image') {
+      const file = qrDataInput && qrDataInput.files ? qrDataInput.files[0] : null;
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          qrPreview.innerHTML = `<img src="${e.target.result}" width="${size}" height="${size}" />`;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        qrPreview.innerHTML = '';
+      }
+      return;
+    }
+    const data = getQrData() || ' ';
     const color = hexToRgb(qrColor.value);
     const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&color=${color}&data=${encodeURIComponent(data)}`;
     qrPreview.innerHTML = `<img src="${url}" width="${size}" height="${size}" />`;
   }
 
-  if (qrDataInput) qrDataInput.addEventListener('input', updateQRPreview);
+  function buildQrFields(){
+    if (!qrInputWrapper) return;
+    qrInputWrapper.innerHTML = '';
+    if (qrType.value === 'url') {
+      qrInputWrapper.innerHTML = '<label>URL :</label><input type="url" id="qr-data" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;" />';
+    } else if (qrType.value === 'text') {
+      qrInputWrapper.innerHTML = '<label>Texte :</label><textarea id="qr-data" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;"></textarea>';
+    } else if (qrType.value === 'vcard') {
+      qrInputWrapper.innerHTML = '<label>Nom :</label><input type="text" id="qr-name" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:10px;" /><label>Téléphone :</label><input type="tel" id="qr-phone" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:10px;" /><label>Email :</label><input type="email" id="qr-mail" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:10px;" />';
+    } else if (qrType.value === 'image') {
+      qrInputWrapper.innerHTML = '<label>Image :</label><input type="file" id="qr-data" accept="image/*" style="margin-bottom:15px;" />';
+    }
+    qrDataInput = document.getElementById('qr-data');
+    const inputs = qrInputWrapper.querySelectorAll('input,textarea');
+    inputs.forEach(inp => inp.addEventListener('input', updateQRPreview));
+    if (qrType.value === 'image' && qrDataInput) {
+      qrDataInput.addEventListener('change', updateQRPreview);
+    }
+    updateQRPreview();
+  }
+
+  if (qrType) {
+    qrType.addEventListener('change', buildQrFields);
+    buildQrFields();
+  }
+
   if (qrSize) qrSize.addEventListener('input', updateQRPreview);
   if (qrColor) qrColor.addEventListener('input', updateQRPreview);
-  if (qrType) {
-    qrType.addEventListener('change', function(){
-      if (qrType.value === 'image') {
-        qrDataInput.type = 'file';
-      } else {
-        qrDataInput.type = 'text';
-      }
-    });
-  }
 
   if (applyQrBtn) {
     applyQrBtn.addEventListener('click', function(){
-      const layer = document.getElementById('layer-qr');
-      layer.innerHTML = qrPreview.innerHTML;
-      layer.style.display = 'flex';
+      if (!currentQrLayer) {
+        currentQrLayer = createLayer('QR Code', qrPreview.innerHTML);
+      } else {
+        currentQrLayer.innerHTML = qrPreview.innerHTML;
+      }
     });
   }
-
-  updateQRPreview();
 
   // AI panel
   const aiDescription = document.getElementById('ai-description');
@@ -384,8 +429,7 @@ jQuery(function($){
             img.className = 'design-item';
             img.innerHTML = `<img src="https://via.placeholder.com/150?text=IA" alt="AI" />`;
             img.addEventListener('click', function(){
-              baseLayer.innerHTML = this.innerHTML;
-              baseLayer.style.display = 'flex';
+              createLayer('Image', this.innerHTML);
             });
             aiResults.appendChild(img);
           }
@@ -395,7 +439,6 @@ jQuery(function($){
   }
 
   // Size controls
-  const designArea = document.querySelector('.design-area');
   const sizeBtns = document.querySelectorAll('.size-btn');
   sizeBtns.forEach(btn => {
     btn.addEventListener('click', function(){
