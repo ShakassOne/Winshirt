@@ -97,9 +97,12 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
         <div class="tshirt-container">
           <div class="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div class="design-area" id="design-area" style="width:<?php echo esc_attr( $default_zone['width'] ); ?>px;height:<?php echo esc_attr( $default_zone['height'] ); ?>px;top:<?php echo esc_attr( $default_zone['top'] ); ?>px;left:<?php echo esc_attr( $default_zone['left'] ); ?>px;"></div>
+            <div class="design-area" id="design-area">
+              <img id="design-item" class="draggable-item" src="" alt="" />
+            </div>
           </div>
         </div>
+        <input type="hidden" id="design-coords" name="design_coords" value="" />
 
         <div class="size-controls">
           <?php foreach ( $zones as $zone ) : ?>

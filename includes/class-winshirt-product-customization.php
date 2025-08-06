@@ -120,6 +120,21 @@ class WinShirt_Product_Customization {
         wp_enqueue_script( 'jquery-ui-resizable' );
         wp_enqueue_script( 'jquery-ui-rotatable', 'https://cdn.jsdelivr.net/npm/jquery-ui-rotatable@1.1.2/jquery.ui.rotatable.min.js', [ 'jquery-ui-draggable', 'jquery-ui-resizable' ], '1.1.2', true );
         wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable', 'jquery-ui-rotatable' ], WINSHIRT_VERSION, true );
+
+        // Interact.js for draggable/resizable zone
+        wp_enqueue_script( 'interactjs', 'https://cdn.jsdelivr.net/npm/@interactjs/interactjs/index.min.js', [], '1.10.17', true );
+        wp_enqueue_script( 'winshirt-design-area', plugins_url( 'assets/js/design-area.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'interactjs' ], WINSHIRT_VERSION, true );
+
+        $mockup_id = get_post_meta( $product_id, self::MOCKUP_META_KEY, true );
+        $zones     = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_zones', true ) : [];
+        if ( ! is_array( $zones ) ) {
+            $zones = [];
+        }
+        $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
+
+        wp_localize_script( 'winshirt-design-area', 'winshirtDesign', [
+            'zone' => $default_zone,
+        ] );
     }
 }
 
