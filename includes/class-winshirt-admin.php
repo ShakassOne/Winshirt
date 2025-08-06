@@ -89,8 +89,8 @@ class WinShirt_Admin {
         // Sous-menus Visuels
         add_submenu_page(
             'winshirt',
-            __( 'Visuels', 'winshirt' ),
-            __( 'Visuels', 'winshirt' ),
+            __( 'Tous les visuels', 'winshirt' ),
+            __( 'Tous les visuels', 'winshirt' ),
             'edit_posts',
             'edit.php?post_type=ws-design'
         );
@@ -115,7 +115,6 @@ class WinShirt_Admin {
     }
 
     public function cleanup_menu() {
-        remove_submenu_page( 'winshirt', 'edit.php?post_type=ws-design' );
         remove_submenu_page( 'winshirt', 'edit-tags.php?taxonomy=ws-design-category&post_type=ws-design' );
     }
 
