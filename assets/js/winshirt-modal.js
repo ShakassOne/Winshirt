@@ -144,7 +144,8 @@ jQuery(function($){
     item.addEventListener('click', function(){
       const img = this.dataset.img;
       if (img) {
-        createLayer('Image', `<img src="${img}" alt="" />`);
+        const evt = new CustomEvent('winshirt:load-design', { detail: { src: img } });
+        document.dispatchEvent(evt);
       }
     });
   });
