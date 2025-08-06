@@ -11,6 +11,7 @@ class WinShirt_Admin {
     public function __construct() {
         $this->roadmap_steps = $this->load_roadmap_steps();
         add_action( 'admin_menu', array( $this, 'add_menu' ) );
+        add_action( 'admin_menu', array( $this, 'cleanup_menu' ), 99 );
     }
 
     /**
@@ -68,33 +69,6 @@ class WinShirt_Admin {
             'dashicons-admin-generic'
         );
 
-        // Sous-menu Visuels
-        add_submenu_page(
-            'winshirt',
-            __( 'Visuels', 'winshirt' ),
-            __( 'Visuels', 'winshirt' ),
-            'edit_posts',
-            'edit.php?post_type=ws-design'
-        );
-
-        // Sous-menu Ajouter un visuel
-        add_submenu_page(
-            'winshirt',
-            __( 'Ajouter un visuel', 'winshirt' ),
-            __( 'Ajouter un visuel', 'winshirt' ),
-            'edit_posts',
-            'post-new.php?post_type=ws-design'
-        );
-
-        // Sous-menu Catégories de visuels
-        add_submenu_page(
-            'winshirt',
-            __( 'Catégories de visuels', 'winshirt' ),
-            __( 'Catégories de visuels', 'winshirt' ),
-            'edit_posts',
-            'edit-tags.php?taxonomy=ws-design-category&post_type=ws-design'
-        );
-
         // Sous-menu Mockups
         add_submenu_page(
             'winshirt',
@@ -113,6 +87,11 @@ class WinShirt_Admin {
             'winshirt-settings',
             array( 'WinShirt_Settings', 'render_settings_page' )
         );
+    }
+
+    public function cleanup_menu() {
+        remove_submenu_page( 'winshirt', 'edit.php?post_type=ws-design' );
+        remove_submenu_page( 'winshirt', 'edit-tags.php?taxonomy=ws-design-category&post_type=ws-design' );
     }
 
     /**
