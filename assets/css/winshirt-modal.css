@@ -154,6 +154,11 @@
   color: #6c757d;
   font-size: 18px;
   background: rgba(248, 249, 250, 0.4);
+  margin-top: -50px;
+  width: 600px;
+  height: 600px;
+  top: 0;
+  left: 0;
 }
 
 .draggable-item {

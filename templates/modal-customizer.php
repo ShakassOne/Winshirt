@@ -136,7 +136,7 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
         </div>
 
         <div class="gallery-content">
-          <button class="upload-btn">Upload your own design</button>
+          <button class="upload-btn" id="upload-btn">Upload your own design</button>
 
           <div class="design-grid">
             <?php foreach ( $designs as $design ) :
