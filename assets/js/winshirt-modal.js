@@ -7,7 +7,9 @@ jQuery(function($){
     e.preventDefault();
     $modal.fadeIn(200);
     initVisuels();
-    addPrintingZoneButtons();
+    $('.layer').each(function(){
+      $(this).find('.resize, .move').remove();
+    });
     // TODO: ici lancer init de la librairie de personnalisation (canvas/SVG)
   });
 
@@ -117,7 +119,9 @@ jQuery(function($){
     $el.draggable({ containment: '#design-area' })
        .resizable({
          handles: 'n,e,s,w,ne,se,sw,nw',
-         containment: '#design-area'
+         containment: '#design-area',
+         minWidth: 50,
+         maxWidth: 500
        })
        .rotatable();
     $el.on('mousedown', function(e){
@@ -180,28 +184,6 @@ jQuery(function($){
     });
   }
 
-  // Ajouter un bouton pour ajuster la zone d'impression
-  function addPrintingZoneButtons() {
-    const designArea = document.querySelector('.design-area');
-    if (designArea) {
-      const buttons = ['resize', 'move'];
-      buttons.forEach(action => {
-        const button = document.createElement('button');
-        button.classList.add('printing-zone-btn', action);
-        button.textContent = action.charAt(0).toUpperCase() + action.slice(1);
-        designArea.appendChild(button);
-
-        button.addEventListener('click', function() {
-          if (action === 'resize') {
-            // Code pour redimensionner la zone
-          } else if (action === 'move') {
-            // Code pour déplacer la zone
-          }
-        });
-      });
-    }
-  }
-
   if (layerOpacity) {
     layerOpacity.addEventListener('input', function(){
       const layer = document.getElementById(activeLayerId);
@@ -227,10 +209,10 @@ jQuery(function($){
     });
   }
 
-  const uploadBtn = document.querySelector('#image-panel .upload-btn');
+  const uploadBtn = document.getElementById('upload-btn');
   if (uploadBtn) {
     uploadBtn.addEventListener('click', function(){
-      alert('Fonctionnalité d\'upload à implémenter');
+      alert('Fonctionnalité d\'upload en cours de développement');
     });
   }
 

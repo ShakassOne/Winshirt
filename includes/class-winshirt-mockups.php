@@ -157,12 +157,19 @@ class WinShirt_Mockups {
         wp_enqueue_script( 'jquery-ui-resizable' );
         $front = get_post_meta( $post->ID, '_ws_mockup_front', true );
         $zones = get_post_meta( $post->ID, '_ws_mockup_zones', true );
+        $tarif_a3 = get_post_meta( $post->ID, '_ws_tarif_a3', true );
+        $tarif_a4 = get_post_meta( $post->ID, '_ws_tarif_a4', true );
+        $tarif_a5 = get_post_meta( $post->ID, '_ws_tarif_a5', true );
+        $tarif_a6 = get_post_meta( $post->ID, '_ws_tarif_a6', true );
+        $tarif_a7 = get_post_meta( $post->ID, '_ws_tarif_a7', true );
         if ( ! is_array( $zones ) ) {
             $zones = [];
         }
         echo '<div id="ws-mockup-zone-wrapper">';
         if ( $front ) {
-            echo '<img src="' . esc_url( $front ) . '" id="ws-mockup-base" />';
+            echo '<img src="' . esc_url( $front ) . '" id="ws-mockup-base" style="width:300px;height:auto;" />';
+            echo '<div class="zone-recto" style="position: absolute; top: 10%; left: 10%; width: 50%; height: 30%; background-color: rgba(0,0,0,0.3);"><span>Zone Recto</span></div>';
+            echo '<div class="zone-verso" style="position: absolute; top: 50%; left: 10%; width: 50%; height: 30%; background-color: rgba(0,0,0,0.3);"><span>Zone Verso</span></div>';
         } else {
             echo '<p>' . esc_html__( 'Veuillez définir une image avant pour le mockup.', 'winshirt' ) . '</p>';
         }
@@ -186,6 +193,11 @@ class WinShirt_Mockups {
         }
         echo '</div>';
         echo '<p><button class="button" id="ws-add-zone">' . esc_html__( 'Ajouter une zone', 'winshirt' ) . '</button></p>';
+        echo '<p><label for="tarif_a3">Tarif A3 : </label><input type="number" name="tarif_a3" id="tarif_a3" value="' . esc_attr( $tarif_a3 ) . '" /></p>';
+        echo '<p><label for="tarif_a4">Tarif A4 : </label><input type="number" name="tarif_a4" id="tarif_a4" value="' . esc_attr( $tarif_a4 ) . '" /></p>';
+        echo '<p><label for="tarif_a5">Tarif A5 : </label><input type="number" name="tarif_a5" id="tarif_a5" value="' . esc_attr( $tarif_a5 ) . '" /></p>';
+        echo '<p><label for="tarif_a6">Tarif A6 : </label><input type="number" name="tarif_a6" id="tarif_a6" value="' . esc_attr( $tarif_a6 ) . '" /></p>';
+        echo '<p><label for="tarif_a7">Tarif A7 : </label><input type="number" name="tarif_a7" id="tarif_a7" value="' . esc_attr( $tarif_a7 ) . '" /></p>';
         ?>
         <style>
         #ws-mockup-zone-wrapper{position:relative;display:inline-block;}
@@ -275,6 +287,12 @@ class WinShirt_Mockups {
             }
         }
         update_post_meta( $post_id, '_ws_mockup_zones', $clean );
+        // Tarifs
+        update_post_meta( $post_id, '_ws_tarif_a3', floatval( $_POST['tarif_a3'] ?? 0 ) );
+        update_post_meta( $post_id, '_ws_tarif_a4', floatval( $_POST['tarif_a4'] ?? 0 ) );
+        update_post_meta( $post_id, '_ws_tarif_a5', floatval( $_POST['tarif_a5'] ?? 0 ) );
+        update_post_meta( $post_id, '_ws_tarif_a6', floatval( $_POST['tarif_a6'] ?? 0 ) );
+        update_post_meta( $post_id, '_ws_tarif_a7', floatval( $_POST['tarif_a7'] ?? 0 ) );
     }
 }
 
