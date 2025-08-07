@@ -97,9 +97,7 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
         <div class="tshirt-container">
           <div class="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div class="design-area" id="design-area">
-              <img id="design-item" class="draggable-item" src="" alt="" />
-            </div>
+            <div class="design-area" id="design-area"></div>
           </div>
           <?php if ( ! empty( $zones ) ) : ?>
           <div class="size-controls">
