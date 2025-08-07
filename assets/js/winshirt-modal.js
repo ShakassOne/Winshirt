@@ -481,21 +481,4 @@ jQuery(function($){
     });
   }
 
-  // Size controls
-  const sizeBtns = document.querySelectorAll('.size-btn');
-  sizeBtns.forEach(btn => {
-    btn.addEventListener('click', function(){
-      sizeBtns.forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      if (designArea) {
-        designArea.style.width = this.dataset.width + 'px';
-        designArea.style.height = this.dataset.height + 'px';
-        designArea.style.top = this.dataset.top + 'px';
-        designArea.style.left = this.dataset.left + 'px';
-        designArea.style.borderRadius = '20px';
-      }
-    });
-  });
-  const defaultSizeBtn = document.querySelector('.size-btn');
-  if (defaultSizeBtn) defaultSizeBtn.click();
 });

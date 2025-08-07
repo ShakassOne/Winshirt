@@ -101,18 +101,17 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
               <img id="design-item" class="draggable-item" src="" alt="" />
             </div>
           </div>
+          <?php if ( ! empty( $zones ) ) : ?>
+          <div class="size-controls">
+            <?php foreach ( $zones as $i => $zone ) : ?>
+              <button class="size-btn<?php echo $i === 0 ? ' active' : ''; ?>" data-width="<?php echo esc_attr( $zone['width'] ); ?>" data-height="<?php echo esc_attr( $zone['height'] ); ?>" data-top="<?php echo esc_attr( $zone['top'] ); ?>" data-left="<?php echo esc_attr( $zone['left'] ); ?>" data-price="<?php echo esc_attr( $zone['price'] ); ?>">
+                <?php echo esc_html( $zone['name'] ); ?>
+              </button>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
         </div>
         <input type="hidden" id="design-coords" name="design_coords" value="" />
-
-        <?php if ( ! empty( $zones ) ) : ?>
-        <div class="size-controls">
-          <?php foreach ( $zones as $i => $zone ) : ?>
-            <button class="size-btn<?php echo $i === 0 ? ' active' : ''; ?>" data-width="<?php echo esc_attr( $zone['width'] ); ?>" data-height="<?php echo esc_attr( $zone['height'] ); ?>" data-top="<?php echo esc_attr( $zone['top'] ); ?>" data-left="<?php echo esc_attr( $zone['left'] ); ?>" data-price="<?php echo esc_attr( $zone['price'] ); ?>">
-              <?php echo esc_html( $zone['name'] ); ?>
-            </button>
-          <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
       </main>
 
       <!-- Image Panel -->
