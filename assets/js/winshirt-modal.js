@@ -23,58 +23,47 @@ jQuery(function($){
   });
 
   // Interactive functionality
-  const toolIcons = document.querySelectorAll('.tool-icon');
-  const panels = document.querySelectorAll('.right-sidebar');
+  const $toolIcons = $('.tool-icon');
+  const $panels = $('.right-sidebar');
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
-  let activePanel = null;
 
-  function openPanel(panel) {
-    if (!panel) return;
-
-    if (window.matchMedia('(max-width: 768px)').matches) {
-      activePanel = panel;
-      panel.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    } else {
-      panels.forEach(p => p.style.display = 'none');
-      panel.style.display = 'flex';
-    }
-  }
-
-  function closeActivePanel(){
-    if (!isMobile) return;
-    if (activePanel){
-      activePanel.classList.remove('open');
-      document.body.style.overflow = '';
-      activePanel = null;
-    }
+  function closePanels(){
+    $('.mobile-panel').removeClass('open');
+    $('body').css('overflow', '');
   }
 
   if (isMobile) {
-    panels.forEach(p => {
-      p.classList.add('mobile-panel');
-      const closeBtn = document.createElement('button');
-      closeBtn.className = 'panel-close';
-      closeBtn.innerHTML = '&times;';
-      closeBtn.addEventListener('click', closeActivePanel);
-      p.prepend(closeBtn);
-      let startY = 0;
-      p.addEventListener('touchstart', e => { startY = e.touches[0].clientY; });
-      p.addEventListener('touchend', e => {
-        const dy = e.changedTouches[0].clientY - startY;
-        if (dy > 50) closeActivePanel();
-      });
+    $panels.addClass('mobile-panel').each(function(){
+      if(!$(this).find('.panel-close').length){
+        $(this).prepend('<button class="panel-close">&times;</button>');
+      }
     });
   }
 
-  toolIcons.forEach(icon => {
-    icon.addEventListener('click', function(){
-      toolIcons.forEach(i => i.classList.remove('active'));
-      this.classList.add('active');
-      const target = this.dataset.target;
-      const panel = document.querySelector(target);
-      openPanel(panel);
-    });
+  // Bouton clair pour fermer le volet latéral sur mobile
+  $('.panel-close').off('click').on('click', function(){
+    $(this).closest('.mobile-panel').removeClass('open');
+    $('body').css('overflow', '');
+  });
+
+  // Gestion de l'ouverture correcte des panneaux latéraux
+  $toolIcons.on('click', function(){
+    $toolIcons.removeClass('active');
+    $(this).addClass('active');
+    let targetPanel = $($(this).data('target'));
+    if(isMobile){
+      if(targetPanel.hasClass('open')){
+        targetPanel.removeClass('open');
+        $('body').css('overflow', '');
+      } else {
+        $('.mobile-panel').removeClass('open');
+        targetPanel.addClass('open');
+        $('body').css('overflow', 'hidden');
+      }
+    } else {
+      $panels.hide();
+      targetPanel.css('display','flex');
+    }
   });
 
   const viewBtns = document.querySelectorAll('.view-btn');
@@ -182,12 +171,12 @@ jQuery(function($){
 
   // Initialisation du visuel interactif
   function initVisuels() {
-    const visuels = document.querySelectorAll('.design-item');
-    visuels.forEach(visuel => {
-      visuel.addEventListener('click', function() {
-        createLayer('Visuel', visuel.innerHTML);
-        if (window.matchMedia('(max-width: 768px)').matches) closeActivePanel();
-      });
+    $('.design-item').off('click').on('click', function(){
+      const imgSrc = $(this).data('img');
+      const layer = createLayer('Visuel', `<img src="${imgSrc}" style="width:100%;height:auto;">`);
+      $(layer).css({ width: '40%', position: 'absolute', top: '30%', left: '30%' });
+      if (isMobile) closePanels();
+      setActiveLayer(layer.id);
     });
   }
 
@@ -325,7 +314,7 @@ jQuery(function($){
         currentTextLayer = createLayer('Texte', '');
       }
       updateTextPreview();
-      if (isMobile) closeActivePanel();
+      if (isMobile) closePanels();
     });
   }
 
@@ -466,7 +455,7 @@ jQuery(function($){
       } else {
         currentQrLayer.innerHTML = qrPreview.innerHTML;
       }
-      if (isMobile) closeActivePanel();
+      if (isMobile) closePanels();
     });
   }
 
