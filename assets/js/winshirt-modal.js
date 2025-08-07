@@ -6,6 +6,8 @@ jQuery(function($){
   $open.on('click', function(e){
     e.preventDefault();
     $modal.fadeIn(200);
+    initVisuels();
+    addPrintingZoneButtons();
     // TODO: ici lancer init de la librairie de personnalisation (canvas/SVG)
   });
 
@@ -26,9 +28,10 @@ jQuery(function($){
   const isMobile = window.matchMedia('(max-width: 768px)').matches;
   let activePanel = null;
 
-  function openPanel(panel){
+  function openPanel(panel) {
     if (!panel) return;
-    if (isMobile) {
+
+    if (window.matchMedia('(max-width: 768px)').matches) {
       activePanel = panel;
       panel.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -69,7 +72,7 @@ jQuery(function($){
       toolIcons.forEach(i => i.classList.remove('active'));
       this.classList.add('active');
       const target = this.dataset.target;
-      const panel = target ? document.querySelector(target) : null;
+      const panel = document.querySelector(target);
       openPanel(panel);
     });
   });
@@ -89,7 +92,6 @@ jQuery(function($){
   const filterTabs = document.querySelectorAll('.filter-tab');
   const designItems = document.querySelectorAll('.design-item');
   const designArea  = document.getElementById('design-area');
-  const designImg   = document.getElementById('design-item');
 
   filterTabs.forEach(tab => {
     tab.addEventListener('click', function(){
@@ -178,17 +180,38 @@ jQuery(function($){
     return layerDiv;
   }
 
-  designItems.forEach(item => {
-    item.addEventListener('click', function(){
-      const img = this.dataset.img;
-      if (img) {
-        if (designImg) designImg.src = img;
-        const evt = new CustomEvent('winshirt:load-design', { detail: { src: img } });
-        document.dispatchEvent(evt);
-        if (isMobile) closeActivePanel();
-      }
+  // Initialisation du visuel interactif
+  function initVisuels() {
+    const visuels = document.querySelectorAll('.design-item');
+    visuels.forEach(visuel => {
+      visuel.addEventListener('click', function() {
+        createLayer('Visuel', visuel.innerHTML);
+        if (window.matchMedia('(max-width: 768px)').matches) closeActivePanel();
+      });
     });
-  });
+  }
+
+  // Ajouter un bouton pour ajuster la zone d'impression
+  function addPrintingZoneButtons() {
+    const designArea = document.querySelector('.design-area');
+    if (designArea) {
+      const buttons = ['resize', 'move'];
+      buttons.forEach(action => {
+        const button = document.createElement('button');
+        button.classList.add('printing-zone-btn', action);
+        button.textContent = action.charAt(0).toUpperCase() + action.slice(1);
+        designArea.appendChild(button);
+
+        button.addEventListener('click', function() {
+          if (action === 'resize') {
+            // Code pour redimensionner la zone
+          } else if (action === 'move') {
+            // Code pour déplacer la zone
+          }
+        });
+      });
+    }
+  }
 
   if (layerOpacity) {
     layerOpacity.addEventListener('input', function(){
