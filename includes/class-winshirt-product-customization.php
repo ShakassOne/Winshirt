@@ -119,12 +119,12 @@ class WinShirt_Product_Customization {
         wp_enqueue_script( 'jquery-ui-draggable' );
         wp_enqueue_script( 'jquery-ui-resizable' );
         wp_enqueue_script( 'jquery-ui-rotatable', 'https://cdn.jsdelivr.net/npm/jquery-ui-rotatable@1.1.2/jquery.ui.rotatable.min.js', [ 'jquery-ui-draggable', 'jquery-ui-resizable' ], '1.1.2', true );
-        wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable', 'jquery-ui-rotatable' ], WINSHIRT_VERSION, true );
-        wp_enqueue_script( 'winshirt-printzones', plugins_url( 'assets/js/printzones.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'winshirt-modal-js' ], WINSHIRT_VERSION, true );
+        wp_enqueue_script( 'winshirt-modal', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable', 'jquery-ui-rotatable' ], WINSHIRT_VERSION, true );
+        wp_enqueue_script( 'winshirt-printzones', plugins_url( 'assets/js/printzones.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'winshirt-modal' ], WINSHIRT_VERSION, true );
 
         $mockup_id = get_post_meta( $product_id, self::MOCKUP_META_KEY, true );
-        $front = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_front_image', true ) : '';
-        $back  = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_back_image', true ) : '';
+        $front = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_front', true ) : '';
+        $back  = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_back', true ) : '';
         if ( ! $front && $mockup_id ) {
             $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
         }
@@ -137,17 +137,14 @@ class WinShirt_Product_Customization {
         if ( $back && ! filter_var( $back, FILTER_VALIDATE_URL ) ) {
             $back = wp_get_attachment_url( $back );
         }
-        $zones_meta = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_zones', true ) : [];
-        if ( empty( $zones_meta ) && $mockup_id ) {
-            $zones_meta = get_post_meta( $mockup_id, '_ws_mockup_zones', true );
-        }
+        $zones_meta = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_print_zones', true ) : [];
         if ( ! is_array( $zones_meta ) ) {
             $zones_meta = [];
         }
 
         if ( $mockup_id ) {
             wp_localize_script(
-                'winshirt-modal-js',
+                'winshirt-modal',
                 'WinShirtData',
                 [
                     'mockupId'   => (int) $mockup_id,
@@ -158,7 +155,7 @@ class WinShirt_Product_Customization {
                 ]
             );
         } else {
-            wp_add_inline_script( 'winshirt-modal-js', 'var WinShirtData = null;', 'before' );
+            wp_add_inline_script( 'winshirt-modal', 'var WinShirtData = null;', 'before' );
         }
     }
 }
