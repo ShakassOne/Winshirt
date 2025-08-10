@@ -1,113 +1,96 @@
 (function(){
-  const cfg = window.WINSHIRT_CONFIG || {};
+  const data = window.WinShirtMockup || {};
   const tshirt = document.getElementById('tshirt');
   const designArea = document.getElementById('design-area');
   const bar = document.getElementById('printzones-bar');
   const viewControls = document.getElementById('view-controls');
   if(!tshirt || !designArea || !bar || !viewControls){ return; }
 
-  let state = {
-    side: (sessionStorage.getItem('ws_side') || cfg.activeSide || 'front'),
-    zoneKey: sessionStorage.getItem('ws_zoneKey') || null
-  };
+  let currentSide = 'front';
+  const lastZoneByFace = {};
+  const natural = {};
 
-  function applySide(side){
-    const sideCfg = cfg.sides && cfg.sides[side];
-    if(!sideCfg){ console.warn('Side config missing:', side); return; }
-    state.side = side;
-    sessionStorage.setItem('ws_side', side);
+  function loadNatural(side){
+    return new Promise(resolve => {
+      if(natural[side]){ return resolve(natural[side]); }
+      const img = new Image();
+      img.onload = function(){
+        natural[side] = { w: img.naturalWidth, h: img.naturalHeight };
+        resolve(natural[side]);
+      };
+      img.src = data[side] && data[side].image ? data[side].image : '';
+    });
+  }
 
-    if(sideCfg.image){
-      tshirt.style.backgroundImage = `url('${sideCfg.image}')`;
+  function renderButtons(){
+    bar.innerHTML = '';
+    const zones = data[currentSide] && data[currentSide].zones ? data[currentSide].zones : {};
+    Object.keys(zones).forEach(key => {
+      const btn = document.createElement('button');
+      btn.className = 'printzones-btn';
+      btn.textContent = key.toUpperCase();
+      btn.dataset.key = key;
+      btn.addEventListener('click', () => applyZone(key));
+      bar.appendChild(btn);
+    });
+  }
+
+  function setActiveButton(key){
+    bar.querySelectorAll('.printzones-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.key === key);
+    });
+  }
+
+  async function applyZone(key){
+    const sideData = data[currentSide];
+    if(!sideData || !sideData.zones || !sideData.zones[key]){ return; }
+    const zone = sideData.zones[key];
+    const size = await loadNatural(currentSide);
+    if(!size.w || !size.h){ return; }
+    const disp = tshirt.getBoundingClientRect();
+    const scaleX = disp.width / size.w;
+    const scaleY = disp.height / size.h;
+    const x = zone.xr * size.w * scaleX;
+    const y = zone.yr * size.h * scaleY;
+    const w = zone.wr * size.w * scaleX;
+    const h = zone.hr * size.h * scaleY;
+
+    designArea.style.left = Math.round(x) + 'px';
+    designArea.style.top = Math.round(y) + 'px';
+    designArea.style.width = Math.round(w) + 'px';
+    designArea.style.height = Math.round(h) + 'px';
+
+    document.querySelectorAll('#design-area .layer').forEach(layer => {
+      const $l = jQuery(layer);
+      if($l.data('ui-draggable')){ $l.draggable('option','containment','#design-area'); }
+      if($l.data('ui-resizable')){ $l.resizable('option','containment','#design-area'); }
+    });
+
+    lastZoneByFace[currentSide] = key;
+    setActiveButton(key);
+  }
+
+  function switchSide(side){
+    currentSide = side;
+    const sideData = data[side] || {};
+    if(sideData.image){
+      tshirt.style.backgroundImage = `url('${sideData.image}')`;
     }
-
-    renderZoneButtons(sideCfg.zones || []);
-
-    const defaultZone = resolveDefaultZone(sideCfg.zones);
-    if(defaultZone){
-      applyZone(defaultZone);
-    } else {
-      designArea.style.width = '0px';
-      designArea.style.height = '0px';
-      designArea.style.left = '0px';
-      designArea.style.top = '0px';
-      bar.innerHTML += '<div class="printzones-empty">Aucune zone définie pour cette face.</div>';
-    }
-
+    renderButtons();
+    const key = lastZoneByFace[side] || Object.keys(sideData.zones || {})[0];
+    if(key){ applyZone(key); }
     viewControls.querySelectorAll('.view-btn').forEach(btn => {
       btn.setAttribute('aria-pressed', String(btn.dataset.side === side));
     });
   }
 
-  function resolveDefaultZone(zones){
-    if(!zones || !zones.length){ return null; }
-    if(state.zoneKey){
-      const z = zones.find(z => z.key === state.zoneKey);
-      if(z){ return z; }
-    }
-    return zones[0];
-  }
-
-  function renderZoneButtons(zones){
-    bar.innerHTML = '';
-    if(!zones.length){ return; }
-    zones.forEach(z => {
-      const btn = document.createElement('button');
-      btn.className = 'zone-btn';
-      btn.type = 'button';
-      btn.role = 'tab';
-      btn.dataset.key = z.key;
-      btn.textContent = z.label || z.key;
-      btn.setAttribute('aria-pressed','false');
-      btn.addEventListener('click', () => applyZone(z));
-      bar.appendChild(btn);
+  viewControls.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', function(){
+      const side = this.dataset.side;
+      if(side && side !== currentSide){ switchSide(side); }
     });
-    if(state.zoneKey){
-      const active = bar.querySelector(`.zone-btn[data-key="${state.zoneKey}"]`);
-      if(active){ setActiveZoneButton(active); }
-    }
-  }
-
-  function setActiveZoneButton(btn){
-    bar.querySelectorAll('.zone-btn').forEach(b => {
-      b.classList.remove('active');
-      b.setAttribute('aria-pressed','false');
-    });
-    btn.classList.add('active');
-    btn.setAttribute('aria-pressed','true');
-  }
-
-  function applyZone(zone){
-    if(!zone){ return; }
-    designArea.style.width = zone.w + 'px';
-    designArea.style.height = zone.h + 'px';
-    designArea.style.left = zone.x + 'px';
-    designArea.style.top = zone.y + 'px';
-
-    const btn = bar.querySelector(`.zone-btn[data-key="${zone.key}"]`);
-    if(btn){ setActiveZoneButton(btn); }
-
-    state.zoneKey = zone.key;
-    sessionStorage.setItem('ws_zoneKey', zone.key);
-
-    document.dispatchEvent(new CustomEvent('winshirt:zone-change', {
-      detail: { side: state.side, key: zone.key, box: { w: zone.w, h: zone.h, x: zone.x, y: zone.y } }
-    }));
-  }
-
-  viewControls.addEventListener('click', e => {
-    const btn = e.target.closest('.view-btn');
-    if(!btn){ return; }
-    const side = btn.dataset.side;
-    if(side && side !== state.side){
-      const zones = cfg.sides && cfg.sides[side] ? cfg.sides[side].zones || [] : [];
-      if(!zones.find(z => z.key === state.zoneKey)){
-        state.zoneKey = null;
-        sessionStorage.removeItem('ws_zoneKey');
-      }
-      applySide(side);
-    }
   });
 
-  applySide(state.side);
+  switchSide(currentSide);
 })();
+
