@@ -17,8 +17,14 @@ $front = $back = '';
 $colors = [];
 $zones  = [];
 if ( $mockup_id ) {
-    $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
-    $back  = get_post_meta( $mockup_id, '_ws_mockup_back', true );
+    $front = get_post_meta( $mockup_id, '_winshirt_mockup_front_image', true );
+    $back  = get_post_meta( $mockup_id, '_winshirt_mockup_back_image', true );
+    if ( ! $front ) {
+        $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
+    }
+    if ( ! $back ) {
+        $back = get_post_meta( $mockup_id, '_ws_mockup_back', true );
+    }
     // Accepte un ID de pièce jointe ou une URL directe
     if ( $front && ! filter_var( $front, FILTER_VALIDATE_URL ) ) {
         $front = wp_get_attachment_url( $front );
@@ -30,7 +36,10 @@ if ( $mockup_id ) {
     if ( $color_string ) {
         $colors = array_filter( array_map( 'trim', explode( ',', $color_string ) ) );
     }
-    $zones = get_post_meta( $mockup_id, '_ws_mockup_zones', true );
+    $zones = get_post_meta( $mockup_id, '_winshirt_mockup_zones', true );
+    if ( empty( $zones ) ) {
+        $zones = get_post_meta( $mockup_id, '_ws_mockup_zones', true );
+    }
     if ( ! is_array( $zones ) ) {
         $zones = [];
     }
@@ -90,7 +99,7 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
         <div class="tshirt-container">
           <div class="tshirt" id="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div id="design-area" class="design-area"><img src="" alt="" class="draggable-item" /></div>
+            <div id="design-area" class="design-area"></div>
           </div>
         </div>
 
@@ -131,10 +140,11 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
           <div class="design-grid">
             <?php foreach ( $designs as $design ) :
               $thumb = get_the_post_thumbnail_url( $design->ID, 'thumbnail' );
+              $full  = get_the_post_thumbnail_url( $design->ID, 'full' );
               $terms = get_the_terms( $design->ID, 'ws-design-category' );
               $slugs = $terms ? wp_list_pluck( $terms, 'slug' ) : [];
             ?>
-              <div class="design-item" data-terms="<?php echo esc_attr( implode( ' ', $slugs ) ); ?>" data-img="<?php echo esc_url( $thumb ); ?>">
+              <div class="design-item" data-terms="<?php echo esc_attr( implode( ' ', $slugs ) ); ?>" data-full="<?php echo esc_url( $full ); ?>" data-thumb="<?php echo esc_url( $thumb ); ?>">
                 <?php if ( $thumb ) : ?>
                   <img src="<?php echo esc_url( $thumb ); ?>" alt="<?php echo esc_attr( get_the_title( $design ) ); ?>" />
                 <?php else : ?>
