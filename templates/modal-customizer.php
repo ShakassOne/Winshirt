@@ -80,11 +80,9 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
       <!-- Central Area -->
       <main class="central-area">
-        <div class="view-controls">
-          <button class="view-btn active" data-img="<?php echo esc_url( $front ); ?>">Front</button>
-          <?php if ( $back ) : ?>
-          <button class="view-btn" data-img="<?php echo esc_url( $back ); ?>">Back</button>
-          <?php endif; ?>
+        <div class="view-controls" id="view-controls">
+          <button class="view-btn" data-side="front" aria-pressed="true">Recto</button>
+          <button class="view-btn" data-side="back" aria-pressed="false">Verso</button>
         </div>
 
         <?php if ( ! empty( $colors ) ) : ?>
@@ -96,19 +94,12 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
         <?php endif; ?>
 
         <div class="tshirt-container">
-          <div class="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div class="design-area" id="design-area"></div>
+          <div class="tshirt" id="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
+            <div id="design-area" class="design-area">Zone de design</div>
           </div>
-          <?php if ( ! empty( $zones ) ) : ?>
-          <div class="size-controls">
-            <?php foreach ( $zones as $i => $zone ) : ?>
-              <button class="size-btn<?php echo $i === 0 ? ' active' : ''; ?>" data-width="<?php echo esc_attr( $zone['width'] ); ?>" data-height="<?php echo esc_attr( $zone['height'] ); ?>" data-top="<?php echo esc_attr( $zone['top'] ); ?>" data-left="<?php echo esc_attr( $zone['left'] ); ?>" data-price="<?php echo esc_attr( $zone['price'] ); ?>">
-                <?php echo esc_html( $zone['name'] ); ?>
-              </button>
-            <?php endforeach; ?>
-          </div>
-          <?php endif; ?>
         </div>
+
+        <div class="printzones-bar" id="printzones-bar" aria-label="Zones d'impression" role="tablist"></div>
         <input type="hidden" id="design-coords" name="design_coords" value="" />
       </main>
 

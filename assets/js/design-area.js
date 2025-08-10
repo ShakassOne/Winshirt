@@ -1,35 +1,22 @@
 (function(){
-  // Ensure interact.js and localized data are available
-  let zone = window.winshirtDesign ? window.winshirtDesign.zone : null;
   const designArea = document.getElementById('design-area');
-  if(!designArea || !zone){ return; }
+  if(!designArea){ return; }
+  let zone = null;
 
-  // apply zone dimensions
   function applyZone(z){
     zone = z;
-    designArea.style.width  = z.width + 'px';
-    designArea.style.height = z.height + 'px';
-    designArea.style.top    = z.top + 'px';
-    designArea.style.left   = z.left + 'px';
+    if(!zone){ return; }
+    designArea.style.width = zone.w + 'px';
+    designArea.style.height = zone.h + 'px';
+    designArea.style.top = zone.y + 'px';
+    designArea.style.left = zone.x + 'px';
     initResizable();
+    fitItem();
   }
-  applyZone(zone);
 
-  // listen to size buttons to change zone
-  const sizeButtons = document.querySelectorAll('.size-btn');
-  sizeButtons.forEach(btn => {
-    btn.addEventListener('click', function(){
-      sizeButtons.forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      const newZone = {
-        width: parseInt(this.dataset.width,10),
-        height: parseInt(this.dataset.height,10),
-        top: parseInt(this.dataset.top,10),
-        left: parseInt(this.dataset.left,10)
-      };
-      applyZone(newZone);
-      fitItem();
-    });
+  document.addEventListener('winshirt:zone-change', function(e){
+    const box = e.detail && e.detail.box;
+    if(box){ applyZone(box); }
   });
 
   const item = designArea.querySelector('.draggable-item');
@@ -40,31 +27,27 @@
     if(dataInput){ dataInput.value = JSON.stringify(coords); }
   }
 
-  // fit image to zone
   function fitItem(){
-    if(!item || !item.naturalWidth){ return; }
-    const areaRatio = zone.width / zone.height;
+    if(!item || !zone || !item.naturalWidth){ return; }
+    const areaRatio = zone.w / zone.h;
     const imgRatio  = item.naturalWidth / item.naturalHeight;
     if(imgRatio > areaRatio){
-      item.style.width  = '100%';
+      item.style.width = '100%';
       item.style.height = 'auto';
     } else {
-      item.style.width  = 'auto';
+      item.style.width = 'auto';
       item.style.height = '100%';
     }
     coords.w = item.offsetWidth;
     coords.h = item.offsetHeight;
-    coords.x = (zone.width - coords.w) / 2;
-    coords.y = (zone.height - coords.h) / 2;
+    coords.x = (zone.w - coords.w) / 2;
+    coords.y = (zone.h - coords.h) / 2;
     item.style.transform = `translate(${coords.x}px, ${coords.y}px)`;
     updateData();
   }
 
-  if(item){
-    item.addEventListener('load', fitItem);
-  }
+  if(item){ item.addEventListener('load', fitItem); }
 
-  // drag & resize with interact.js
   interact(item).draggable({
     modifiers: [
       interact.modifiers.restrictRect({ restriction: designArea, endOnly: true })
@@ -80,14 +63,14 @@
   });
 
   function initResizable(){
-    if(!item) return;
+    if(!item || !zone){ return; }
     interact(item).resizable({
-      edges: { left: true, right: true, bottom: true, top: true },
+      edges: { left:true, right:true, bottom:true, top:true },
       modifiers: [
         interact.modifiers.restrictEdges({ outer: designArea }),
         interact.modifiers.restrictSize({
-          min: { width: 20, height: 20 },
-          max: { width: zone.width, height: zone.height }
+          min: { width:20, height:20 },
+          max: { width: zone.w, height: zone.h }
         })
       ],
       listeners: {
@@ -107,9 +90,6 @@
     });
   }
 
-  initResizable();
-
-  // listen for external design load
   document.addEventListener('winshirt:load-design', function(e){
     if(!item) return;
     item.src = e.detail.src;
