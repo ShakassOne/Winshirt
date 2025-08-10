@@ -177,10 +177,8 @@ jQuery(function($){
   function initVisuels() {
     $('.design-item').off('click').on('click', function(){
       const imgSrc = $(this).data('img');
-      const layer = createLayer('Visuel', `<img src="${imgSrc}" style="width:100%;height:auto;">`);
-      $(layer).css({ width: '40%', position: 'absolute', top: '30%', left: '30%' });
+      document.dispatchEvent(new CustomEvent('winshirt:load-design', { detail: { src: imgSrc } }));
       if (isMobile) closePanels();
-      setActiveLayer(layer.id);
     });
   }
 

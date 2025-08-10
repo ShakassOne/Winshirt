@@ -135,11 +135,20 @@ class WinShirt_Product_Customization {
         if ( $back && ! filter_var( $back, FILTER_VALIDATE_URL ) ) {
             $back = wp_get_attachment_url( $back );
         }
-        $zones = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_zones', true ) : [];
-        if ( ! is_array( $zones ) ) {
-            $zones = [];
+        $zones_meta = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_zones', true ) : [];
+        if ( ! is_array( $zones_meta ) ) {
+            $zones_meta = [];
         }
-        $zones_front = array_map( function( $z ) {
+
+        if ( isset( $zones_meta['front'] ) || isset( $zones_meta['back'] ) ) {
+            $zones_front_raw = $zones_meta['front'] ?? [];
+            $zones_back_raw  = $zones_meta['back']  ?? [];
+        } else {
+            $zones_front_raw = $zones_meta;
+            $zones_back_raw  = [];
+        }
+
+        $format_zone = function( $z ) {
             return [
                 'key'   => $z['name'] ?? '',
                 'label' => $z['name'] ?? '',
@@ -148,14 +157,17 @@ class WinShirt_Product_Customization {
                 'x'     => isset( $z['left'] ) ? intval( $z['left'] ) : 0,
                 'y'     => isset( $z['top'] ) ? intval( $z['top'] ) : 0,
             ];
-        }, $zones );
+        };
+
+        $zones_front = array_map( $format_zone, $zones_front_raw );
+        $zones_back  = array_map( $format_zone, $zones_back_raw );
 
         $config = [
             'mockupId'   => (int) $mockup_id,
             'activeSide' => 'front',
             'sides'      => [
                 'front' => [ 'image' => $front, 'zones' => $zones_front ],
-                'back'  => [ 'image' => $back,  'zones' => [] ],
+                'back'  => [ 'image' => $back,  'zones' => $zones_back ],
             ],
         ];
 

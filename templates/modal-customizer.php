@@ -80,11 +80,6 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
       <!-- Central Area -->
       <main class="central-area">
-        <div class="view-controls" id="view-controls">
-          <button class="view-btn" data-side="front" aria-pressed="true">Recto</button>
-          <button class="view-btn" data-side="back" aria-pressed="false">Verso</button>
-        </div>
-
         <?php if ( ! empty( $colors ) ) : ?>
         <div class="color-controls">
           <?php foreach ( $colors as $color ) : ?>
@@ -95,11 +90,15 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
 
         <div class="tshirt-container">
           <div class="tshirt" id="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div id="design-area" class="design-area">Zone de design</div>
+            <div id="design-area" class="design-area"><img src="" alt="" class="draggable-item" /></div>
           </div>
         </div>
 
         <div class="printzones-bar" id="printzones-bar" aria-label="Zones d'impression" role="tablist"></div>
+        <div class="view-controls" id="view-controls">
+          <button class="view-btn" data-side="front" aria-pressed="true">Recto</button>
+          <button class="view-btn" data-side="back" aria-pressed="false">Verso</button>
+        </div>
         <input type="hidden" id="design-coords" name="design_coords" value="" />
       </main>
 
