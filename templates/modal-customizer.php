@@ -17,8 +17,8 @@ $front = $back = '';
 $colors = [];
 $zones  = [];
 if ( $mockup_id ) {
-    $front = get_post_meta( $mockup_id, '_winshirt_mockup_front_image', true );
-    $back  = get_post_meta( $mockup_id, '_winshirt_mockup_back_image', true );
+    $front = get_post_meta( $mockup_id, '_winshirt_mockup_front', true );
+    $back  = get_post_meta( $mockup_id, '_winshirt_mockup_back', true );
     if ( ! $front ) {
         $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
     }
@@ -36,15 +36,12 @@ if ( $mockup_id ) {
     if ( $color_string ) {
         $colors = array_filter( array_map( 'trim', explode( ',', $color_string ) ) );
     }
-    $zones = get_post_meta( $mockup_id, '_winshirt_mockup_zones', true );
-    if ( empty( $zones ) ) {
-        $zones = get_post_meta( $mockup_id, '_ws_mockup_zones', true );
-    }
+    $zones = get_post_meta( $mockup_id, '_winshirt_print_zones', true );
     if ( ! is_array( $zones ) ) {
-        $zones = [];
+        $zones = [ 'front' => [], 'back' => [] ];
     }
 }
-$default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
+$default_zone = $zones['front'][0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
 ?>
 <div id="winshirt-customizer-modal" class="winshirt-modal-overlay" style="display:none;">
   <div class="winshirt-modal-content">
