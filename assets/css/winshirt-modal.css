@@ -128,8 +128,8 @@
 }
 
 .tshirt {
-  width: 560px;
-  max-width: 560px;
+  width: 860px;
+  max-width: 860px;
   height: auto;
   aspect-ratio: var(--ratio, 0.75);
   background-repeat: no-repeat;
