@@ -7,9 +7,8 @@ jQuery(function($){
     e.preventDefault();
     $modal.fadeIn(200);
     initVisuels();
-    $('.layer').each(function(){
-      $(this).find('.resize, .move').remove();
-    });
+    setSide('front');
+    requestAnimationFrame(()=>requestAnimationFrame(computePrintZone));
     // TODO: ici lancer init de la librairie de personnalisation (canvas/SVG)
   });
 
@@ -71,6 +70,47 @@ jQuery(function($){
   const filterTabs = document.querySelectorAll('.filter-tab');
   const designItems = document.querySelectorAll('.design-item');
   const designArea  = document.getElementById('design-area');
+  const mockupImg   = document.getElementById('mockup-img');
+  const printZone   = designArea ? designArea.querySelector('.print-zone') : null;
+  let currentSide   = 'front';
+
+  function computePrintZone(){
+    if(!mockupImg || mockupImg.clientWidth === 0) return;
+    const zones = (window.WinShirtData && window.WinShirtData.zones && window.WinShirtData.zones[currentSide]) ? window.WinShirtData.zones[currentSide] : [];
+    if(!zones.length || !printZone) return;
+    const zone = zones[0];
+    const w = mockupImg.clientWidth * zone.width / 100;
+    const h = mockupImg.clientHeight * zone.height / 100;
+    const x = mockupImg.clientWidth * zone.left / 100;
+    const y = mockupImg.clientHeight * zone.top / 100;
+    printZone.style.width  = Math.round(w) + 'px';
+    printZone.style.height = Math.round(h) + 'px';
+    printZone.style.left   = Math.round(x) + 'px';
+    printZone.style.top    = Math.round(y) + 'px';
+  }
+
+  function setSide(side){
+    if(!mockupImg || !window.WinShirtData) return;
+    currentSide = side;
+    mockupImg.src = window.WinShirtData[side] || '';
+  }
+
+  if(mockupImg){
+    mockupImg.addEventListener('load', computePrintZone);
+    if(mockupImg.complete){ computePrintZone(); }
+    const ro = new ResizeObserver(computePrintZone);
+    if(mockupImg.parentElement){ ro.observe(mockupImg.parentElement); }
+  }
+
+  const viewBtns = document.querySelectorAll('.view-btn');
+  viewBtns.forEach(btn => {
+    btn.addEventListener('click', function(){
+      const side = this.dataset.side;
+      viewBtns.forEach(b => b.setAttribute('aria-pressed', String(b === this)));
+      setSide(side);
+      requestAnimationFrame(()=>requestAnimationFrame(computePrintZone));
+    });
+  });
 
   filterTabs.forEach(tab => {
     tab.addEventListener('click', function(){
@@ -92,7 +132,7 @@ jQuery(function($){
 
   function setActiveLayer(id){
     activeLayerId = id;
-    document.querySelectorAll('.layer').forEach(l => l.classList.toggle('selected', l.id === id));
+    document.querySelectorAll('.design-element').forEach(l => l.classList.toggle('selected', l.id === id));
     layerItems.forEach(li => li.classList.toggle('active', li.dataset.layer === id));
     const layer = document.getElementById(id);
     if (layer && layerOpacity) {
@@ -102,28 +142,16 @@ jQuery(function($){
     }
   }
 
-  function initLayerInteractions($el){
-    if(!$el.length) return;
-    $el.draggable({ containment: '#design-area' })
-       .resizable({
-         handles: 'n,e,s,w,ne,se,sw,nw',
-         containment: '#design-area',
-         minWidth: 32,
-         minHeight: 32,
-         start: function(event){
-           $(this).resizable('option','aspectRatio', event.originalEvent.shiftKey);
-         }
-       })
-       .rotatable();
-    $el.on('mousedown', function(e){
-      e.stopPropagation();
-      setActiveLayer(this.id);
+  if(designArea){
+    designArea.addEventListener('mousedown', function(e){
+      const el = e.target.closest('.design-element');
+      if(el){
+        setActiveLayer(el.id);
+      } else {
+        setActiveLayer(null);
+      }
     });
   }
-
-  $('#design-area').on('mousedown', function(){
-    setActiveLayer(null);
-  });
 
   function addLayerItemListeners(li, layerDiv){
     li.addEventListener('click', function(){ setActiveLayer(layerDiv.id); });
@@ -148,11 +176,10 @@ jQuery(function($){
   function createLayer(name, content){
     const id = 'layer-' + Date.now();
     const layerDiv = document.createElement('div');
-    layerDiv.className = 'layer draggable-item';
+    layerDiv.className = 'design-element';
     layerDiv.id = id;
-    layerDiv.innerHTML = content;
+    layerDiv.innerHTML = `<div class="content">${content}</div><div class="handle" data-handle="resize-locked"></div><div class="handle" data-handle="resize-free"></div><div class="handle" data-handle="rotate"></div><div class="handle" data-handle="delete"></div>`;
     designArea.appendChild(layerDiv);
-    initLayerInteractions($(layerDiv));
     const li = document.createElement('li');
     li.className = 'layer-item';
     li.dataset.layer = id;
@@ -179,8 +206,6 @@ jQuery(function($){
         img.style.objectFit = 'contain';
         img.style.pointerEvents = 'none';
       }
-      $(layerDiv).draggable('option','containment','#design-area')
-                 .resizable('option','containment','#design-area');
       if (isMobile) closePanels();
     });
   }
@@ -244,7 +269,8 @@ jQuery(function($){
     const fontWeight = currentTextStyle.bold ? 'bold' : 'normal';
     const fontStyle = currentTextStyle.italic ? 'italic' : 'normal';
     const textDecoration = currentTextStyle.underline ? 'underline' : 'none';
-    currentTextLayer.innerHTML = text;
+    const textContent = currentTextLayer.querySelector('.content');
+    if(textContent){ textContent.textContent = text; }
     currentTextLayer.style.fontSize = currentTextStyle.size + 'px';
     currentTextLayer.style.color = currentTextStyle.color;
     currentTextLayer.style.fontFamily = fontSelect.value;
@@ -436,7 +462,8 @@ jQuery(function($){
       if (!currentQrLayer) {
         currentQrLayer = createLayer('QR Code', qrPreview.innerHTML);
       } else {
-        currentQrLayer.innerHTML = qrPreview.innerHTML;
+        const qrContent = currentQrLayer.querySelector('.content');
+        if(qrContent){ qrContent.innerHTML = qrPreview.innerHTML; }
       }
       if (isMobile) closePanels();
     });
@@ -477,3 +504,246 @@ jQuery(function($){
   }
 
 });
+
+// ===================== WINSHIRT START: Manipulation éléments =====================
+// Config selectors (adapte si besoin)
+const WS_CFG = {
+  stage:      '#design-area',         // conteneur où se déplacent les éléments
+  clampZone:  '.print-zone',          // zone d'impression (doit exister)
+  elementSel: '.design-element',      // éléments manipulables
+  handleSel:  '.handle',              // poignées
+  ratioHandle:'[data-handle="resize-locked"]',
+  freeHandle: '[data-handle="resize-free"]',
+  rotHandle:  '[data-handle="rotate"]',
+  delHandle:  '[data-handle="delete"]'
+};
+
+(function WinshirtManipulator(){
+  const stage = document.querySelector(WS_CFG.stage);
+  if(!stage){ console.error('WinShirt: stage introuvable'); return; }
+
+  let selected = null;
+  let dragState = null;
+  let moveListenersAttached = false;
+
+  // Utilitaires
+  const getClampRect = () => {
+    const clampEl = stage.querySelector(WS_CFG.clampZone) || stage;
+    const sRect = stage.getBoundingClientRect();
+    const cRect = clampEl.getBoundingClientRect();
+    // coords clamp en repère stage
+    return {
+      left:  cRect.left - sRect.left,
+      top:   cRect.top - sRect.top,
+      right: (cRect.right - sRect.left),
+      bottom:(cRect.bottom - sRect.top),
+      width: cRect.width,
+      height:cRect.height
+    };
+  };
+
+  const px = (n)=>`${Math.round(n)}px`;
+
+  const bringToFront = (el)=>{
+    let maxZ = 1;
+    stage.querySelectorAll(WS_CFG.elementSel).forEach(d=>{
+      const z = parseInt(window.getComputedStyle(d).zIndex||1,10);
+      if(z>maxZ) maxZ=z;
+    });
+    el.style.zIndex = String(maxZ+1);
+  };
+
+  // Sélection
+  function select(el){
+    stage.querySelectorAll(WS_CFG.elementSel).forEach(d=>d.classList.remove('selected'));
+    el.classList.add('selected');
+    selected = el;
+    bringToFront(el);
+  }
+
+  // DRAG
+  function startDrag(ev, el){
+    ev.preventDefault(); ev.stopPropagation();
+    select(el);
+
+    const sRect = stage.getBoundingClientRect();
+    const rect  = el.getBoundingClientRect();
+    const clamp = getClampRect();
+
+    const start = pointFromEvent(ev);
+    dragState = {
+      mode:'move',
+      el,
+      offsetX: start.x - (rect.left - sRect.left),
+      offsetY: start.y - (rect.top  - sRect.top),
+      clamp
+    };
+    attachMoveListeners();
+  }
+
+  // ROTATE
+  function startRotate(ev, el){
+    ev.preventDefault(); ev.stopPropagation();
+    select(el);
+    const sRect = stage.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const center = { x: (r.left - sRect.left) + r.width/2, y: (r.top - sRect.top) + r.height/2 };
+    dragState = { mode:'rotate', el, center };
+    attachMoveListeners();
+  }
+
+  // RESIZE
+  function startResize(ev, el, lockAspect){
+    ev.preventDefault(); ev.stopPropagation();
+    select(el);
+
+    const rect = el.getBoundingClientRect();
+    const sRect = stage.getBoundingClientRect();
+    const clamp = getClampRect();
+
+    dragState = {
+      mode:'resize',
+      el,
+      start: pointFromEvent(ev),
+      startW: rect.width,
+      startH: rect.height,
+      startLeft: rect.left - sRect.left,
+      startTop:  rect.top  - sRect.top,
+      ratio: rect.width / rect.height,
+      lock: !!lockAspect,
+      clamp
+    };
+    attachMoveListeners();
+  }
+
+  function deleteElement(el){
+    if(el && el.parentNode) el.parentNode.removeChild(el);
+    selected = null;
+  }
+
+  // Mouvements
+  function onPointerMove(ev){
+    if(!dragState) return;
+    const p = pointFromEvent(ev);
+    switch(dragState.mode){
+      case 'move': doMove(p); break;
+      case 'rotate': doRotate(p); break;
+      case 'resize': doResize(p); break;
+    }
+  }
+
+  function doMove(p){
+    const {el, offsetX, offsetY, clamp} = dragState;
+    const w = el.offsetWidth, h = el.offsetHeight;
+
+    let left = p.x - offsetX;
+    let top  = p.y - offsetY;
+
+    left = Math.max(clamp.left, Math.min(left, clamp.right - w));
+    top  = Math.max(clamp.top,  Math.min(top,  clamp.bottom - h));
+
+    el.style.left = px(left);
+    el.style.top  = px(top);
+  }
+
+  function doRotate(p){
+    const {el, center} = dragState;
+    const dx = p.x - center.x;
+    const dy = p.y - center.y;
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI + 90; // aligné avec ta préview
+    el.style.transform = `rotate(${angle}deg)`;
+    el.dataset.angle = String(angle);
+  }
+
+  function doResize(p){
+    const s = dragState;
+    let dX = p.x - s.start.x;
+    let dY = p.y - s.start.y;
+
+    // lock ratio = on prend le delta le plus fort et on impose le ratio
+    let newW = s.startW + (s.lock ? Math.max(dX, dY) : dX);
+    let newH = s.lock ? (newW / s.ratio) : (s.startH + dY);
+
+    newW = Math.max(30, newW);
+    newH = Math.max(30, newH);
+
+    // clamp: si on dépasse la zone, on réduit
+    const maxW = s.clamp.right  - s.startLeft;
+    const maxH = s.clamp.bottom - s.startTop;
+    newW = Math.min(newW, maxW);
+    newH = Math.min(newH, maxH);
+
+    s.el.style.width  = px(newW);
+    s.el.style.height = px(newH);
+  }
+
+  function onPointerUp(){
+    detachMoveListeners();
+    dragState = null;
+  }
+
+  function pointFromEvent(ev){
+    const sRect = stage.getBoundingClientRect();
+    const e = ('touches' in ev && ev.touches.length) ? ev.touches[0] : ev;
+    return { x: e.clientX - sRect.left, y: e.clientY - sRect.top };
+  }
+
+  function attachMoveListeners(){
+    if(moveListenersAttached) return;
+    moveListenersAttached = true;
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, {passive:false});
+    window.addEventListener('touchend', onPointerUp);
+  }
+  function detachMoveListeners(){
+    if(!moveListenersAttached) return;
+    moveListenersAttached = false;
+    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('mouseup', onPointerUp);
+    window.removeEventListener('touchmove', onPointerMove);
+    window.removeEventListener('touchend', onPointerUp);
+  }
+
+  // Délégation d’événements (compatible contenus dynamiques)
+  stage.addEventListener('mousedown', (e)=>{
+    const el = e.target.closest(WS_CFG.elementSel);
+    if(!el) return;
+    const handle = e.target.closest(WS_CFG.handleSel);
+    if(!handle){
+      startDrag(e, el);
+    }else{
+      const h = handle.matches(WS_CFG.rotHandle)  ? 'rotate'
+              : handle.matches(WS_CFG.delHandle)  ? 'delete'
+              : handle.matches(WS_CFG.ratioHandle)? 'resize-locked'
+              : 'resize-free';
+      if(h==='delete')      deleteElement(el);
+      else if(h==='rotate') startRotate(e, el);
+      else startResize(e, el, h==='resize-locked');
+    }
+  });
+
+  stage.addEventListener('touchstart', (e)=>{
+    const el = e.target.closest(WS_CFG.elementSel);
+    if(!el) return;
+    const handle = e.target.closest(WS_CFG.handleSel);
+    if(!handle){
+      startDrag(e, el);
+    }else{
+      const h = handle.matches(WS_CFG.rotHandle)  ? 'rotate'
+              : handle.matches(WS_CFG.delHandle)  ? 'delete'
+              : handle.matches(WS_CFG.ratioHandle)? 'resize-locked'
+              : 'resize-free';
+      if(h==='delete')      deleteElement(el);
+      else if(h==='rotate') startRotate(e, el);
+      else startResize(e, el, h==='resize-locked');
+    }
+  }, {passive:false});
+
+  // API minimale si besoin ailleurs
+  window.WinshirtManip = {
+    select, getSelection:()=>selected,
+    recomputeClamp: ()=>getClampRect()
+  };
+})();
+// ===================== WINSHIRT END =====================

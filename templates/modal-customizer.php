@@ -100,8 +100,12 @@ $default_zone = $zones['front'][0] ?? [ 'width' => 600, 'height' => 650, 'top' =
         </div>
 
         <div class="tshirt-container">
-          <div id="tshirt" class="tshirt"></div>
-          <div id="design-area" class="design-area"></div>
+          <div id="tshirt" class="tshirt">
+            <img id="mockup-img" src="<?php echo esc_url( $front ); ?>" alt="" />
+            <div id="design-area" class="design-area">
+              <div class="print-zone"></div>
+            </div>
+          </div>
         </div>
 
         <div id="printzones-bar" class="printzones-bar" role="tablist"></div>
