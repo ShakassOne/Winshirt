@@ -97,17 +97,17 @@ $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'lef
         </div>
         <?php endif; ?>
 
-        <div class="tshirt-container">
-          <div class="tshirt" id="tshirt" style="background-image:url('<?php echo esc_url( $front ); ?>'); background-repeat:no-repeat; background-size:contain; background-position:center;">
-            <div id="design-area" class="design-area"></div>
-          </div>
-        </div>
-
-        <div class="printzones-bar" id="printzones-bar" aria-label="Zones d'impression" role="tablist"></div>
         <div class="view-controls" id="view-controls">
-          <button class="view-btn" data-side="front" aria-pressed="true">Recto</button>
+          <button class="view-btn is-active" data-side="front" aria-pressed="true">Recto</button>
           <button class="view-btn" data-side="back" aria-pressed="false">Verso</button>
         </div>
+
+        <div class="tshirt-container">
+          <div id="tshirt" class="tshirt"></div>
+          <div id="design-area" class="design-area"></div>
+        </div>
+
+        <div id="printzones-bar" class="printzones-bar" role="tablist"></div>
         <input type="hidden" id="design-coords" name="design_coords" value="" />
       </main>
 

@@ -1,13 +1,28 @@
 (function(){
-  const data = window.WinShirtMockup || {};
+  const data = window.WinShirtData;
   const tshirt = document.getElementById('tshirt');
   const designArea = document.getElementById('design-area');
   const bar = document.getElementById('printzones-bar');
   const viewControls = document.getElementById('view-controls');
+  const container = document.querySelector('.tshirt-container');
   if(!tshirt || !designArea || !bar || !viewControls){ return; }
 
-  let currentSide = 'front';
+  if(!data || !data.mockupId){
+    if(container){
+      const msg = document.createElement('p');
+      msg.textContent = 'Pas de mockup associé à ce produit';
+      container.appendChild(msg);
+    }
+    tshirt.style.display = 'none';
+    designArea.style.display = 'none';
+    bar.style.display = 'none';
+    viewControls.style.display = 'none';
+    return;
+  }
+
+  let currentSide = data.activeSide || 'front';
   const lastZoneByFace = {};
+  let currentZoneKey = null;
   const natural = {};
 
   function loadNatural(side){
@@ -18,21 +33,22 @@
         natural[side] = { w: img.naturalWidth, h: img.naturalHeight };
         resolve(natural[side]);
       };
-      img.src = data[side] && data[side].image ? data[side].image : '';
+      img.src = data[side] || '';
     });
   }
 
   function renderButtons(){
     bar.innerHTML = '';
-    const zones = data[currentSide] && data[currentSide].zones ? data[currentSide].zones : {};
-    Object.keys(zones).forEach(key => {
+    const zones = (data.zones && data.zones[currentSide]) ? data.zones[currentSide] : [];
+    zones.forEach(z => {
       const btn = document.createElement('button');
       btn.className = 'printzones-btn';
-      btn.textContent = key.toUpperCase();
-      btn.dataset.key = key;
-      btn.addEventListener('click', () => applyZone(key));
+      btn.textContent = z.id;
+      btn.dataset.key = z.id;
+      btn.addEventListener('click', () => applyZone(z.id));
       bar.appendChild(btn);
     });
+    bar.style.display = zones.length ? 'flex' : 'none';
   }
 
   function setActiveButton(key){
@@ -41,20 +57,20 @@
     });
   }
 
-  async function applyZone(key){
-    const sideData = data[currentSide];
-    if(!sideData || !sideData.zones || !sideData.zones[key]){ return; }
-    const zone = sideData.zones[key];
-    const size = await loadNatural(currentSide);
-    if(!size.w || !size.h){ return; }
+  function applyZone(key){
+    const zones = (data.zones && data.zones[currentSide]) ? data.zones[currentSide] : [];
+    const zone = zones.find(z => z.id === key);
+    if(!zone){
+      designArea.style.display = 'none';
+      return;
+    }
     const disp = tshirt.getBoundingClientRect();
-    const scaleX = disp.width / size.w;
-    const scaleY = disp.height / size.h;
-    const x = zone.xr * size.w * scaleX;
-    const y = zone.yr * size.h * scaleY;
-    const w = zone.wr * size.w * scaleX;
-    const h = zone.hr * size.h * scaleY;
+    const x = zone.x * disp.width / 100;
+    const y = zone.y * disp.height / 100;
+    const w = zone.w * disp.width / 100;
+    const h = zone.h * disp.height / 100;
 
+    designArea.style.display = 'block';
     designArea.style.left = Math.round(x) + 'px';
     designArea.style.top = Math.round(y) + 'px';
     designArea.style.width = Math.round(w) + 'px';
@@ -67,20 +83,29 @@
     });
 
     lastZoneByFace[currentSide] = key;
+    currentZoneKey = key;
     setActiveButton(key);
   }
 
   function switchSide(side){
     currentSide = side;
-    const sideData = data[side] || {};
-    if(sideData.image){
-      tshirt.style.backgroundImage = `url('${sideData.image}')`;
-    }
-    renderButtons();
-    const key = lastZoneByFace[side] || Object.keys(sideData.zones || {})[0];
-    if(key){ applyZone(key); }
-    viewControls.querySelectorAll('.view-btn').forEach(btn => {
-      btn.setAttribute('aria-pressed', String(btn.dataset.side === side));
+    const img = data[side] || '';
+    tshirt.style.backgroundImage = img ? `url('${img}')` : 'none';
+    loadNatural(side).then(size => {
+      const ratio = size.w ? (size.h / size.w) : 1;
+      tshirt.style.setProperty('--ratio', ratio);
+      renderButtons();
+      const zones = (data.zones && data.zones[side]) ? data.zones[side] : [];
+      if(zones.length){
+        const key = lastZoneByFace[side] || zones[0].id;
+        applyZone(key);
+      } else {
+        designArea.style.display = 'none';
+        bar.style.display = 'none';
+      }
+      viewControls.querySelectorAll('.view-btn').forEach(btn => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.side === side));
+      });
     });
   }
 
@@ -89,6 +114,10 @@
       const side = this.dataset.side;
       if(side && side !== currentSide){ switchSide(side); }
     });
+  });
+
+  window.addEventListener('resize', function(){
+    if(currentZoneKey){ applyZone(currentZoneKey); }
   });
 
   switchSide(currentSide);
