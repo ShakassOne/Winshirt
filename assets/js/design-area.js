@@ -2,6 +2,7 @@
   const designArea = document.getElementById('design-area');
   if(!designArea){ return; }
   let zone = null;
+  let ratio = 1;
 
   function applyZone(z){
     zone = z;
@@ -10,8 +11,7 @@
     designArea.style.height = zone.h + 'px';
     designArea.style.top = zone.y + 'px';
     designArea.style.left = zone.x + 'px';
-    initResizable();
-    fitItem();
+    placeItem();
   }
 
   document.addEventListener('winshirt:zone-change', function(e){
@@ -27,26 +27,23 @@
     if(dataInput){ dataInput.value = JSON.stringify(coords); }
   }
 
-  function fitItem(){
+  function placeItem(){
     if(!item || !zone || !item.naturalWidth){ return; }
-    const areaRatio = zone.w / zone.h;
-    const imgRatio  = item.naturalWidth / item.naturalHeight;
-    if(imgRatio > areaRatio){
-      item.style.width = '100%';
-      item.style.height = 'auto';
-    } else {
-      item.style.width = 'auto';
-      item.style.height = '100%';
-    }
-    coords.w = item.offsetWidth;
-    coords.h = item.offsetHeight;
+    ratio = item.naturalWidth / item.naturalHeight || 1;
+    coords.w = zone.w * 0.4;
+    coords.h = coords.w / ratio;
     coords.x = (zone.w - coords.w) / 2;
     coords.y = (zone.h - coords.h) / 2;
-    item.style.transform = `translate(${coords.x}px, ${coords.y}px)`;
+    Object.assign(item.style, {
+      width: coords.w + 'px',
+      height: coords.h + 'px',
+      transform: `translate(${coords.x}px, ${coords.y}px)`
+    });
     updateData();
+    initResizable();
   }
 
-  if(item){ item.addEventListener('load', fitItem); }
+  if(item){ item.addEventListener('load', placeItem); }
 
   interact(item).draggable({
     modifiers: [
@@ -71,7 +68,8 @@
         interact.modifiers.restrictSize({
           min: { width:20, height:20 },
           max: { width: zone.w, height: zone.h }
-        })
+        }),
+        interact.modifiers.aspectRatio({ ratio })
       ],
       listeners: {
         move(event){
