@@ -124,18 +124,42 @@ class WinShirt_Product_Customization {
         // Interact.js for draggable/resizable zone
         wp_enqueue_script( 'interactjs', 'https://cdn.jsdelivr.net/npm/@interactjs/interactjs/index.min.js', [], '1.10.17', true );
         wp_enqueue_script( 'winshirt-design-area', plugins_url( 'assets/js/design-area.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'interactjs' ], WINSHIRT_VERSION, true );
+        wp_enqueue_script( 'winshirt-printzones', plugins_url( 'assets/js/printzones.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'winshirt-design-area' ], WINSHIRT_VERSION, true );
 
         $mockup_id = get_post_meta( $product_id, self::MOCKUP_META_KEY, true );
-        $zones     = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_zones', true ) : [];
+        $front = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_front', true ) : '';
+        $back  = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_back', true ) : '';
+        if ( $front && ! filter_var( $front, FILTER_VALIDATE_URL ) ) {
+            $front = wp_get_attachment_url( $front );
+        }
+        if ( $back && ! filter_var( $back, FILTER_VALIDATE_URL ) ) {
+            $back = wp_get_attachment_url( $back );
+        }
+        $zones = $mockup_id ? get_post_meta( $mockup_id, '_ws_mockup_zones', true ) : [];
         if ( ! is_array( $zones ) ) {
             $zones = [];
         }
-        $default_zone = $zones[0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
+        $zones_front = array_map( function( $z ) {
+            return [
+                'key'   => $z['name'] ?? '',
+                'label' => $z['name'] ?? '',
+                'w'     => isset( $z['width'] ) ? intval( $z['width'] ) : 0,
+                'h'     => isset( $z['height'] ) ? intval( $z['height'] ) : 0,
+                'x'     => isset( $z['left'] ) ? intval( $z['left'] ) : 0,
+                'y'     => isset( $z['top'] ) ? intval( $z['top'] ) : 0,
+            ];
+        }, $zones );
 
-        wp_localize_script( 'winshirt-design-area', 'winshirtDesign', [
-            'zone'  => $default_zone,
-            'zones' => array_values( $zones ),
-        ] );
+        $config = [
+            'mockupId'   => (int) $mockup_id,
+            'activeSide' => 'front',
+            'sides'      => [
+                'front' => [ 'image' => $front, 'zones' => $zones_front ],
+                'back'  => [ 'image' => $back,  'zones' => [] ],
+            ],
+        ];
+
+        wp_add_inline_script( 'winshirt-printzones', 'window.WINSHIRT_CONFIG = ' . wp_json_encode( $config ) . ';', 'before' );
     }
 }
 
