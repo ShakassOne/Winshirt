@@ -171,7 +171,7 @@ class WinShirt_Mockups {
 
         echo '<div id="ws-mockup-zone-wrapper">';
         if ( $front ) {
-            echo '<img src="' . esc_url( $front ) . '" id="ws-mockup-image" style="width:300px;height:auto;" />';
+            echo '<img src="' . esc_url( $front ) . '" id="ws-mockup-image" style="width:600px;height:auto;" />';
         } else {
             echo '<p>' . esc_html__( 'Veuillez définir une image avant pour le mockup.', 'winshirt' ) . '</p>';
         }
