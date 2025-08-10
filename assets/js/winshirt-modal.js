@@ -148,7 +148,7 @@ jQuery(function($){
   function createLayer(name, content){
     const id = 'layer-' + Date.now();
     const layerDiv = document.createElement('div');
-    layerDiv.className = 'layer';
+    layerDiv.className = 'layer draggable-item';
     layerDiv.id = id;
     layerDiv.innerHTML = content;
     designArea.appendChild(layerDiv);
@@ -171,10 +171,11 @@ jQuery(function($){
       const layerDiv = createLayer('Design', `<img src="${url}" alt="" />`);
       layerDiv.style.width = '120px';
       layerDiv.style.height = '120px';
+      const daRect = designArea.getBoundingClientRect();
+      layerDiv.style.left = Math.max((daRect.width - 120) / 2, 0) + 'px';
+      layerDiv.style.top = Math.max((daRect.height - 120) / 2, 0) + 'px';
       const img = layerDiv.querySelector('img');
       if(img){
-        img.style.width = '100%';
-        img.style.height = '100%';
         img.style.objectFit = 'contain';
         img.style.pointerEvents = 'none';
       }

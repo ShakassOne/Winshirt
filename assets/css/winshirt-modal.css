@@ -128,33 +128,26 @@
 }
 
 .tshirt {
-  width: 800px;
-  height: 800px;
-  background: white;
-  border-radius: 25px;
-  box-shadow: 0 15px 40px rgba(0,0,0,0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  transition: transform 0.3s;
+  width: 560px;
+  max-width: 560px;
+  height: auto;
+  aspect-ratio: var(--ratio, 0.75);
+  background-repeat: no-repeat;
   background-size: contain;
   background-position: center;
-  background-repeat: no-repeat;
-}
-
-.tshirt:hover {
-  transform: scale(1.005);
+  margin: 0 auto;
+  position: relative;
 }
 
 .design-area {
   position: absolute;
-  border: 3px dashed #dee2e6;
-  border-radius: 20px;
-  display: block;
-  background: rgba(248, 249, 250, 0.4);
-  top: 0;
   left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  outline: 2px dashed #6aa0ff;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 .draggable-item {
@@ -162,7 +155,7 @@
   top: 0;
   left: 0;
   cursor: move;
-  touch-action: none;
+  z-index: 10;
 }
 
 .layer {
@@ -170,19 +163,21 @@
   cursor: move;
 }
 
-.layer img {
-  width: 100%;
+.layer img,
+.draggable-item img {
+  display: block;
+  max-width: 100%;
   height: auto;
   pointer-events: none;
 }
 
 .ui-resizable-handle {
+  z-index: 11;
   width: 15px;
   height: 15px;
   background: #007bff;
   border: 2px solid white;
   border-radius: 50%;
-  z-index: 10;
 }
 
 .layer.selected {

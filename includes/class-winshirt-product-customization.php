@@ -120,7 +120,7 @@ class WinShirt_Product_Customization {
         wp_enqueue_script( 'jquery-ui-resizable' );
         wp_enqueue_script( 'jquery-ui-rotatable', 'https://cdn.jsdelivr.net/npm/jquery-ui-rotatable@1.1.2/jquery.ui.rotatable.min.js', [ 'jquery-ui-draggable', 'jquery-ui-resizable' ], '1.1.2', true );
         wp_enqueue_script( 'winshirt-modal-js', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable', 'jquery-ui-rotatable' ], WINSHIRT_VERSION, true );
-        wp_enqueue_script( 'winshirt-printzones', plugins_url( 'assets/js/printzones.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery' ], WINSHIRT_VERSION, true );
+        wp_enqueue_script( 'winshirt-printzones', plugins_url( 'assets/js/printzones.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'winshirt-modal-js' ], WINSHIRT_VERSION, true );
 
         $mockup_id = get_post_meta( $product_id, self::MOCKUP_META_KEY, true );
         $front = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_front_image', true ) : '';
@@ -144,20 +144,22 @@ class WinShirt_Product_Customization {
         if ( ! is_array( $zones_meta ) ) {
             $zones_meta = [];
         }
-        wp_localize_script(
-            'winshirt-printzones',
-            'WinShirtMockup',
-            [
-                'front' => [
-                    'image' => $front,
-                    'zones' => $zones_meta['front'] ?? [],
-                ],
-                'back'  => [
-                    'image' => $back,
-                    'zones' => $zones_meta['back'] ?? [],
-                ],
-            ]
-        );
+
+        if ( $mockup_id ) {
+            wp_localize_script(
+                'winshirt-modal-js',
+                'WinShirtData',
+                [
+                    'mockupId'   => (int) $mockup_id,
+                    'front'      => $front,
+                    'back'       => $back,
+                    'zones'      => $zones_meta,
+                    'activeSide' => 'front',
+                ]
+            );
+        } else {
+            wp_add_inline_script( 'winshirt-modal-js', 'var WinShirtData = null;', 'before' );
+        }
     }
 }
 
