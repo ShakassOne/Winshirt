@@ -1,164 +1,110 @@
 <?php
-// includes/class-winshirt-product-customization.php
+/**
+ * WinShirt - Données produit => WinShirtData (mockups & zones)
+ * - Alimente les filtres : winshirt_mockups_data, winshirt_zones_data
+ * - Cherche des metas produit (optionnel), sinon fallback génériques
+ */
+
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! class_exists( 'WinShirt_Product_Customization' ) ) {
 
 class WinShirt_Product_Customization {
 
-    const META_KEY = '_winshirt_personnalisable';
-    const MOCKUP_META_KEY = '_winshirt_mockup_id';
+	public static function init() {
+		add_filter( 'winshirt_mockups_data', [ __CLASS__, 'provide_mockups' ] );
+		add_filter( 'winshirt_zones_data',   [ __CLASS__, 'provide_zones' ] );
+	}
 
-    public function __construct() {
-        // Ajout de la méta-box produit
-        add_action( 'add_meta_boxes',     [ $this, 'add_personalizable_metabox' ] );
-        add_action( 'save_post',           [ $this, 'save_personalizable_meta' ], 10, 2 );
+	/**
+	 * Retourne URLs mockups front/back
+	 * Priorité : meta produit > options > fallback image plugin
+	 */
+	public static function provide_mockups( $mockups ) {
+		$product_id = self::current_product_id();
 
-        // Front-end : bouton + modal
-        add_action( 'woocommerce_before_add_to_cart_button', [ $this, 'print_personalize_button' ] );
-        add_action( 'wp_footer',                                [ $this, 'print_modal' ] );
-        add_action( 'wp_enqueue_scripts',                       [ $this, 'enqueue_assets' ] );
-    }
+		$front = '';
+		$back  = '';
 
-    /** 1️⃣ Méta-box “Personnalisable” dans l’admin produit */
-    public function add_personalizable_metabox() {
-        add_meta_box(
-            'winshirt_personalizable',
-            __( 'WinShirt : personnalisable ?', 'winshirt' ),
-            [ $this, 'render_personalizable_metabox' ],
-            'product',
-            'side',
-            'default'
-        );
-    }
+		// Exemple de metas (adapte si tu as déjà des clés) :
+		if ( $product_id ) {
+			$front = get_post_meta( $product_id, '_winshirt_mockup_front', true );
+			$back  = get_post_meta( $product_id, '_winshirt_mockup_back',  true );
+		}
 
-    public function render_personalizable_metabox( $post ) {
-        wp_nonce_field( 'winshirt_save_personalizable', 'winshirt_personnalisable_nonce' );
-        $checked = get_post_meta( $post->ID, self::META_KEY, true ) === 'yes' ? 'checked' : '';
-        echo '<p><label><input type="checkbox" name="winshirt_personnalisable" value="yes" ' . $checked . '/> '
-            . esc_html__( 'Produit personnalisable', 'winshirt' )
-            . '</label></p>';
+		// Fallback : une image “placeholder” du plugin (met la tienne dans assets/)
+		if ( ! $front ) $front = WINSHIRT_URL . 'assets/img/mockup-front.png';
+		if ( ! $back  ) $back  = WINSHIRT_URL . 'assets/img/mockup-back.png';
 
-        $mockups = get_posts( [
-            'post_type'      => 'ws-mockup',
-            'posts_per_page' => -1,
-            'post_status'    => 'publish',
-        ] );
-        $current_mockup = get_post_meta( $post->ID, self::MOCKUP_META_KEY, true );
-        echo '<p><label for="winshirt_mockup_id">' . esc_html__( 'Mockup associé', 'winshirt' ) . '</label>';
-        echo '<select name="winshirt_mockup_id" id="winshirt_mockup_id" class="widefat">';
-        echo '<option value="">' . esc_html__( 'Aucun', 'winshirt' ) . '</option>';
-        foreach ( $mockups as $m ) {
-            $selected = (int) $current_mockup === $m->ID ? 'selected' : '';
-            echo '<option value="' . esc_attr( $m->ID ) . '" ' . $selected . '>' . esc_html( $m->post_title ) . '</option>';
-        }
-        echo '</select></p>';
-    }
+		return [
+			'front' => esc_url_raw( $front ),
+			'back'  => esc_url_raw( $back ),
+		];
+	}
 
-    public function save_personalizable_meta( $post_id, $post ) {
-        if (
-            $post->post_type !== 'product'
-            || ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE )
-            || wp_is_post_revision( $post_id )
-            || ! isset( $_POST['winshirt_personnalisable_nonce'] )
-            || ! wp_verify_nonce( $_POST['winshirt_personnalisable_nonce'], 'winshirt_save_personalizable' )
-        ) {
-            return;
-        }
-        $value = ( isset( $_POST['winshirt_personnalisable'] ) && $_POST['winshirt_personnalisable'] === 'yes' ) ? 'yes' : 'no';
-        update_post_meta( $post_id, self::META_KEY, $value );
+	/**
+	 * Zones d’impression en pourcentage (x/y/w/h en % du canvas)
+	 * Structure attendue :
+	 * [
+	 *   'front' => [ [ 'xPct'=>20,'yPct'=>20,'wPct'=>60,'hPct'=>45 ] ],
+	 *   'back'  => [ [ 'xPct'=>20,'yPct'=>20,'wPct'=>60,'hPct'=>45 ] ]
+	 * ]
+	 */
+	public static function provide_zones( $zones ) {
+		$product_id = self::current_product_id();
 
-        $mockup_id = isset( $_POST['winshirt_mockup_id'] ) ? intval( $_POST['winshirt_mockup_id'] ) : 0;
-        update_post_meta( $post_id, self::MOCKUP_META_KEY, $mockup_id );
-    }
+		// Si tu stockes en meta (JSON), lis-les ici :
+		$meta = $product_id ? get_post_meta( $product_id, '_winshirt_zones', true ) : '';
+		$data = is_string( $meta ) ? json_decode( $meta, true ) : ( is_array( $meta ) ? $meta : null );
 
-    /** 2️⃣ Front-end : n’affiche le bouton QUE si le produit est personnalisable */
-    public function print_personalize_button() {
-        if ( ! is_product() ) {
-            return;
-        }
+		if ( is_array( $data ) && isset( $data['front'] ) && isset( $data['back'] ) ) {
+			return [
+				'front' => self::sanitize_zone_array( $data['front'] ),
+				'back'  => self::sanitize_zone_array( $data['back'] ),
+			];
+		}
 
-        $product_id = get_queried_object_id();
-        if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
-            return;
-        }
+		// Fallback sobre : 60% de largeur au centre, ratio ~0.75
+		return [
+			'front' => [ [ 'xPct'=>20, 'yPct'=>20, 'wPct'=>60, 'hPct'=>45 ] ],
+			'back'  => [ [ 'xPct'=>20, 'yPct'=>20, 'wPct'=>60, 'hPct'=>45 ] ],
+		];
+	}
 
-        echo '<button id="winshirt-open-modal" class="button alt" type="button">'
-             . esc_html__( 'Personnaliser ce produit', 'winshirt' )
-             . '</button>';
-    }
+	// ================= Helpers =================
 
-    /** 3️⃣ Affiche le conteneur modal de personnalisation */
-    public function print_modal() {
-        if ( ! is_product() ) {
-            return;
-        }
+	private static function current_product_id() {
+		// Lecture par GET d’abord (page /personnalisez?product_id=)
+		if ( isset( $_GET['product_id'] ) ) {
+			return absint( $_GET['product_id'] );
+		}
+		// Puis contexte Woo
+		if ( function_exists( 'is_product' ) && is_product() ) {
+			global $product;
+			if ( $product && method_exists( $product, 'get_id' ) ) {
+				return (int) $product->get_id();
+			}
+			$post_id = get_the_ID();
+			if ( $post_id ) return (int) $post_id;
+		}
+		return 0;
+	}
 
-        $product_id = get_queried_object_id();
-        if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
-            return;
-        }
-
-        include WINSHIRT_PATH . 'templates/modal-customizer.php';
-    }
-
-    /** 4️⃣ Enqueue CSS + JS du modal */
-    public function enqueue_assets() {
-        if ( ! is_product() ) {
-            return;
-        }
-
-        $product_id = get_queried_object_id();
-        if ( ! $product_id || get_post_meta( $product_id, self::META_KEY, true ) !== 'yes' ) {
-            return;
-        }
-
-        // CSS minimal pour le modal
-        wp_enqueue_style( 'winshirt-modal-css', plugins_url( 'assets/css/winshirt-modal.css', WINSHIRT_PATH . 'winshirt.php' ), [], WINSHIRT_VERSION );
-        wp_enqueue_style( 'jquery-ui-css', 'https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css', [], '1.13.2' );
-
-        // JS pour ouvrir/fermer le modal
-        wp_enqueue_script( 'jquery-ui-draggable' );
-        wp_enqueue_script( 'jquery-ui-resizable' );
-        wp_enqueue_script( 'jquery-ui-rotatable', 'https://cdn.jsdelivr.net/npm/jquery-ui-rotatable@1.1.2/jquery.ui.rotatable.min.js', [ 'jquery-ui-draggable', 'jquery-ui-resizable' ], '1.1.2', true );
-        wp_enqueue_script( 'winshirt-modal', plugins_url( 'assets/js/winshirt-modal.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable', 'jquery-ui-rotatable' ], WINSHIRT_VERSION, true );
-        wp_enqueue_script( 'winshirt-printzones', plugins_url( 'assets/js/printzones.js', WINSHIRT_PATH . 'winshirt.php' ), [ 'jquery', 'winshirt-modal' ], WINSHIRT_VERSION, true );
-
-        $mockup_id = get_post_meta( $product_id, self::MOCKUP_META_KEY, true );
-        $front = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_front', true ) : '';
-        $back  = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_mockup_back', true ) : '';
-        if ( ! $front && $mockup_id ) {
-            $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
-        }
-        if ( ! $back && $mockup_id ) {
-            $back = get_post_meta( $mockup_id, '_ws_mockup_back', true );
-        }
-        if ( $front && ! filter_var( $front, FILTER_VALIDATE_URL ) ) {
-            $front = wp_get_attachment_url( $front );
-        }
-        if ( $back && ! filter_var( $back, FILTER_VALIDATE_URL ) ) {
-            $back = wp_get_attachment_url( $back );
-        }
-        $zones_meta = $mockup_id ? get_post_meta( $mockup_id, '_winshirt_print_zones', true ) : [];
-        if ( ! is_array( $zones_meta ) ) {
-            $zones_meta = [];
-        }
-
-        if ( $mockup_id ) {
-            wp_localize_script(
-                'winshirt-modal',
-                'WinShirtData',
-                [
-                    'mockupId'   => (int) $mockup_id,
-                    'front'      => $front,
-                    'back'       => $back,
-                    'zones'      => $zones_meta,
-                    'activeSide' => 'front',
-                ]
-            );
-        } else {
-            wp_add_inline_script( 'winshirt-modal', 'var WinShirtData = null;', 'before' );
-        }
-    }
+	private static function sanitize_zone_array( $arr ) {
+		$out = [];
+		if ( is_array( $arr ) ) {
+			foreach ( $arr as $z ) {
+				$out[] = [
+					'xPct' => isset($z['xPct']) ? (float)$z['xPct'] : 20.0,
+					'yPct' => isset($z['yPct']) ? (float)$z['yPct'] : 20.0,
+					'wPct' => isset($z['wPct']) ? (float)$z['wPct'] : 60.0,
+					'hPct' => isset($z['hPct']) ? (float)$z['hPct'] : 45.0,
+				];
+			}
+		}
+		return $out ?: [ [ 'xPct'=>20, 'yPct'=>20, 'wPct'=>60, 'hPct'=>45 ] ];
+	}
 }
 
-// Instanciation
-new WinShirt_Product_Customization();
+WinShirt_Product_Customization::init();
+}
