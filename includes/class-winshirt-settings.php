@@ -1,191 +1,127 @@
 <?php
-// includes/class-winshirt-settings.php
+/**
+ * WinShirt - Réglages produit Woo + bouton & modal sur la page produit
+ */
+
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! class_exists( 'WinShirt_Settings' ) ) {
 
 class WinShirt_Settings {
 
-    const OPTION_KEY = 'winshirt_settings';
-    const PAGE_SLUG  = 'winshirt-settings';
+	// Slug du CPT mockup (adaptable via filtre)
+	public static function mockup_cpt() {
+		$slug = 'mockup';
+		return apply_filters( 'winshirt_mockup_cpt', $slug );
+	}
 
-    public static function init() {
-        // Register settings without adding a separate top-level menu. The menu
-        // entry is provided by \WinShirt_Admin.
-        add_action( 'admin_init', [ __CLASS__, 'register_settings' ] );
-    }
+	public static function init() {
+		// Métas produit
+		add_action( 'woocommerce_product_options_general_product_data', [ __CLASS__, 'product_fields' ] );
+		add_action( 'woocommerce_admin_process_product_object',         [ __CLASS__, 'save_product_fields' ] );
 
-    // Enregistrer les réglages (Settings API)
-    public static function register_settings() {
-        register_setting(
-            'winshirt_settings_group',                // option group
-            self::OPTION_KEY,                         // option name
-            [ __CLASS__, 'sanitize_settings' ]        // sanitize callback
-        );
+		// Bouton + modal + assets sur page produit (si activé)
+		add_action( 'wp', [ __CLASS__, 'maybe_hook_product_page' ] );
+	}
 
-        add_settings_section(
-            'winshirt_section_main',                  // id
-            __( 'Paramètres généraux', 'winshirt' ),  // title
-            '__return_false',                         // callback description
-            self::PAGE_SLUG                           // page
-        );
+	// ----------- Admin produit -----------
 
-        // Champs : API IA
-        add_settings_field(
-            'ftp_api_ia_key',
-            __( 'Clé API IA', 'winshirt' ),
-            [ __CLASS__, 'field_api_key_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
+	public static function product_fields() {
+		echo '<div class="options_group">';
 
-        // Champs : Formats autorisés
-        add_settings_field(
-            'formats_allowed',
-            __( 'Formats autorisés', 'winshirt' ),
-            [ __CLASS__, 'field_formats_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
+		woocommerce_wp_checkbox( [
+			'id'          => '_winshirt_enable',
+			'label'       => __( 'Activer la personnalisation WinShirt', 'winshirt' ),
+			'description' => __( 'Affiche le bouton “Personnaliser” sur la page produit.', 'winshirt' ),
+		] );
 
-        // Champs : Dimensions par défaut
-        add_settings_field(
-            'dimensions_default',
-            __( 'Dimensions par défaut (L×H×U)', 'winshirt' ),
-            [ __CLASS__, 'field_dimensions_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
+		// Sélecteur Mockup
+		$mockups = self::get_mockup_choices();
+		woocommerce_wp_select( [
+			'id'          => '_winshirt_mockup_id',
+			'label'       => __( 'Mockup à utiliser', 'winshirt' ),
+			'options'     => [ '' => __( '— Sélectionner —', 'winshirt' ) ] + $mockups,
+			'description' => __( 'Choisissez le mockup (recto/verso + zones) défini dans le CPT “Mockup”.', 'winshirt' ),
+			'desc_tip'    => true,
+		] );
 
-        // Champs : Préfixe export
-        add_settings_field(
-            'prefix_export',
-            __( 'Préfixe export', 'winshirt' ),
-            [ __CLASS__, 'field_prefix_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
+		echo '</div>';
+	}
 
-        // Champs : Chemins export JSON/XML
-        add_settings_field(
-            'path_export_json',
-            __( 'Chemin export JSON', 'winshirt' ),
-            [ __CLASS__, 'field_path_json_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
-        add_settings_field(
-            'path_export_xml',
-            __( 'Chemin export XML', 'winshirt' ),
-            [ __CLASS__, 'field_path_xml_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
+	public static function save_product_fields( $product ) {
+		$enable = isset( $_POST['_winshirt_enable'] ) ? 'yes' : 'no';
+		$product->update_meta_data( '_winshirt_enable', $enable );
 
-        // Champs : Email huissier
-        add_settings_field(
-            'bailiff_email',
-            __( 'Email huissier', 'winshirt' ),
-            [ __CLASS__, 'field_bailiff_email_cb' ],
-            self::PAGE_SLUG,
-            'winshirt_section_main'
-        );
-    }
+		$mockup_id = isset( $_POST['_winshirt_mockup_id'] ) ? absint( $_POST['_winshirt_mockup_id'] ) : 0;
+		$product->update_meta_data( '_winshirt_mockup_id', $mockup_id );
+	}
 
-    // 3. Sanitize
-    public static function sanitize_settings( $input ) {
-        $output = [];
-        $output['api_ia_key']        = sanitize_text_field( $input['api_ia_key'] ?? '' );
-        $output['formats_allowed']   = sanitize_text_field( $input['formats_allowed'] ?? '' );
-        $output['dimensions_default']= sanitize_text_field( $input['dimensions_default'] ?? '' );
-        $output['prefix_export']     = sanitize_text_field( $input['prefix_export'] ?? '' );
-        $output['path_export_json']  = sanitize_text_field( $input['path_export_json'] ?? '' );
-        $output['path_export_xml']   = sanitize_text_field( $input['path_export_xml'] ?? '' );
-        $output['bailiff_email']     = sanitize_email( $input['bailiff_email'] ?? '' );
-        return $output;
-    }
+	private static function get_mockup_choices() {
+		$choices = [];
+		$posts = get_posts( [
+			'post_type'      => self::mockup_cpt(),
+			'post_status'    => 'publish',
+			'posts_per_page' => 200,
+			'orderby'        => 'title',
+			'order'          => 'ASC',
+			'fields'         => 'ids',
+		] );
+		foreach ( $posts as $pid ) {
+			$choices[ $pid ] = get_the_title( $pid ) . ' (#' . $pid . ')';
+		}
+		return $choices;
+	}
 
-    // 4. Callbacks pour chaque champ
-    public static function field_api_key_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="text" name="%1$s[api_ia_key]" value="%2$s" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['api_ia_key'] ?? '' )
-        );
-    }
+	// ----------- Front (page produit) -----------
 
-    public static function field_formats_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="text" name="%1$s[formats_allowed]" value="%2$s" placeholder="A4,A3,Coeur,Full" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['formats_allowed'] ?? '' )
-        );
-    }
+	public static function maybe_hook_product_page() {
+		if ( ! function_exists('is_product') || ! is_product() ) return;
 
-    public static function field_dimensions_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="text" name="%1$s[dimensions_default]" value="%2$s" placeholder="100x150x1" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['dimensions_default'] ?? '' )
-        );
-    }
+		$product = wc_get_product( get_the_ID() );
+		if ( ! $product ) return;
 
-    public static function field_prefix_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="text" name="%1$s[prefix_export]" value="%2$s" placeholder="winshirt_" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['prefix_export'] ?? '' )
-        );
-    }
+		$enabled   = $product->get_meta( '_winshirt_enable' ) === 'yes';
+		$mockup_id = (int) $product->get_meta( '_winshirt_mockup_id' );
 
-    public static function field_path_json_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="text" name="%1$s[path_export_json]" value="%2$s" placeholder="/exports/json/" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['path_export_json'] ?? '' )
-        );
-    }
+		if ( ! $enabled || ! $mockup_id ) return;
 
-    public static function field_path_xml_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="text" name="%1$s[path_export_xml]" value="%2$s" placeholder="/exports/xml/" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['path_export_xml'] ?? '' )
-        );
-    }
+		// 1) Bouton “Personnaliser” sous le bouton Ajouter au panier
+		add_action( 'woocommerce_single_product_summary', [ __CLASS__, 'render_customize_button' ], 35 );
 
-    public static function field_bailiff_email_cb() {
-        $opts = get_option( self::OPTION_KEY );
-        printf(
-            '<input type="email" name="%1$s[bailiff_email]" value="%2$s" class="regular-text" />',
-            esc_attr( self::OPTION_KEY ),
-            esc_attr( $opts['bailiff_email'] ?? '' )
-        );
-    }
+		// 2) Injecte le template modal en footer
+		add_action( 'wp_footer', [ __CLASS__, 'render_modal_template' ] );
 
-    // 5. Rendu de la page
-    public static function render_settings_page() {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            return;
-        }
-        ?>
-        <div class="wrap">
-            <h1><?php esc_html_e( 'Configuration WinShirt', 'winshirt' ); ?></h1>
-            <form action="options.php" method="post">
-                <?php
-                settings_fields( 'winshirt_settings_group' );
-                do_settings_sections( self::PAGE_SLUG );
-                submit_button( __( 'Enregistrer', 'winshirt' ) );
-                ?>
-            </form>
-        </div>
-        <?php
-    }
+		// 3) Force l’enqueue des assets front
+		add_filter( 'winshirt_force_enqueue', '__return_true' );
+
+		// 4) Pousse product_id pour WinShirtData
+		add_filter( 'winshirt_front_data', function( $data ) use ( $product ) {
+			if ( ! is_array( $data ) ) $data = [];
+			$data['product'] = [
+				'id'    => (int) $product->get_id(),
+				'title' => $product->get_name(),
+			];
+			return $data;
+		} );
+	}
+
+	public static function render_customize_button() {
+		echo '<p><button type="button" class="single_add_to_cart_button button alt" data-ws-open-customizer>'
+		   . esc_html__( 'Personnaliser', 'winshirt' )
+		   . '</button></p>';
+	}
+
+	public static function render_modal_template() {
+		// Charge le template fourni par le plugin
+		if ( function_exists( 'winshirt_require_if_exists' ) ) {
+			$path = WINSHIRT_PATH . 'templates/modal-customizer.php';
+			if ( file_exists( $path ) ) {
+				// Passe des args vides : les images/zones seront injectées par WinShirt_Product_Customization
+				include $path;
+			}
+		}
+	}
 }
 
-// Lancement
 WinShirt_Settings::init();
+}
