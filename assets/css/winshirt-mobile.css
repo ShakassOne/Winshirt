@@ -1,0 +1,86 @@
+/**
+ * WinShirt - Styles spécifiques mobile
+ * Optimisation de l’espace : mockup en haut, boutons recto/verso sous le mockup,
+ * panneaux/navigation en bas.
+ */
+
+@media (max-width: 768px) {
+    /* Conteneur modal en mode mobile */
+    #winshirt-customizer-modal {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(6px);
+    }
+
+    /* Zone mockup */
+    .winshirt-mockup-area {
+        flex: 0 0 auto;
+        position: relative;
+        width: 100%;
+        max-height: 45%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #fff;
+    }
+    .winshirt-mockup-area img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    /* Boutons recto/verso */
+    .winshirt-side-buttons {
+        flex: 0 0 auto;
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+        padding: 8px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(4px);
+        border-bottom: 1px solid rgba(0,0,0,0.1);
+    }
+    .winshirt-side-buttons button {
+        padding: 8px 14px;
+        font-size: 0.95em;
+        border: none;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+    .winshirt-side-buttons button.active {
+        background: rgba(0, 0, 0, 0.15);
+        font-weight: bold;
+    }
+    .winshirt-side-buttons button:hover {
+        background: rgba(0, 0, 0, 0.1);
+    }
+
+    /* Panneaux multi-niveaux en bas */
+    #winshirt-panel-root.ws-panels {
+        flex: 1 1 auto;
+        position: relative;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(6px);
+    }
+
+    /* S'assurer que les menus ne prennent pas plus de 55% de hauteur */
+    .ws-panel {
+        max-height: 55%;
+        overflow-y: auto;
+    }
+
+    /* Ajustement boutons menu L1 */
+    .ws-menu-l1 li {
+        font-size: 1em;
+        padding: 10px;
+    }
+
+    /* Boutons simples */
+    .ws-panel-content button {
+        font-size: 0.9em;
+    }
+}
