@@ -134,6 +134,7 @@
   aspect-ratio: var(--ratio, 0.75);
   margin: 0 auto;
   position: relative;
+  background:none !important; /* Patch: keep only <img> source */
 }
 
 .tshirt img {
@@ -148,11 +149,11 @@
   pointer-events: auto;        /* IMPORTANT: réactive les events */
 }
 
-#design-area::after {          /* affichage discret de la zone d’impression */
+#design-area.ready::after {          /* affichage discret de la zone d’impression */
   content: "";
   position: absolute;
   inset: 0;
-  border: 2px dashed rgba(0,0,0,.25);
+  border: 2px dashed rgba(0,0,0,.28);
   border-radius: 8px;
   pointer-events: none;
 }
