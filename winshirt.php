@@ -27,6 +27,8 @@ if ( ! function_exists('winshirt_require_if_exists') ) {
 		return false;
 	}
 }
+winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );        // restaure le menu WinShirt si le fichier existe
+winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );     // méta produit + bouton + modal sur page produit
 
 // === Boot minimal front (assets + données) ===
 // Charge la classe d’assets (créée) pour voir bouger le module de suite
