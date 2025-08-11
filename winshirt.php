@@ -30,6 +30,7 @@ if ( ! function_exists('winshirt_require_if_exists') ) {
 
 // === Assets front ===
 winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
+winshirt_require_if_exists( 'includes/class-winshirt-designs.php' );
 
 // === Pré-câblage modules ===
 winshirt_require_if_exists( 'includes/class-winshirt-router.php' );
