@@ -60,22 +60,31 @@ if ( ! class_exists( 'WinShirt_Assets' ) ) {
 
 			$deps_jq = [ 'jquery' ];
 
-			$scripts = [
-				// Nouveau cœur UI/state
-				'winshirt-state'        => [ 'assets/js/state.js',           $deps_jq, true ],
-				'winshirt-ui-router'    => [ 'assets/js/ui-router.js',       array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
-				'winshirt-ui-panels'    => [ 'assets/js/ui-panels.js',       array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-ui-router' ] ), true ],
-				'winshirt-layers'       => [ 'assets/js/layers.js',          array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
-				'winshirt-text-tools'   => [ 'assets/js/text-tools.js',      array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-layers' ] ), true ],
-				'winshirt-image-tools'  => [ 'assets/js/image-tools.js',     array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-layers' ] ), true ],
-				'winshirt-qr-tools'     => [ 'assets/js/qr-tools.js',        array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
-				'winshirt-price'        => [ 'assets/js/price.js',           array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
-				'winshirt-uploader'     => [ 'assets/js/uploader.js',        array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
-				'winshirt-router-hooks' => [ 'assets/js/router-hooks.js',    array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-ui-router' ] ), true ],
+		$scripts = [
+    // noyau / state
+    'winshirt-state'         => [ 'assets/js/state.js',            $deps_jq, true ],
 
-				// JS existant (on le garde en "glue" : ouverture/fermeture modal, évènements)
-				'winshirt-modal'        => [ 'assets/js/winshirt-modal.js',  array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-ui-router', 'winshirt-ui-panels' ] ), true ],
-			];
+    // UI navigation
+    'winshirt-ui-router'     => [ 'assets/js/ui-router.js',        array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
+    'winshirt-ui-panels'     => [ 'assets/js/ui-panels.js',        array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-ui-router' ] ), true ],
+
+    // mockup + zones (NOUVEAU)
+    'winshirt-mockup-canvas' => [ 'assets/js/mockup-canvas.js',    array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
+
+    // calques & outils
+    'winshirt-layers'        => [ 'assets/js/layers.js',           array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
+    'winshirt-text-tools'    => [ 'assets/js/text-tools.js',       array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-layers' ] ), true ],
+    'winshirt-image-tools'   => [ 'assets/js/image-tools.js',      array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-layers' ] ), true ],
+    'winshirt-qr-tools'      => [ 'assets/js/qr-tools.js',         array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
+    'winshirt-price'         => [ 'assets/js/price.js',            array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
+    'winshirt-uploader'      => [ 'assets/js/uploader.js',         array_merge( $deps_jq, [ 'winshirt-state' ] ), true ],
+
+    // hooks & modal (le modal dépend DU mockup)
+    'winshirt-router-hooks'  => [ 'assets/js/router-hooks.js',     array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-ui-router' ] ), true ],
+    'winshirt-modal'         => [ 'assets/js/winshirt-modal.js',   array_merge( $deps_jq, [ 'winshirt-state', 'winshirt-ui-router', 'winshirt-ui-panels', 'winshirt-mockup-canvas' ] ), true ],
+];
+
+
 
 			foreach ( $scripts as $handle => $cfg ) {
 				list( $rel, $deps, $in_footer ) = $cfg;
