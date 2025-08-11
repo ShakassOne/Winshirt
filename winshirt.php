@@ -2,8 +2,8 @@
 /**
  * Plugin Name: WinShirt
  * Description: Personnalisation produits + loteries (module WinShirt).
- * Author: WinShirt
- * Version: 2.0.0
+ * Author: Shakas Communication
+ * Version: 1.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
  */
