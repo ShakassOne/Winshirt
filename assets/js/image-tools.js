@@ -1,246 +1,122 @@
 /**
- * WinShirt - Outils Images
- * - Ajout d'un calque image (depuis URL ou <input type="file">)
- * - Fit dans la zone d'impression (contain/cover/none)
- * - Sélection automatique du calque créé
- *
- * Dépendances : jQuery, WinShirtState, WinShirtLayers
+ * WinShirt - Image Tools
+ * - Galerie de visuels (ws-design) via REST /winshirt/v1/designs
+ * - Filtres catégories, pagination
+ * - Insertion du visuel dans la zone d'impression (via WinShirtLayers si dispo)
  */
 
 (function($){
-    'use strict';
+  'use strict';
 
-    const ACCEPTED_MIME = ['image/png','image/jpeg','image/jpg','image/webp','image/gif','image/svg+xml'];
+  const API = {
+    base(){ return (window.WinShirtData && WinShirtData.restUrl) ? WinShirtData.restUrl : '/wp-json/winshirt/v1'; },
+    async list(category='all', page=1, per=24){
+      const url = `${this.base()}/designs?category=${encodeURIComponent(category)}&page=${page}&per_page=${per}`;
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }
+  };
 
-    const ImageTools = {
+  function gridItemTpl(item){
+    const title = item.title ? item.title.replace(/"/g,'&quot;') : '';
+    const src = item.thumb || item.full || '';
+    return `
+      <div class="ws-grid-item" data-id="${item.id}" data-src="${src}" title="${title}"
+           style="border:1px solid rgba(0,0,0,.08);border-radius:10px;overflow:hidden;cursor:pointer;background:#fff">
+        <div style="aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#f7f7f7">
+          ${src ? `<img src="${src}" style="max-width:100%;max-height:100%;object-fit:contain;display:block">` : '<div style="opacity:.5">—</div>'}
+        </div>
+        <div style="font-size:12px;padding:6px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}</div>
+      </div>`;
+  }
 
-        /**
-         * ID unique
-         */
-        _uid(){
-            return 'img_' + Math.random().toString(36).slice(2, 9);
-        },
+  function mountGallery($container){
+    $container.html(`
+      <div class="ws-gallery" style="display:flex;flex-direction:column;gap:10px">
+        <div class="ws-filters" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        <div class="ws-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px"></div>
+        <div class="ws-pager" style="display:flex;gap:8px;justify-content:center">
+          <button class="button ws-prev" disabled>◀</button>
+          <span class="ws-pageinfo" style="align-self:center"></span>
+          <button class="button ws-next" disabled>▶</button>
+        </div>
+        <div class="ws-upload-hint" style="font-size:12px;opacity:.7">Ou glissez-déposez votre image sur le mockup pour l’ajouter.</div>
+      </div>
+    `);
+  }
 
-        /**
-         * Détermine le rectangle de la zone d'impression actuelle.
-         * Cherche un élément .ws-print-zone[data-side] dans le canvas. Fallback: le canvas lui-même.
-         * Retourne {left, top, width, height} en px relatifs au canvas.
-         */
-        _getPrintZoneRect(){
-            const $cv = WinShirtLayers && WinShirtLayers.$canvas ? WinShirtLayers.$canvas : null;
-            if(!$cv || !$cv.length){
-                return { left: 0, top: 0, width: 300, height: 300 }; // fallback
-            }
-            const side = WinShirtState.currentSide;
-            const $zone = $cv.find(`.ws-print-zone[data-side="${side}"]`);
-            const w = $cv.innerWidth();
-            const h = $cv.innerHeight();
+  async function loadAndRender($l2){
+    const $body = $l2.find('.ws-l2-body');
+    mountGallery($body);
 
-            if($zone.length){
-                return {
-                    left: parseFloat($zone.css('left')) || 0,
-                    top: parseFloat($zone.css('top')) || 0,
-                    width: $zone.outerWidth() || w,
-                    height: $zone.outerHeight() || h
-                };
-            }
-            // Si pas de zone dédiée, on prend tout le canvas
-            return { left: 0, top: 0, width: w, height: h };
-        },
+    const state = { cat:'all', page:1, per:12, total:0 };
 
-        /**
-         * Calcule une boîte "fit" dans un conteneur (contain/cover/none)
-         * Retourne {left, top, width, height}
-         */
-        _fitBox(imgRatio, box, mode='contain'){
-            const { width: BW, height: BH } = box;
+    async function refresh(){
+      $body.find('.ws-grid').html('<div style="opacity:.6">Chargement…</div>');
+      try{
+        const data = await API.list(state.cat, state.page, state.per);
 
-            if(mode === 'none'){
-                // Pas de fit, on centre juste un cadre carré raisonnable
-                const side = Math.min(BW, BH) * 0.5;
-                return {
-                    width: side,
-                    height: side,
-                    left: box.left + (BW - side)/2,
-                    top: box.top + (BH - side)/2
-                };
-            }
-
-            // contain / cover
-            const boxRatio = BW / BH;
-            let w, h;
-
-            if(mode === 'contain'){
-                if(imgRatio > boxRatio){
-                    w = BW; h = BW / imgRatio;
-                }else{
-                    h = BH; w = BH * imgRatio;
-                }
-            } else { // cover
-                if(imgRatio > boxRatio){
-                    h = BH; w = BH * imgRatio;
-                }else{
-                    w = BW; h = BW / imgRatio;
-                }
-            }
-
-            return {
-                width: w,
-                height: h,
-                left: box.left + (BW - w)/2,
-                top: box.top + (BH - h)/2
-            };
-        },
-
-        /**
-         * Ajoute un calque image depuis une URL
-         * @param {Object} opts - { src, name, fit: 'contain'|'cover'|'none', left, top, width, height, rotation }
-         */
-        addImageFromURL(opts = {}){
-            if(!opts.src){
-                console.error('ImageTools.addImageFromURL: src manquant');
-                return null;
-            }
-
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = () => {
-                const id = this._uid();
-                const ratio = img.width / img.height;
-                const zone = this._getPrintZoneRect();
-
-                let geom;
-                if(opts.width && opts.height){
-                    geom = {
-                        width: parseFloat(opts.width),
-                        height: parseFloat(opts.height),
-                        left: parseFloat(opts.left ?? (zone.left + (zone.width - opts.width)/2)),
-                        top: parseFloat(opts.top ?? (zone.top + (zone.height - opts.height)/2))
-                    };
-                } else {
-                    geom = this._fitBox(ratio, zone, opts.fit || 'contain');
-                }
-
-                const layer = {
-                    id,
-                    type: 'image',
-                    name: opts.name || 'Image',
-                    src: opts.src,
-                    width: geom.width,
-                    height: geom.height,
-                    left: geom.left,
-                    top: geom.top,
-                    rotation: parseFloat(opts.rotation || 0)
-                };
-
-                WinShirtState.addLayer(layer);
-
-                if(window.WinShirtLayers && WinShirtLayers.$canvas){
-                    WinShirtLayers.addLayerElement(layer);
-                    WinShirtLayers.highlightSelected();
-                }
-
-                $(document).trigger('winshirt:imageAdded', [layer, WinShirtState.currentSide]);
-            };
-
-            img.onerror = () => {
-                console.error('ImageTools: impossible de charger', opts.src);
-            };
-
-            img.src = opts.src;
-            return true;
-        },
-
-        /**
-         * Ajoute un calque image depuis un File (input)
-         * @param {File} file
-         * @param {Object} opts - options (fit, name…)
-         */
-        addImageFromFile(file, opts = {}){
-            if(!file || !file.type || ACCEPTED_MIME.indexOf(file.type) === -1){
-                console.warn('ImageTools.addImageFromFile: type non supporté', file && file.type);
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                this.addImageFromURL(Object.assign({}, opts, { src: e.target.result, name: file.name }));
-            };
-            reader.readAsDataURL(file);
-        },
-
-        /**
-         * Branche un <input type="file"> externe pour l’upload local
-         * @param {String|jQuery} selector
-         * @param {Object} opts
-         */
-        bindFileInput(selector, opts = {}){
-            const $input = $(selector);
-            if(!$input.length) return;
-
-            $input.attr('accept', ACCEPTED_MIME.join(','));
-            $input.off('change.winshirt').on('change.winshirt', (e)=>{
-                const files = e.target.files || [];
-                if(!files.length) return;
-                // on ne prend que le premier pour l’instant
-                this.addImageFromFile(files[0], opts);
-                $input.val(''); // reset
-            });
-        },
-
-        /**
-         * Replace/fit le calque sélectionné dans la zone d’impression
-         * @param {'contain'|'cover'|'none'} mode
-         */
-        fitSelected(mode='contain'){
-            const layer = WinShirtState.getSelectedLayer();
-            if(!layer || layer.type !== 'image') return;
-
-            const zone = this._getPrintZoneRect();
-
-            // Image réelle : calcul du ratio via un objet Image
-            const img = new Image();
-            img.onload = () => {
-                const ratio = img.width / img.height;
-                const geom = this._fitBox(ratio, zone, mode);
-                WinShirtState.updateLayer(layer.id, geom);
-
-                if(WinShirtLayers && WinShirtLayers.$canvas){
-                    const $el = WinShirtLayers.$canvas.find(`.ws-layer[data-id="${layer.id}"]`);
-                    $el.css({
-                        left: geom.left,
-                        top: geom.top,
-                        width: geom.width,
-                        height: geom.height
-                    });
-                }
-
-                $(document).trigger('winshirt:imageFitted', [layer.id, mode]);
-            };
-            img.src = layer.src;
-        }
-    };
-
-    // Expose
-    window.WinShirtImageTools = ImageTools;
-
-    // Hooks simples
-    $(function(){
-        // Bouton générique : data-ws-add-image-url="https://..."
-        $(document).on('click', '[data-ws-add-image-url]', function(e){
-            e.preventDefault();
-            const url = $(this).attr('data-ws-add-image-url');
-            if(url) ImageTools.addImageFromURL({ src: url, fit: 'contain' });
+        // Filters
+        const $filters = $body.find('.ws-filters').empty();
+        data.categories.forEach(c=>{
+          const btn = $(`<button class="button ws-cat" data-slug="${c.slug}">${c.name}</button>`);
+          if(c.slug === state.cat) btn.addClass('active').css({fontWeight:'700'});
+          $filters.append(btn);
         });
 
-        // Input fichier générique : <input data-ws-image-input>
-        ImageTools.bindFileInput('input[data-ws-image-input]', { fit: 'contain' });
+        // Grid
+        const $grid = $body.find('.ws-grid').empty();
+        data.items.forEach(it=> $grid.append(gridItemTpl(it)) );
 
-        // Boutons de fit
-        $(document).on('click', '[data-ws-image-fit]', function(e){
-            e.preventDefault();
-            const mode = $(this).attr('data-ws-image-fit') || 'contain';
-            ImageTools.fitSelected(mode);
-        });
+        state.total = data.total;
+        const maxPage = Math.max(1, Math.ceil(state.total / state.per));
+
+        $body.find('.ws-pageinfo').text(`Page ${state.page} / ${maxPage}`);
+        $body.find('.ws-prev').prop('disabled', state.page<=1);
+        $body.find('.ws-next').prop('disabled', state.page>=maxPage);
+
+      }catch(e){
+        console.error(e);
+        $body.find('.ws-grid').html('<div style="color:#c00">Erreur chargement.</div>');
+      }
+    }
+
+    // Interactions
+    $body.off('click.wsimg');
+    $body.on('click.wsimg', '.ws-cat', function(){
+      state.cat = $(this).data('slug'); state.page = 1; refresh();
     });
+    $body.on('click.wsimg', '.ws-prev', ()=>{ if(state.page>1){ state.page--; refresh(); } });
+    $body.on('click.wsimg', '.ws-next', ()=>{ state.page++; refresh(); });
+
+    // Insertion d’un visuel
+    $body.on('click.wsimg', '.ws-grid-item', function(){
+      const src = $(this).data('src');
+      if(!src) return;
+
+      if(window.WinShirtLayers && typeof WinShirtLayers.addImage==='function'){
+        WinShirtLayers.addImage(src);
+      } else {
+        // Fallback simple : image centrée dans la zone
+        const side = (window.WinShirtState && WinShirtState.currentSide) || 'front';
+        const $zone = $(`#winshirt-canvas .ws-print-zone[data-side="${side}"]`);
+        if(!$zone.length) return;
+
+        const zOff = $zone.position();
+        const $img = $(`<img class="ws-layer" src="${src}" alt="">`).css({
+          left: zOff.left + 10, top: zOff.top + 10, width: Math.max(60, $zone.width()*0.4), height:'auto'
+        });
+        $('#winshirt-canvas').append($img);
+      }
+    });
+
+    await refresh();
+  }
+
+  // Branche l’outil Images quand L2 s’ouvre
+  $(document).on('winshirt:panel:images', function(e, ctx){
+    loadAndRender(ctx.l2);
+  });
 
 })(jQuery);
