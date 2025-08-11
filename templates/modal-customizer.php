@@ -1,381 +1,221 @@
 <?php
-// templates/modal-customizer.php
+/**
+ * Template – WinShirt Customizer Modal
+ * - Structure neutre + hooks data-*
+ * - Mockup + zones d’impression + panneaux L1/L2/L3
+ * - Boutons Recto/Verso (passage de côté via WinShirtState)
+ * - Champ hidden pour payload WooCommerce (cart item)
+ */
 
-// Récupère de manière fiable l'ID du produit courant
-$product_id = get_queried_object_id();
-if ( ! $product_id ) {
-    global $product;
-    if ( $product instanceof WC_Product ) {
-        $product_id = $product->get_id();
-    }
-}
+if ( ! defined('ABSPATH') ) exit;
 
-// ID du mockup associé au produit
-$mockup_id = $product_id ? get_post_meta( $product_id, WinShirt_Product_Customization::MOCKUP_META_KEY, true ) : 0;
+// Mockups (fallback si WinShirtData non peuplé côté PHP)
+$front_img = isset( $args['front_img'] ) ? esc_url( $args['front_img'] ) : '';
+$back_img  = isset( $args['back_img'] )  ? esc_url( $args['back_img'] )  : '';
 
-$front = $back = '';
-$colors = [];
-$zones  = [];
-if ( $mockup_id ) {
-    $front = get_post_meta( $mockup_id, '_winshirt_mockup_front', true );
-    $back  = get_post_meta( $mockup_id, '_winshirt_mockup_back', true );
-    if ( ! $front ) {
-        $front = get_post_meta( $mockup_id, '_ws_mockup_front', true );
-    }
-    if ( ! $back ) {
-        $back = get_post_meta( $mockup_id, '_ws_mockup_back', true );
-    }
-    // Accepte un ID de pièce jointe ou une URL directe
-    if ( $front && ! filter_var( $front, FILTER_VALIDATE_URL ) ) {
-        $front = wp_get_attachment_url( $front );
-    }
-    if ( $back && ! filter_var( $back, FILTER_VALIDATE_URL ) ) {
-        $back = wp_get_attachment_url( $back );
-    }
-    $color_string = get_post_meta( $mockup_id, '_ws_mockup_colors', true );
-    if ( $color_string ) {
-        $colors = array_filter( array_map( 'trim', explode( ',', $color_string ) ) );
-    }
-    $zones = get_post_meta( $mockup_id, '_winshirt_print_zones', true );
-    if ( ! is_array( $zones ) ) {
-        $zones = [ 'front' => [], 'back' => [] ];
-    }
-}
-$default_zone = $zones['front'][0] ?? [ 'width' => 600, 'height' => 650, 'top' => 0, 'left' => 0 ];
 ?>
-<div id="winshirt-customizer-modal" class="winshirt-modal-overlay" style="display:none;">
-  <div class="winshirt-modal-content">
-    <button class="winshirt-modal-close" id="winshirt-close-modal">&times;</button>
+<div id="winshirt-customizer-modal" class="winshirt-modal" data-ws-root>
+    <!-- Zone haute : mockup + canvas calques -->
+    <div class="winshirt-mockup-area">
+        <div class="winshirt-mockup-canvas" id="winshirt-canvas" aria-live="polite">
+            <!-- Mockups recto/verso (affichage alterné) -->
+            <img class="winshirt-mockup-img" data-side="front" alt="Mockup Recto" style="position:absolute; inset:0; margin:auto; max-width:100%; max-height:100%; object-fit:contain; display:block;">
+            <img class="winshirt-mockup-img" data-side="back"  alt="Mockup Verso" style="position:absolute; inset:0; margin:auto; max-width:100%; max-height:100%; object-fit:contain; display:none;">
 
-    <div class="header"></div>
-
-    <div class="main-container">
-      <!-- Left Sidebar -->
-      <aside class="left-sidebar">
-        <div class="tool-icon" title="Produit" data-target="#product-panel">
-          <svg class="svg-icon" viewBox="0 0 24 24">
-            <path d="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z"/>
-          </svg>
+            <!-- Zones d'impression (en px recalculés depuis %) -->
+            <div class="ws-print-zone" data-side="front" style="position:absolute; border:1px dashed rgba(0,0,255,0.4); pointer-events:none;"></div>
+            <div class="ws-print-zone" data-side="back"  style="position:absolute; border:1px dashed rgba(0,0,255,0.4); pointer-events:none; display:none;"></div>
         </div>
-        <div class="tool-icon active" title="Images" data-target="#image-panel">
-          <svg class="svg-icon" viewBox="0 0 24 24">
-            <path d="M21,19V5C21,3.89 20.1,3 19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19M19,19H5V5H19V19M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
-          </svg>
-        </div>
-        <div class="tool-icon" title="Texte" data-target="#text-panel">
-          <svg class="svg-icon" viewBox="0 0 24 24">
-            <path d="M18.5,4L19.66,8.35L18.7,8.61C18.25,7.74 17.79,6.87 17.26,6.43C16.73,6 16.11,6 15.5,6H13V16.5C13,17 13,17.5 13.33,17.75C13.67,18 14.33,18 15,18V19H9V18C9.67,18 10.33,18 10.67,17.75C11,17.5 11,17 11,16.5V6H8.5C7.89,6 7.27,6 6.74,6.43C6.21,6.87 5.75,7.74 5.3,8.61L4.34,8.35L5.5,4H18.5Z"/>
-          </svg>
-        </div>
-        <div class="tool-icon" title="Calques" data-target="#layers-panel">
-          <svg class="svg-icon" viewBox="0 0 24 24">
-            <path d="M12,16L19.36,10.27L21,9L12,2L3,9L4.63,10.27M12,18.54L4.62,12.81L3,14.07L12,21.07L21,14.07L19.37,12.8L12,18.54Z"/>
-          </svg>
-        </div>
-        <div class="tool-icon" title="QR Code" data-target="#qr-panel">
-          <svg class="svg-icon" viewBox="0 0 24 24">
-            <path d="M3,11H5V13H3V11M11,5H13V9H11V5M9,11H13V15H9V11M15,11H17V13H15V11M19,11H21V13H19V11M5,19H7V21H5V19M3,5H9V9H3V5M5,7V7H7V9H5V7M15,3H21V9H15V3M17,5V7H19V9H17V5M3,15H9V21H3V15Z"/>
-          </svg>
-        </div>
-        <div class="tool-icon" title="IA" data-target="#ai-panel">
-          <svg class="svg-icon" viewBox="0 0 24 24">
-            <path d="M12,2A2,2 0 0,1 14,4C14,4.74 13.6,5.39 13,5.73V7H14A7,7 0 0,1 21,14H22A1,1 0 0,1 23,15V18A1,1 0 0,1 22,19H21V20A2,2 0 0,1 19,22H5A2,2 0 0,1 3,20V19H2A1,1 0 0,1 1,18V15A1,1 0 0,1 2,14H3A7,7 0 0,1 10,7H11V5.73C10.4,5.39 10,4.74 10,4A2,2 0 0,1 12,2M7.5,13A2.5,2.5 0 0,0 5,15.5A2.5,2.5 0 0,0 7.5,18A2.5,2.5 0 0,0 10,15.5A2.5,2.5 0 0,0 7.5,13M16.5,13A2.5,2.5 0 0,0 14,15.5A2.5,2.5 0 0,0 16.5,18A2.5,2.5 0 0,0 19,15.5A2.5,2.5 0 0,0 16.5,13Z"/>
-          </svg>
-        </div>
-      </aside>
-
-      <!-- Central Area -->
-      <main class="central-area">
-        <?php if ( ! empty( $colors ) ) : ?>
-        <div class="color-controls">
-          <?php foreach ( $colors as $color ) : ?>
-            <button class="color-btn" data-color="<?php echo esc_attr( $color ); ?>" style="background: <?php echo esc_attr( $color ); ?>;"></button>
-          <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
-
-        <div class="view-controls" id="view-controls">
-          <button class="view-btn is-active" data-side="front" aria-pressed="true">Recto</button>
-          <button class="view-btn" data-side="back" aria-pressed="false">Verso</button>
-        </div>
-
-        <div class="tshirt-container">
-          <div id="tshirt" class="tshirt">
-            <img id="mockup-img" src="<?php echo esc_url( $front ); ?>" alt="" />
-            <div id="design-area" class="design-area"></div>
-          </div>
-        </div>
-
-        <div id="printzones-bar" class="printzones-bar" role="tablist"></div>
-        <input type="hidden" id="design-coords" name="design_coords" value="" />
-      </main>
-
-      <!-- Image Panel -->
-      <?php
-        $design_categories = get_terms([
-          'taxonomy'   => 'ws-design-category',
-          'hide_empty' => false,
-        ]);
-        $designs = get_posts([
-          'post_type'      => 'ws-design',
-          'numberposts'    => -1,
-          'post_status'    => 'publish',
-        ]);
-      ?>
-      <aside class="right-sidebar" id="image-panel">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title">Galerie de designs</h2>
-          <div class="filter-tabs">
-            <div class="filter-tab active" data-term="all"><?php esc_html_e( 'Tous', 'winshirt' ); ?></div>
-            <?php foreach ( $design_categories as $cat ) : ?>
-              <div class="filter-tab" data-term="<?php echo esc_attr( $cat->slug ); ?>"><?php echo esc_html( $cat->name ); ?></div>
-            <?php endforeach; ?>
-          </div>
-        </div>
-
-        <div class="gallery-content">
-          <button class="upload-btn" id="upload-btn">Upload your own design</button>
-
-          <div class="design-grid">
-            <?php foreach ( $designs as $design ) :
-              $thumb = get_the_post_thumbnail_url( $design->ID, 'thumbnail' );
-              $full  = get_the_post_thumbnail_url( $design->ID, 'full' );
-              $terms = get_the_terms( $design->ID, 'ws-design-category' );
-              $slugs = $terms ? wp_list_pluck( $terms, 'slug' ) : [];
-            ?>
-              <div class="design-item" data-terms="<?php echo esc_attr( implode( ' ', $slugs ) ); ?>" data-full="<?php echo esc_url( $full ); ?>" data-thumb="<?php echo esc_url( $thumb ); ?>">
-                <?php if ( $thumb ) : ?>
-                  <img src="<?php echo esc_url( $thumb ); ?>" alt="<?php echo esc_attr( get_the_title( $design ) ); ?>" />
-                <?php else : ?>
-                  <?php echo esc_html( get_the_title( $design ) ); ?>
-                <?php endif; ?>
-              </div>
-            <?php endforeach; ?>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Text Panel (hidden by default) -->
-      <aside class="right-sidebar" id="text-panel" style="display: none;">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title">Options de texte</h2>
-        </div>
-
-        <div class="gallery-content">
-          <div class="text-option">
-            <label>Texte :</label>
-            <input type="text" id="text-input" placeholder="Entrez votre texte..." style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 15px;">
-          </div>
-
-          <div class="text-option">
-            <label>Police :</label>
-            <select id="font-select" style="width: 100%; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 15px;">
-              <option value="Arial">Arial</option>
-              <option value="Georgia">Georgia</option>
-              <option value="Times New Roman">Times New Roman</option>
-              <option value="Helvetica">Helvetica</option>
-              <option value="Impact">Impact</option>
-              <option value="Comic Sans MS">Comic Sans MS</option>
-            </select>
-          </div>
-
-          <div class="text-option">
-            <label>Taille :</label>
-            <input type="range" id="font-size" min="12" max="120" value="48" style="width: 100%; margin-bottom: 10px;">
-            <div style="text-align: center; color: #666; font-size: 12px;"><span id="size-value">48</span>px</div>
-          </div>
-
-          <div class="text-option" style="margin-top: 20px;">
-            <label>Couleur :</label>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
-              <div class="color-option" data-color="#000000" style="background: #000000;"></div>
-              <div class="color-option" data-color="#ffffff" style="background: #ffffff; border: 1px solid #ccc;"></div>
-              <div class="color-option" data-color="#ff0000" style="background: #ff0000;"></div>
-              <div class="color-option" data-color="#00ff00" style="background: #00ff00;"></div>
-              <div class="color-option" data-color="#0000ff" style="background: #0000ff;"></div>
-              <div class="color-option" data-color="#ffff00" style="background: #ffff00;"></div>
-              <div class="color-option" data-color="#ff00ff" style="background: #ff00ff;"></div>
-              <div class="color-option" data-color="#00ffff" style="background: #00ffff;"></div>
-            </div>
-          </div>
-
-          <div class="text-option" style="margin-top: 20px;">
-            <label>Style :</label>
-            <div style="display: flex; gap: 10px; margin-top: 10px;">
-              <button class="style-btn" id="bold-btn" style="font-weight: bold;">B</button>
-              <button class="style-btn" id="italic-btn" style="font-style: italic;">I</button>
-              <button class="style-btn" id="underline-btn" style="text-decoration: underline;">U</button>
-            </div>
-          </div>
-
-          <button class="upload-btn" id="add-text-btn" style="margin-top: 30px;">Ajouter le texte</button>
-        </div>
-      </aside>
-
-      <!-- Product Panel -->
-      <aside class="right-sidebar" id="product-panel" style="display:none;">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title">Produit</h2>
-        </div>
-        <div class="gallery-content">
-          <div class="text-option">
-            <label>Type de produit :</label>
-            <select id="product-type" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="tshirt">T-shirt</option>
-              <option value="hoodie">Hoodie</option>
-              <option value="debardeur">Débardeur</option>
-              <option value="polo">Polo</option>
-              <option value="casquette">Casquette</option>
-              <option value="sac">Sac</option>
-            </select>
-          </div>
-
-          <div class="text-option">
-            <label>Couleur :</label>
-            <select id="product-color" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="white">Blanc</option>
-              <option value="black">Noir</option>
-              <option value="red">Rouge</option>
-              <option value="blue">Bleu</option>
-            </select>
-          </div>
-
-          <div class="text-option">
-            <label>Taille :</label>
-            <select id="product-size" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="XS">XS</option>
-              <option value="S">S</option>
-              <option value="M">M</option>
-              <option value="L">L</option>
-              <option value="XL">XL</option>
-              <option value="XXL">XXL</option>
-            </select>
-          </div>
-
-          <div class="text-option">
-            <label>Matériau :</label>
-            <select id="product-material" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="cotton">100% Coton</option>
-              <option value="mix">Coton/Polyester</option>
-              <option value="bio">Bio</option>
-              <option value="premium">Premium</option>
-            </select>
-          </div>
-
-          <div class="text-option" style="text-align:center; margin-bottom:20px;">
-            <strong>Prix estimé : <span id="product-price">20.00€</span></strong>
-          </div>
-
-          <button class="upload-btn" id="add-to-cart-btn">Ajouter au panier</button>
-        </div>
-      </aside>
-
-      <!-- Layers Panel -->
-      <aside class="right-sidebar" id="layers-panel" style="display:none;">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title">Calques</h2>
-        </div>
-        <div class="gallery-content">
-          <ul id="layers-list" style="list-style:none; padding:0; margin:0;"></ul>
-
-          <div class="text-option" style="margin-top:20px;">
-            <label>Opacité :</label>
-            <input type="range" id="layer-opacity" min="0" max="100" value="100" style="width:100%;">
-          </div>
-
-          <div class="text-option" style="margin-top:20px;">
-            <label>Position :</label>
-            <div id="position-controls" style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
-              <button class="pos-btn" data-pos="tl">↖</button>
-              <button class="pos-btn" data-pos="tc">↑</button>
-              <button class="pos-btn" data-pos="tr">↗</button>
-              <button class="pos-btn" data-pos="cl">←</button>
-              <button class="pos-btn" data-pos="cc">•</button>
-              <button class="pos-btn" data-pos="cr">→</button>
-              <button class="pos-btn" data-pos="bl">↙</button>
-              <button class="pos-btn" data-pos="bc">↓</button>
-              <button class="pos-btn" data-pos="br">↘</button>
-            </div>
-          </div>
-
-          <button class="upload-btn" id="new-layer-btn" style="margin-top:20px;">Nouveau calque</button>
-        </div>
-      </aside>
-
-      <!-- QR Code Panel -->
-      <aside class="right-sidebar" id="qr-panel" style="display:none;">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title">QR Code</h2>
-        </div>
-        <div class="gallery-content">
-          <div class="text-option">
-            <label>Type :</label>
-            <select id="qr-type" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="url">URL</option>
-              <option value="text">Texte</option>
-              <option value="vcard">VCard</option>
-              <option value="image">Image</option>
-            </select>
-          </div>
-          <div class="text-option" id="qr-input-wrapper"></div>
-          <div class="text-option">
-            <label>Taille :</label>
-            <input type="range" id="qr-size" min="100" max="400" value="200" style="width:100%; margin-bottom:10px;">
-          </div>
-          <div class="text-option">
-            <label>Couleur :</label>
-            <input type="color" id="qr-color" value="#000000" style="width:100%; height:40px; border:1px solid #e0e0e0; border-radius:6px;">
-          </div>
-          <div class="text-option" style="text-align:center; margin-top:20px;">
-            <div id="qr-preview" class="qr-preview" style="margin:auto;"></div>
-          </div>
-          <button class="upload-btn" id="apply-qr-btn" style="margin-top:20px;">Appliquer</button>
-        </div>
-      </aside>
-
-      <!-- AI Panel -->
-      <aside class="right-sidebar" id="ai-panel" style="display:none;">
-        <div class="sidebar-header">
-          <h2 class="sidebar-title">Génération IA</h2>
-        </div>
-        <div class="gallery-content">
-          <div class="text-option">
-            <label>Description :</label>
-            <textarea id="ai-description" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;"></textarea>
-          </div>
-          <div class="text-option">
-            <label>Style :</label>
-            <select id="ai-style" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="realiste">Réaliste</option>
-              <option value="cartoon">Cartoon</option>
-              <option value="anime">Anime</option>
-              <option value="abstrait">Abstrait</option>
-              <option value="peinture">Peinture</option>
-              <option value="pixel">Pixel Art</option>
-              <option value="photo">Photographie</option>
-            </select>
-          </div>
-          <div class="text-option">
-            <label>Résolution :</label>
-            <select id="ai-resolution" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;">
-              <option value="512">512x512</option>
-              <option value="768">768x768</option>
-              <option value="1024">1024x1024</option>
-            </select>
-          </div>
-          <div class="text-option" id="ai-examples" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:15px;">
-            <button class="style-btn ai-example" data-prompt="Chien qui joue">Chien</button>
-            <button class="style-btn ai-example" data-prompt="Paysage futuriste">Futur</button>
-            <button class="style-btn ai-example" data-prompt="Portrait ancien">Portrait</button>
-            <button class="style-btn ai-example" data-prompt="Dragon">Dragon</button>
-            <button class="style-btn ai-example" data-prompt="Voiture rapide">Voiture</button>
-            <button class="style-btn ai-example" data-prompt="Fleurs colorées">Fleurs</button>
-          </div>
-          <button class="upload-btn" id="ai-generate-btn">Générer</button>
-          <div id="ai-status" style="text-align:center; margin-top:10px; color:#666;"></div>
-          <div class="design-grid" id="ai-results" style="margin-top:20px;"></div>
-        </div>
-      </aside>
     </div>
-  </div>
+
+    <!-- Boutons Recto / Verso -->
+    <div class="winshirt-side-buttons" role="tablist" aria-label="Choix du côté">
+        <button type="button" class="ws-side-btn active" data-ws-side="front" role="tab" aria-selected="true">Recto</button>
+        <button type="button" class="ws-side-btn"        data-ws-side="back"  role="tab" aria-selected="false">Verso</button>
+    </div>
+
+    <!-- Panneaux L1/L2/L3 (router UI) -->
+    <div id="winshirt-panel-root" class="ws-panels" data-active-level="0" aria-live="polite">
+        <div class="ws-panel ws-panel-l1" data-level="1" aria-hidden="true"></div>
+        <div class="ws-panel ws-panel-l2" data-level="2" aria-hidden="true"></div>
+        <div class="ws-panel ws-panel-l3" data-level="3" aria-hidden="true"></div>
+    </div>
+
+    <!-- Actions basiques (tu pourras les replacer / styler) -->
+    <div class="winshirt-actions" style="display:flex; gap:8px; padding:10px;">
+        <button type="button" class="button ws-save-design" data-ws-save>Enregistrer le design</button>
+        <button type="button" class="button ws-add-to-cart" data-ws-add-to-cart>Ajouter au panier</button>
+    </div>
+
+    <!-- Champ hidden pour Woo (cart item) -->
+    <input type="hidden" name="winshirt_payload" id="winshirt-payload" value="">
 </div>
+
+<script>
+(function($){
+    'use strict';
+
+    // --- 1) Appliquer les mockups recto/verso s'ils existent dans WinShirtData ---
+    function applyMockups(){
+        const front = (window.WinShirtData && WinShirtData.mockups && WinShirtData.mockups.front) ? WinShirtData.mockups.front : '<?php echo $front_img; ?>';
+        const back  = (window.WinShirtData && WinShirtData.mockups && WinShirtData.mockups.back ) ? WinShirtData.mockups.back  : '<?php echo $back_img; ?>';
+        if(front){
+            $('#winshirt-canvas .winshirt-mockup-img[data-side="front"]').attr('src', front);
+        }
+        if(back){
+            $('#winshirt-canvas .winshirt-mockup-img[data-side="back"]').attr('src', back);
+        }
+    }
+
+    // --- 2) Recalcule les zones d'impression (px) depuis WinShirtData.zones (en %) ---
+    function lerp(a,b,t){ return a + (b-a)*t; }
+    function applyZones(){
+        const $cv = $('#winshirt-canvas');
+        const W = $cv.innerWidth(), H = $cv.innerHeight();
+        const zones = (window.WinShirtData && WinShirtData.zones) ? WinShirtData.zones : null;
+
+        ['front','back'].forEach(side=>{
+            const $z = $cv.find('.ws-print-zone[data-side="'+side+'"]');
+            if(!$z.length) return;
+
+            let cfg = null;
+            if(zones && zones[side] && zones[side].length){
+                // on prend la zone active (index 0 par défaut)
+                const idx = (window.WinShirtState ? WinShirtState.currentZoneIndex : 0) || 0;
+                cfg = zones[side][idx] || zones[side][0];
+            }
+            if(!cfg){
+                // fallback : 60% largeur, ratio 0.75
+                const w = W * 0.6, h = H * 0.45;
+                $z.css({ left:(W-w)/2, top:(H-h)/2, width:w, height:h });
+                return;
+            }
+            // cfg attendu : { xPct, yPct, wPct, hPct } en %
+            const x = (cfg.xPct||20) / 100 * W;
+            const y = (cfg.yPct||20) / 100 * H;
+            const w = (cfg.wPct||60) / 100 * W;
+            const h = (cfg.hPct||45) / 100 * H;
+            $z.css({ left:x, top:y, width:w, height:h });
+        });
+    }
+
+    // --- 3) Gestion Recto/Verso ---
+    function setSide(side){
+        if(!window.WinShirtState){ return; }
+        WinShirtState.setSide(side);
+
+        // Images mockup & zones
+        $('#winshirt-canvas .winshirt-mockup-img').hide();
+        $('#winshirt-canvas .winshirt-mockup-img[data-side="'+side+'"]').show();
+
+        $('#winshirt-canvas .ws-print-zone').hide();
+        $('#winshirt-canvas .ws-print-zone[data-side="'+side+'"]').show();
+
+        // Boutons actifs
+        $('.ws-side-btn').removeClass('active').attr('aria-selected','false');
+        $('.ws-side-btn[data-ws-side="'+side+'"]').addClass('active').attr('aria-selected','true');
+    }
+
+    // --- 4) Save design → previews + JSON calques → REST /save-design ---
+    async function saveDesign(){
+        try{
+            // capture recto/verso (si html2canvas présent)
+            const $cv = $('#winshirt-canvas');
+            if(typeof html2canvas !== 'function'){
+                alert('Capture indisponible (html2canvas manquant).'); return;
+            }
+
+            // Recto
+            setSide('front'); await new Promise(r=>setTimeout(r,50));
+            const canvasF = await html2canvas($cv[0], {useCORS:true});
+            const frontDataUrl = canvasF.toDataURL('image/png');
+
+            // Verso
+            setSide('back'); await new Promise(r=>setTimeout(r,50));
+            const canvasB = await html2canvas($cv[0], {useCORS:true});
+            const backDataUrl = canvasB.toDataURL('image/png');
+
+            // Payload
+            const layers = window.WinShirtState ? WinShirtState.layers : {front:[], back:[]};
+            const body = {
+                product_id: (window.WinShirtData && WinShirtData.product) ? WinShirtData.product.id : 0,
+                front_dataurl: frontDataUrl,
+                back_dataurl:  backDataUrl,
+                layers_json: JSON.stringify(layers),
+                lottery_id: 0
+            };
+
+            const resp = await fetch((WinShirtData.restUrl||'')+'/save-design', {
+                method:'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-WP-Nonce': WinShirtData.nonce || ''
+                },
+                body: JSON.stringify(body)
+            });
+            if(!resp.ok){
+                const t = await resp.text();
+                console.error('save-design error', t);
+                alert('Erreur sauvegarde design');
+                return;
+            }
+            const data = await resp.json();
+
+            // Remplit le hidden Woo
+            const payload = {
+                frontPreviewUrl: data.front ? data.front.url : '',
+                backPreviewUrl:  data.back  ? data.back.url  : '',
+                layers: layers,
+                lotteryId: data.lottery_id || 0
+            };
+            $('#winshirt-payload').val(JSON.stringify(payload));
+
+            // Revenir côté initial
+            setSide(WinShirtState.currentSide === 'back' ? 'back' : 'front');
+
+            alert('Design sauvegardé.');
+        }catch(e){
+            console.error(e);
+            alert('Erreur inattendue (save).');
+        }
+    }
+
+    // --- 5) Add to cart : exige que #winshirt-payload soit rempli (après save) ---
+    function addToCart(){
+        if(!$('#winshirt-payload').val()){
+            alert('Enregistre d’abord le design (prévisualisations).');
+            return;
+        }
+        // Si le bouton "Ajouter au panier" Woo est présent : on déclenche submit du formulaire produit.
+        const $form = $('form.cart');
+        if($form.length){
+            $form.trigger('submit');
+        }else{
+            alert('Formulaire WooCommerce introuvable. Ajoute au panier manuellement.');
+        }
+    }
+
+    // --- Boot ---
+    $(function(){
+        applyMockups();
+        applyZones();
+        setSide('front');
+
+        // Recalcul zones au resize
+        let t=null;
+        $(window).on('resize', function(){ clearTimeout(t); t=setTimeout(applyZones, 120); });
+
+        // Boutons recto/verso
+        $(document).on('click', '.ws-side-btn', function(){
+            setSide($(this).data('ws-side'));
+        });
+
+        // Actions
+        $(document).on('click', '[data-ws-save]', saveDesign);
+        $(document).on('click', '[data-ws-add-to-cart]', addToCart);
+
+        // Signaler qu’on est prêt
+        $(document).trigger('winshirt:templateReady');
+    });
+})(jQuery);
+</script>
