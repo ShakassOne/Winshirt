@@ -1,138 +1,41 @@
-Plan de développement — Plugin WinShirt (Complet)
-
-Contexte & objectifs
-
-Le plugin WinShirt a pour vocation de permettre :
-
-La personnalisation textile (t-shirts, sweats, casquettes) directement depuis la fiche produit WooCommerce.
-
-La gestion de loteries associées aux produits, avec export des participants pour huissier.
-
-L’enregistrement, l’aperçu et la production des mockups et visuels clients.
-
-Un workflow DTF pour suivre l’état de production des commandes personnalisées.
-
-État actuel
-
-Déploiement automatisé via GitHub Actions → plugin synchronisé en FTP/Web
-
-Frontend minimal : bouton « Personnaliser ce produit » + modal vide
-
-Métabox produit « Personnalisable » opérationnelle (sauvegarde de la méta)
-
-Taxonomie « Loterie » sur Articles + bouton d’envoi participants
-
-Roadmap détaillée (ordre de priorité)
-
-1. Initialisation & structure de base
-
-Fichier principal (winshirt.php) : constantes, autoload des classes, hooks init
-
-Arborescence : includes/, assets/css, assets/js, templates/, admin/, .github/workflows
-
-Déploiement : confirmer le workflow GitHub Actions (SFTP ou SSH‑git pull)
-
-2. Configuration globale
-
-Menu WinShirt > Configuration
-
-Champs via Settings API : API IA, formats autorisés, dimensions par défaut, préfixes/chemins exports, email huissier
-
-Validation/sanitization des options
-
-3. Personnalisation produit
-
-Méta-box « Produit personnalisable » sur post-type product
-
-Méthode de sauvegarde : hook save_post, contrôle nonce, autosave, révisions, capabilities
-
-Bouton front : woocommerce_before_add_to_cart_button selon méta
-
-Impression des assets : CSS/JS pour modal chargé uniquement en produit personnalisé
-
-4. Modal de personnalisation (prestations frontend)
-
-Template PHP (templates/modal-customizer.php) avec ta structure HTML & classes exactes
-
-CSS externe (assets/css/winshirt-modal.css) reprenant intégralement ton code (styles, ombres, responsive)
-
-JS (assets/js/winshirt-modal.js) pour :
-
-Ouvrir/fermer modal (overlay, close, Esc)
-
-Switch outils (images, texte, calques, QR, IA)
-
-Switch face (front/back) et taille (A4, A3, cœur,…)
-
-Zone dynamique : <div class="design-area"> remplaçable par SVG ou canvas vierge
-
-5. Éditeur d’éléments
-
-Images : galerie + upload via File API ou media handle AJAX
-
-Texte : input, choix police, taille, couleur, style (gras, italique, souligné)
-
-QR Code : génération via JS et insertion directe
-
-IA : prompt → appel AJAX au serveur → inserion de l’image générée
-
-Calques : liste des éléments, ordre (drag & drop dans sidebar ou controls de profondeur)
-
-Drag & resize : utiliser une librairie (ex. interact.js) ou manipuler via JS natif
-
-6. Capture & sauvegarde
-
-html2canvas ou canvas.toBlob() pour générer :
-
-PNG basse résolution (preview)
-
-PNG HD (production)
-
-Enregistrement : send AJAX/REST à wc_add_order_item_meta ou update_post_meta
-
-Gestion des médias : stocker dans la médiathèque WP, attacher à l’ordre ou au produit
-
-7. Mockups produits
-
-Custom Post Type winshirt_mockup
-
-Liste avec colonnes produits, format, zones définies
-
-UI graphique pour dessiner/positionner les zones (x, y, width, height)
-
-Enregistrement en métadonnées
-
-8. Visuels clients
-
-Custom Post Type winshirt_visual ou métas dans order_item
-
-Galerie admin avec miniatures, date, produit, client
-
-Actions : télécharger PNG, supprimer, régénérer HD
-
-9. Commandes DTF
-
-Sous-menu Commandes DTF
-
-Table WP_List_Table listant les commandes personnalisées
-
-Filtres : statut (À produire, En cours, Expédié), date, client
-
-Bouton export JSON/XML pour huissier
-
-10. Tests & validation
-
-Tests unitaires (PHPUnit, WP-CLI) pour classes et fonctions critiques
-
-Tests fonctionnels (cypress, integration-tests) pour flux complet (personnalisation → commande)
-
-QA/UI : test responsiveness, accessibilité (ARIA), performance du modal
-
-11. Documentation & publication
-
-Documentation utilisateur (docs/): installation, configuration, tutoriel modal
-
-Readme.txt pour WordPress.org (Changelog, captures, FAQ)
-
-Préparation du zip pour dépôt sur WordPress.org
-
+Roadmap détaillée – WinShirt
+
+1. Socle & structure
+- Initialisation plugin : constantes, autoload, hooks, activation/désactivation
+- Arborescence /assets, /includes, /templates, /admin
+- Enqueue CSS/JS public + WinShirtData (state/config/mockups/zones)
+- Shortcode [winshirt_customizer] et template modal basique
+
+2. UI & Modal
+- Modal overlay + layout responsive (desktop colonne droite, mobile en bas)
+- Ouverture/fermeture (winshirt-modal.js)
+- Boutons Recto/Verso + gestion de côté
+- Mockup + zones d’impression (mockup-canvas.js)
+- Router/panels (squelette) + hooks
+
+3. Données produit
+- Réglages produit Woo : _winshirt_enable, _winshirt_mockup_id
+- Bouton “Personnaliser” sur page produit
+- Injection mockups/zones depuis CPT mockup
+
+4. CPT & Galerie
+- CPT ws-mockup (mockups produits)
+- CPT ws-design (visuels)
+- Taxonomie ws-design-category
+- Menus admin WinShirt → listes/ajouts (mockups/visuels)
+
+5. Personnalisation & panier
+- Sauvegarde design (REST) + previews recto/verso
+- Ajout au panier : winshirt_payload → meta item & commande
+- Affichage BO : vignettes recto/verso
+
+6. Outils d’édition (à venir)
+- Outil Images : galerie, upload, placement dans zone
+- Outil Texte : ajout/édition, fonts, styles
+- Calques : drag, ordre, lock/visibility
+- QR Code & IA (placeholder)
+
+7. Prix & export (à venir)
+- Grille pricing par surface (A7→A3) – client & serveur
+- Exports DTF/PNG/JSON
+- Email & récap commande
