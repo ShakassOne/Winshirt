@@ -1,85 +1,99 @@
 <?php
-if ( ! defined( 'ABSPATH' ) ) {
-    exit;
-}
+/**
+ * WinShirt - REST Designs (liste de visuels pour la galerie)
+ */
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! class_exists( 'WinShirt_Designs' ) ) {
 
 class WinShirt_Designs {
 
-    public function __construct() {
-        // Enregistre le CPT et la taxonomie lors de l'init
-        add_action( 'init', [ $this, 'register_post_type_and_taxonomy' ] );
-        // Ajoute le support des vignettes pour ce CPT
-        add_action( 'after_setup_theme', [ $this, 'ensure_thumbnails' ] );
-    }
+	public static function init() {
+		add_action( 'rest_api_init', [ __CLASS__, 'register_routes' ] );
+	}
 
-    /**
-     * Enregistre le CPT 'ws-design' (Visuels)
-     * et sa taxonomie 'ws-design-category'
-     */
-    public function register_post_type_and_taxonomy() {
-        // --- CPT Visuels ---
-        $labels = [
-            'name'               => __( 'Visuels', 'winshirt' ),
-            'singular_name'      => __( 'Visuel', 'winshirt' ),
-            'add_new'            => __( 'Ajouter', 'winshirt' ),
-            'add_new_item'       => __( 'Ajouter un visuel', 'winshirt' ),
-            'edit_item'          => __( 'Modifier le visuel', 'winshirt' ),
-            'new_item'           => __( 'Nouveau visuel', 'winshirt' ),
-            'view_item'          => __( 'Voir le visuel', 'winshirt' ),
-            'search_items'       => __( 'Rechercher des visuels', 'winshirt' ),
-            'not_found'          => __( 'Aucun visuel trouvé', 'winshirt' ),
-            'not_found_in_trash' => __( 'Aucun visuel dans la corbeille', 'winshirt' ),
-            'menu_name'          => __( 'Visuels', 'winshirt' ),
-        ];
+	public static function register_routes() {
+		register_rest_route( 'winshirt/v1', '/designs', [
+			'methods'  => 'GET',
+			'callback' => [ __CLASS__, 'get_designs' ],
+			'permission_callback' => '__return_true',
+			'args' => [
+				'category' => [ 'type'=>'string', 'required'=>false ],
+				'page'     => [ 'type'=>'integer', 'required'=>false, 'default'=>1 ],
+				'per_page' => [ 'type'=>'integer', 'required'=>false, 'default'=>24 ],
+			],
+		] );
+	}
 
-        $args = [
-            'labels'             => $labels,
-            'public'             => false,
-            'show_ui'            => true,
-            // Place ce CPT sous le menu WinShirt principal
-            // L'affichage du CPT dans le menu est géré manuellement
-            'show_in_menu'       => false,
-            'supports'           => [ 'title', 'thumbnail' ],
-            'capability_type'    => 'post',
-            'map_meta_cap'       => true,
-        ];
+	public static function get_designs( WP_REST_Request $req ) {
+		$tax_query = [];
+		$cat = sanitize_text_field( $req->get_param('category') );
+		if ( $cat && $cat !== 'all' ) {
+			$tax_query[] = [
+				'taxonomy' => 'ws-design-category',
+				'field'    => 'slug',
+				'terms'    => $cat,
+			];
+		}
 
-        register_post_type( 'ws-design', $args );
+		$page     = max(1, (int)$req['page']);
+		$per_page = min(60, max(1, (int)$req['per_page']));
 
-        // --- Taxonomie Catégories de visuels ---
-        $tax_labels = [
-            'name'              => __( 'Catégories de visuels', 'winshirt' ),
-            'singular_name'     => __( 'Catégorie de visuel', 'winshirt' ),
-            'search_items'      => __( 'Rechercher des catégories', 'winshirt' ),
-            'all_items'         => __( 'Toutes les catégories', 'winshirt' ),
-            'edit_item'         => __( 'Modifier la catégorie', 'winshirt' ),
-            'update_item'       => __( 'Mettre à jour la catégorie', 'winshirt' ),
-            'add_new_item'      => __( 'Ajouter une nouvelle catégorie', 'winshirt' ),
-            'new_item_name'     => __( 'Nom de la nouvelle catégorie', 'winshirt' ),
-            'menu_name'         => __( 'Catégories de visuels', 'winshirt' ),
-        ];
+		$q = new WP_Query([
+			'post_type'      => 'ws-design',
+			'post_status'    => 'publish',
+			'posts_per_page' => $per_page,
+			'paged'          => $page,
+			'tax_query'      => $tax_query,
+			'no_found_rows'  => false,
+		]);
 
-        $tax_args = [
-            'hierarchical'      => true,
-            'labels'            => $tax_labels,
-            'show_ui'           => true,
-            'show_admin_column' => true,
-            'query_var'         => true,
-            'rewrite'           => [ 'slug' => 'ws-design-category' ],
-            // Ne pas créer de sous-menu séparé
-            'show_in_menu'      => false,
-        ];
+		$items = [];
+		foreach ( $q->posts as $p ) {
+			$thumb = get_the_post_thumbnail_url( $p, 'medium' );
+			if ( ! $thumb ) {
+				// fallback meta possible (si l’image est stockée en URL)
+				$maybe = get_post_meta( $p->ID, 'image', true );
+				if ( is_string($maybe) && preg_match('#^https?://#', $maybe) ) $thumb = $maybe;
+			}
 
-        register_taxonomy( 'ws-design-category', [ 'ws-design' ], $tax_args );
-    }
+			$cats = [];
+			$terms = get_the_terms( $p, 'ws-design-category' );
+			if ( is_array($terms) ) {
+				foreach ( $terms as $t ) $cats[] = [ 'slug'=>$t->slug, 'name'=>$t->name ];
+			}
 
-    /**
-     * Active le support des vignettes pour ce CPT
-     */
-    public function ensure_thumbnails() {
-        add_theme_support( 'post-thumbnails', [ 'ws-design' ] );
-    }
+			$items[] = [
+				'id'    => (int) $p->ID,
+				'title' => get_the_title( $p ),
+				'thumb' => $thumb ?: '',
+				'full'  => $thumb ?: '',
+				'cats'  => $cats,
+			];
+		}
+
+		// catégories
+		$cat_items = [];
+		$terms = get_terms([
+			'taxonomy'   => 'ws-design-category',
+			'hide_empty' => true,
+		]);
+		if ( ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $t ) {
+				$cat_items[] = [ 'slug'=>$t->slug, 'name'=>$t->name, 'count'=>$t->count ];
+			}
+		}
+
+		return new WP_REST_Response([
+			'items'      => $items,
+			'categories' => array_merge([['slug'=>'all','name'=>'Tous','count'=>0]], $cat_items),
+			'total'      => (int) $q->found_posts,
+			'page'       => $page,
+			'per_page'   => $per_page,
+		]);
+	}
 }
 
-// Instanciation
-new WinShirt_Designs();
+WinShirt_Designs::init();
+}
