@@ -2,8 +2,7 @@
  * WinShirt - Modal (glue légère)
  * - Ouvre/ferme le customizer
  * - Initialise Layers sur le canvas
- * - Déclenche l’ouverture du menu principal (router déjà prêt)
- * - Évite doublons de roots / écouteurs
+ * - Déclenche l’ouverture du menu principal
  *
  * Dépendances : jQuery, WinShirtState, WinShirtUIRouter, WinShirtLayers
  */
@@ -17,15 +16,14 @@
       const $modal = $('#winshirt-customizer-modal');
       if(!$modal.length){ console.warn('WinShirt modal introuvable.'); return; }
 
-      // Affiche le modal (adapte si tu as déjà un système d’overlay)
+      // Affiche le modal (overlay)
       $modal.addClass('is-open').show();
 
-      // Init unique
       if(!this.booted){
         this.boot();
       }
 
-      // Ouvre le menu principal (router) proprement
+      // Ouvre le menu principal
       $(document).trigger('winshirt:openMainMenu');
     },
 
@@ -43,36 +41,32 @@
         WinShirtLayers.init($canvas);
       }
 
-      // Sélecteurs par défaut (tu peux binder tes propres boutons avec data-ws-open/close)
-      $(document).on('click', '[data-ws-open-customizer]', (e)=>{
-        e.preventDefault(); this.open();
-      });
-      $(document).on('click', '[data-ws-close-customizer]', (e)=>{
-        e.preventDefault(); this.close();
-      });
-
-      // Sécurité : empêcher double-root
+      // Sécurité : un seul root panels
       const $roots = $('#winshirt-panel-root');
       if($roots.length > 1){
-        // on garde le premier, on supprime les suivants
         $roots.slice(1).remove();
       }
 
-      // À l’ouverture du template, recalcul des zones (au cas où)
+      // Recalcul zones après rendu template
       $(document).on('winshirt:templateReady', ()=>{
         $(window).trigger('resize');
       });
     }
   };
 
-  // Expose (si besoin)
+  // Expose si besoin
   window.WinShirtModal = Modal;
 
-  // Auto-bind : si un bouton “Personnaliser” existe déjà
+  // ❗️Bind du bouton dès le ready (corrige le bug)
   $(function(){
-    // Par convention : un bouton avec data-ws-open-customizer
-    // Sinon, laisse l’intégrateur binder manuellement.
-    // Exemple : $('body').on('click', '.btn-personnaliser', ()=>WinShirtModal.open());
+    $(document).on('click', '[data-ws-open-customizer]', function(e){
+      e.preventDefault();
+      Modal.open();
+    });
+    $(document).on('click', '[data-ws-close-customizer]', function(e){
+      e.preventDefault();
+      Modal.close();
+    });
   });
 
 })(jQuery);
