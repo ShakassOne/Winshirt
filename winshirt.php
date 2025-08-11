@@ -41,6 +41,8 @@ winshirt_require_if_exists( 'includes/class-winshirt-product-customization.php' 
 // === Admin / Réglages / Menu ===
 winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
 winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
+winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
+
 
 // === Activation / Désactivation ===
 register_activation_hook( __FILE__, function(){
