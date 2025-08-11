@@ -8,7 +8,7 @@ jQuery(function($){
     $modal.fadeIn(200);
     initVisuels();
     setSide('front');
-    requestAnimationFrame(()=>requestAnimationFrame(computePrintZone));
+    initZones();
     // TODO: ici lancer init de la librairie de personnalisation (canvas/SVG)
   });
 
@@ -88,13 +88,26 @@ jQuery(function($){
     designArea.style.top    = Math.round(y) + 'px';
   }
 
+  function initZones(){
+    const mock = document.querySelector('#tshirt img.mockup-img') || mockupImg;
+    const compute = () => {
+      computePrintZone();
+      requestAnimationFrame(()=>{
+        document.getElementById('design-area')?.classList.add('ready');
+      });
+    };
+    if(mock && !mock.complete) mock.addEventListener('load', compute, {once:true});
+    requestAnimationFrame(()=>requestAnimationFrame(compute));
+  }
+
   function setSide(side){
     if(!mockupImg || !window.WinShirtData) return;
-    currentSide = side;
-    mockupImg.src = window.WinShirtData[side] || '';
-    if(window.WinshirtCustomizer && typeof window.WinshirtCustomizer.setSide === 'function'){
-      window.WinshirtCustomizer.setSide(side);
-    }
+    const s = side==='back' ? 'back' : 'front';
+    currentSide = s;
+    mockupImg.src = window.WinShirtData[s] || '';
+    document.querySelectorAll('#design-area .design-element').forEach(el=>{
+      el.style.display = (el.dataset.side===s ? 'block' : 'none');
+    });
   }
 
   if(mockupImg){
@@ -180,7 +193,7 @@ jQuery(function($){
     const layerDiv = document.createElement('div');
     layerDiv.className = 'design-element';
     layerDiv.id = id;
-    layerDiv.innerHTML = `<div class="content">${content}</div><div class="handle" data-handle="resize-locked"></div><div class="handle" data-handle="resize-free"></div><div class="handle" data-handle="rotate"></div><div class="handle" data-handle="delete"></div>`;
+    layerDiv.innerHTML = `<div class="content">${content}</div>`; // handles injected later
     designArea.appendChild(layerDiv);
     const li = document.createElement('li');
     li.className = 'layer-item';
@@ -200,9 +213,6 @@ jQuery(function($){
       const layerDiv = createLayer('Design', `<img src="${url}" alt="" />`);
       layerDiv.style.width = '120px';
       layerDiv.style.height = '120px';
-      const daRect = designArea.getBoundingClientRect();
-      layerDiv.style.left = Math.max((daRect.width - 120) / 2, 0) + 'px';
-      layerDiv.style.top = Math.max((daRect.height - 120) / 2, 0) + 'px';
       const img = layerDiv.querySelector('img');
       if(img){
         img.style.objectFit = 'contain';
@@ -507,270 +517,148 @@ jQuery(function($){
 
 });
 
-// ===================== WINSHIRT START: Manipulation & Faces =====================
+// ===================== WINSHIRT START: Drag/Resize/Rotate =====================
 (function(){
-  const STAGE_SEL = '#design-area';               // ta zone d'impression (déjà présente)
-  const stage = document.querySelector(STAGE_SEL);
-  if(!stage){ console.error('WinShirt: #design-area introuvable'); return; }
+  const STAGE = document.getElementById('design-area');
+  if(!STAGE){ console.error('WinShirt: #design-area manquant'); return; }
 
-  // Face courante (par défaut recto)
-  let currentSide = 'front';
+  let cur = null, ctx = null, moving=false;
 
-  // Etat sélection
-  let selected = null;
-  let dragCtx = null;
-  let moveAttached = false;
+  const px = n=>`${Math.round(n)}px`;
+  const sRect = ()=> STAGE.getBoundingClientRect();
+  const clamp = ()=>{
+    const r=sRect(); return {l:0,t:0,r:r.width,b:r.height};
+  };
+  const point = ev=>{
+    const r=sRect(); const e=(ev.touches && ev.touches[0])||ev;
+    return {x:e.clientX - r.left, y:e.clientY - r.top};
+  };
 
-  // Utils
-  const px = n => `${Math.round(n)}px`;
-  const zTop = (el)=>{
-    let max = 1;
-    stage.querySelectorAll('.design-element').forEach(d=>{
-      const z = parseInt(getComputedStyle(d).zIndex||1,10);
-      if(z>max) max=z;
+  function select(el){
+    STAGE.querySelectorAll('.design-element').forEach(d=>d.classList.remove('selected'));
+    el.classList.add('selected'); cur=el;
+    let max=1; STAGE.querySelectorAll('.design-element').forEach(d=>{
+      const z=parseInt(getComputedStyle(d).zIndex||1,10); if(z>max) max=z;
     });
     el.style.zIndex = String(max+1);
-  };
-  const stageRect = ()=> stage.getBoundingClientRect();
-  const clampRect = ()=> { // clamp = la zone elle-même
-    const r = stage.getBoundingClientRect();
-    return { left:0, top:0, right:r.width, bottom:r.height, width:r.width, height:r.height };
-  };
-  const eventPoint = (ev)=>{
-    const r = stageRect();
-    const e = (ev.touches && ev.touches.length) ? ev.touches[0] : ev;
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  };
-
-  // Faces
-  function setSide(side){
-    currentSide = (side==='back' ? 'back' : 'front');
-    stage.querySelectorAll('.design-element').forEach(el=>{
-      el.style.display = (el.dataset.side === currentSide ? 'block' : 'none');
-    });
   }
 
-  // PUBLIC API minimale
-  window.WinshirtCustomizer = window.WinshirtCustomizer || {};
-  Object.assign(window.WinshirtCustomizer, {
-    setSide,
-    addImage,                 // addImage({src, side?})
-    getState                  // retourne la liste d'éléments (par face)
-  });
-
-  function getState(){
-    const list = [];
-    stage.querySelectorAll('.design-element').forEach(el=>{
-      list.push({
-        side: el.dataset.side || 'front',
-        left: parseInt(el.style.left||0,10),
-        top:  parseInt(el.style.top||0,10),
-        width: el.offsetWidth,
-        height: el.offsetHeight,
-        angle: parseFloat(el.dataset.angle||'0'),
-        zIndex: parseInt(getComputedStyle(el).zIndex||1,10),
-        type: el.dataset.type || 'image',
-        src:  el.dataset.src  || null
-      });
-    });
-    return list;
-  }
-
-  // Sélection
-  function select(el){
-    stage.querySelectorAll('.design-element').forEach(d=>d.classList.remove('selected'));
-    el.classList.add('selected');
-    selected = el;
-    zTop(el);
-  }
-
-  // Création d’un élément image (ex. depuis ta galerie)
-  function addImage({src, side}){
-    const s = side || currentSide;
-
-    const el = document.createElement('div');
-    el.className = 'design-element';
-    el.dataset.side = s;
-    el.dataset.type = 'image';
-    el.dataset.src  = src;
-    el.style.left = px( (stage.clientWidth  - 180)/2 );
-    el.style.top  = px( (stage.clientHeight - 180)/2 );
-    el.style.width  = px(180);
-    el.style.height = px(180);
-    el.style.transform = 'rotate(0deg)';
-    el.dataset.angle = '0';
-
-    el.innerHTML = `
-      <img class="content" src="${src}" alt="">
-      <div class="resize-handles">
-        <div class="handle handle-tl" data-handle="rotate" title="Rotation"></div>
-        <div class="handle handle-tr" data-handle="delete" title="Supprimer"></div>
-        <div class="handle handle-bl" data-handle="resize-locked" title="Redimensionner (ratio)"></div>
-        <div class="handle handle-br" data-handle="resize-free"   title="Redimensionner (libre)"></div>
-      </div>
-    `;
-
-    stage.appendChild(el);
-    bindElement(el);
-    select(el);
-    setSide(currentSide); // masque si autre face
-    return el;
-  }
-
-  function bindElement(el){
-    // Drag sur le cadre (hors poignées)
-    el.addEventListener('mousedown', (e)=>{
-      if(e.target.classList.contains('handle')) return;
-      e.preventDefault(); e.stopPropagation();
-      select(el);
-      startDrag(e, el);
-    });
-    el.addEventListener('touchstart', (e)=>{
-      if(e.target.classList.contains('handle')) return;
-      select(el);
-      startDrag(e, el);
-    }, {passive:false});
-
-    // Poignées
-    el.querySelectorAll('.handle').forEach(h=>{
-      const a = h.dataset.handle;
-      const start = (ev)=>{
-        ev.preventDefault(); ev.stopPropagation(); select(el);
-        if(a==='delete'){ deleteEl(el); return; }
-        if(a==='rotate'){ startRotate(ev, el); return; }
-        startResize(ev, el, a==='resize-locked');
-      };
-      h.addEventListener('mousedown', start);
-      h.addEventListener('touchstart', start, {passive:false});
-    });
-  }
-
-  // DRAG
   function startDrag(ev, el){
-    const p = eventPoint(ev);
-    const r = el.getBoundingClientRect();
-    const s = stageRect();
-    dragCtx = {
-      mode:'move',
-      el,
-      offX: p.x - (r.left - s.left),
-      offY: p.y - (r.top  - s.top),
-      clamp: clampRect()
-    };
-    attachMoves();
+    const p=point(ev), r=el.getBoundingClientRect(), s=sRect();
+    ctx={mode:'move', el, dx:p.x-(r.left-s.left), dy:p.y-(r.top-s.top), clamp:clamp()};
+    attach(); ev.preventDefault();
   }
   function doDrag(p){
-    const {el, offX, offY, clamp} = dragCtx;
-    const w = el.offsetWidth, h = el.offsetHeight;
-    let L = p.x - offX;
-    let T = p.y - offY;
-    L = Math.max(clamp.left, Math.min(L, clamp.right  - w));
-    T = Math.max(clamp.top,  Math.min(T, clamp.bottom - h));
-    el.style.left = px(L);
-    el.style.top  = px(T);
+    const {el,dx,dy,clamp:c}=ctx, w=el.offsetWidth, h=el.offsetHeight;
+    let L=p.x-dx, T=p.y-dy;
+    L=Math.max(c.l, Math.min(L, c.r-w)); T=Math.max(c.t, Math.min(T, c.b-h));
+    el.style.left=px(L); el.style.top=px(T);
   }
 
-  // ROTATE
   function startRotate(ev, el){
-    const r = el.getBoundingClientRect();
-    const s = stageRect();
-    dragCtx = {
-      mode:'rotate',
-      el,
-      cx: (r.left - s.left) + r.width/2,
-      cy: (r.top  - s.top ) + r.height/2
-    };
-    attachMoves();
+    const r=el.getBoundingClientRect(), s=sRect();
+    ctx={mode:'rot', el, cx:(r.left-s.left)+r.width/2, cy:(r.top-s.top)+r.height/2};
+    attach(); ev.preventDefault();
   }
   function doRotate(p){
-    const {el, cx, cy} = dragCtx;
-    const dx = p.x - cx, dy = p.y - cy;
-    const angle = (Math.atan2(dy, dx) * 180 / Math.PI) + 90;
-    el.style.transform = `rotate(${angle}deg)`;
-    el.dataset.angle = String(angle);
+    const {el,cx,cy}=ctx, a=(Math.atan2(p.y-cy,p.x-cx)*180/Math.PI)+90;
+    el.style.transform=`rotate(${a}deg)`; el.dataset.angle=String(a);
   }
 
-  // RESIZE
   function startResize(ev, el, lock){
-    const r = el.getBoundingClientRect();
-    const s = stageRect();
-    dragCtx = {
-      mode:'resize',
-      el,
-      start: eventPoint(ev),
-      startW: r.width,
-      startH: r.height,
-      startL: r.left - s.left,
-      startT: r.top  - s.top,
-      ratio: r.width / r.height,
-      lock: !!lock,
-      clamp: clampRect()
-    };
-    attachMoves();
+    const r=el.getBoundingClientRect(), s=sRect();
+    ctx={mode:'rsz', el, lock:!!lock,
+         sx:point(ev).x, sy:point(ev).y,
+         w:r.width, h:r.height, L:r.left-s.left, T:r.top-s.top,
+         ratio:r.width/r.height, clamp:clamp()};
+    attach(); ev.preventDefault();
   }
   function doResize(p){
-    const d = dragCtx;
-    let dX = p.x - d.start.x;
-    let dY = p.y - d.start.y;
-
-    let newW = d.startW + (d.lock ? Math.max(dX, dY) : dX);
-    let newH = d.lock ? (newW / d.ratio) : (d.startH + dY);
-
-    newW = Math.max(30, newW);
-    newH = Math.max(30, newH);
-
-    // clamp à droite/bas
-    const maxW = d.clamp.right  - d.startL;
-    const maxH = d.clamp.bottom - d.startT;
-    newW = Math.min(newW, maxW);
-    newH = Math.min(newH, maxH);
-
-    d.el.style.width  = px(newW);
-    d.el.style.height = px(newH);
+    const d=ctx; let dX=p.x-d.sx, dY=p.y-d.sy;
+    let w=d.w+(d.lock?Math.max(dX,dY):dX);
+    let h=d.lock?(w/d.ratio):(d.h+dY);
+    w=Math.max(30, Math.min(w, d.clamp.r - d.L));
+    h=Math.max(30, Math.min(h, d.clamp.b - d.T));
+    d.el.style.width=px(w); d.el.style.height=px(h);
   }
 
-  function deleteEl(el){
-    if(el && el.parentNode) el.parentNode.removeChild(el);
-    if(selected===el) selected = null;
-  }
+  function del(el){ el.remove(); if(cur===el) cur=null; }
 
-  // Mouvement global
-  function onMove(ev){
-    if(!dragCtx) return;
-    const p = eventPoint(ev);
-    if(dragCtx.mode==='move') doDrag(p);
-    else if(dragCtx.mode==='rotate') doRotate(p);
-    else if(dragCtx.mode==='resize') doResize(p);
+  STAGE.addEventListener('mousedown', (e)=>{
+    const el = e.target.closest('.design-element');
+    if(!el) return;
+    if(e.target.classList.contains('handle')){
+      const k=e.target.dataset.handle;
+      if(k==='delete') return del(el);
+      if(k==='rotate') return startRotate(e, el);
+      return startResize(e, el, k==='resize-locked');
+    }
+    select(el); startDrag(e, el);
+  });
+  STAGE.addEventListener('touchstart', (e)=>{
+    const el=e.target.closest('.design-element'); if(!el) return;
+    if(e.target.classList.contains('handle')){
+      const k=e.target.dataset.handle;
+      if(k==='delete') return del(el);
+      if(k==='rotate') return startRotate(e, el);
+      return startResize(e, el, k==='resize-locked');
+    }
+    select(el); startDrag(e, el);
+  }, {passive:false});
+
+  function onMove(e){
+    if(!ctx) return; const p=point(e);
+    if(ctx.mode==='move') doDrag(p);
+    else if(ctx.mode==='rot') doRotate(p);
+    else if(ctx.mode==='rsz') doResize(p);
   }
-  function onUp(){
-    detachMoves();
-    dragCtx = null;
-  }
-  function attachMoves(){
-    if(moveAttached) return;
-    moveAttached = true;
+  function onUp(){ detach(); ctx=null; }
+  function attach(){
+    if(moving) return; moving=true;
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
     window.addEventListener('touchmove', onMove, {passive:false});
     window.addEventListener('touchend', onUp);
   }
-  function detachMoves(){
-    if(!moveAttached) return;
-    moveAttached = false;
+  function detach(){
+    if(!moving) return; moving=false;
     window.removeEventListener('mousemove', onMove);
     window.removeEventListener('mouseup', onUp);
     window.removeEventListener('touchmove', onMove);
     window.removeEventListener('touchend', onUp);
   }
 
-  // Re-clamp si la zone change (après chargement du mockup, resize, etc.)
-  const ro = new ResizeObserver(()=>{ /* rien à recalculer ici, clampRect lit stage */ });
-  ro.observe(stage);
-
-  // Expose un helper pour déboguer
-  window.WinshirtManip = {
-    select: (el)=>select(el),
-    setSide
+  const injectHandles = (el)=>{
+    if(!el.querySelector('.resize-handles')){
+      const box=document.createElement('div');
+      box.className='resize-handles';
+      box.innerHTML=`
+        <div class="handle handle-tl" data-handle="rotate"></div>
+        <div class="handle handle-tr" data-handle="delete"></div>
+        <div class="handle handle-bl" data-handle="resize-locked"></div>
+        <div class="handle handle-br" data-handle="resize-free"></div>`;
+      el.appendChild(box);
+    }
+    if(!el.dataset.side){
+      const active=document.querySelector('.view-btn[aria-pressed="true"]');
+      el.dataset.side = active ? active.dataset.side : 'front';
+    }
+    if(!el.style.left){ el.style.left=px((STAGE.clientWidth - el.offsetWidth)/2 || 10); }
+    if(!el.style.top ){ el.style.top =px((STAGE.clientHeight- el.offsetHeight)/2 || 10); }
   };
+
+  const mo = new MutationObserver(muts=>{
+    muts.forEach(m=>{
+      m.addedNodes.forEach(n=>{
+        if(n.nodeType===1 && n.classList.contains('design-element')){
+          injectHandles(n);
+          n.style.display = (n.dataset.side==='back' ? 'none' : 'block');
+        }
+      });
+    });
+  });
+  mo.observe(STAGE, {childList:true, subtree:false});
+
+  STAGE.querySelectorAll('.design-element').forEach(injectHandles);
 })();
-/// ===================== WINSHIRT END =====================
+// ===================== WINSHIRT END =====================
