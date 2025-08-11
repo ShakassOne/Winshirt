@@ -1,0 +1,15 @@
+/* WinShirt - Layers */
+
+.winshirt-mockup-canvas .ws-layer {
+  box-sizing: border-box;
+  outline: 1px dashed rgba(0,0,0,0.15);
+}
+
+.winshirt-mockup-canvas .ws-layer.selected {
+  outline: 2px solid #3b82f6;
+}
+
+/* Zone d'impression visuelle */
+.winshirt-mockup-canvas .ws-print-zone {
+  border: 1px dashed rgba(0, 102, 255, 0.5);
+}
