@@ -1,211 +1,90 @@
 /**
- * WinShirt - Outils Texte
- * - Ajout d'un calque texte
- * - Mise à jour de styles: fontFamily, fontSize, fontWeight, textAlign, color, strokeColor, strokeWidth, letterSpacing, lineHeight
- * - Sélection automatique du calque créé
- *
- * Dépendances : jQuery, WinShirtState, WinShirtLayers
+ * WinShirt - Text Tools
+ * - UI L2 pour ajouter/éditer du texte
+ * - Ajout d’un calque texte via WinShirtLayers.addText()
+ * - Edition du calque sélectionné (contenu, taille, gras, italique)
  */
-
 (function($){
-    'use strict';
+  'use strict';
 
-    const DEFAULTS = {
-        text: 'Votre texte',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: 32,         // px
-        fontWeight: 600,
-        textAlign: 'center',  // left|center|right
-        color: '#111111',
-        strokeColor: '#ffffff',
-        strokeWidth: 0,       // px
-        letterSpacing: 0,     // px
-        lineHeight: 1.2,      // unitless
-        width: 260,           // px (zone initiale)
-        height: 100,
-        left: 80,
-        top: 80,
-        rotation: 0
-    };
+  function tpl(){
+    return `
+      <div class="ws-text-tool" style="display:flex;flex-direction:column;gap:10px;padding:10px">
+        <label style="display:block">
+          <div style="font-size:12px;opacity:.7;margin-bottom:4px">Texte</div>
+          <input type="text" class="ws-txt-content" placeholder="Votre texte" style="width:100%;padding:8px;border:1px solid #ddd;border-radius:8px">
+        </label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label> Taille
+            <input type="number" class="ws-txt-size" value="32" min="8" max="200" style="width:80px;margin-left:6px;padding:6px;border:1px solid #ddd;border-radius:8px">
+          </label>
+          <label style="display:flex;gap:6px;align-items:center">
+            <input type="checkbox" class="ws-txt-bold"> <span>Gras</span>
+          </label>
+          <label style="display:flex;gap:6px;align-items:center">
+            <input type="checkbox" class="ws-txt-italic"> <span>Italique</span>
+          </label>
+          <button class="button ws-txt-add">Ajouter</button>
+        </div>
+        <div class="ws-txt-help" style="font-size:12px;opacity:.7">Astuce : clique le texte sur le mockup pour l’éditer directement.</div>
+      </div>
+    `;
+  }
 
-    const TextTools = {
+  function mount($l2){
+    const $body = $l2.find('.ws-l2-body');
+    $body.html(tpl());
 
-        /**
-         * Crée un ID unique
-         */
-        _uid() {
-            return 'txt_' + Math.random().toString(36).slice(2, 9);
-        },
+    // Ajouter
+    $body.on('click', '.ws-txt-add', function(){
+      const text  = $body.find('.ws-txt-content').val() || 'Votre texte';
+      const size  = parseInt($body.find('.ws-txt-size').val()||32,10);
+      const bold  = $body.find('.ws-txt-bold').is(':checked');
+      const italic= $body.find('.ws-txt-italic').is(':checked');
 
-        /**
-         * Ajoute un calque texte et le rend sélectionné
-         * @param {Object} opts - options texte (merge avec DEFAULTS)
-         */
-        addText(opts = {}) {
-            const o = Object.assign({}, DEFAULTS, opts);
-            const id = this._uid();
-
-            /** Modèle de calque texte dans le State */
-            const layer = {
-                id,
-                type: 'text',
-                name: (o.name || 'Texte'),
-                text: String(o.text || DEFAULTS.text),
-                fontFamily: o.fontFamily,
-                fontSize: parseInt(o.fontSize, 10),
-                fontWeight: o.fontWeight,
-                textAlign: o.textAlign,
-                color: o.color,
-                strokeColor: o.strokeColor,
-                strokeWidth: parseInt(o.strokeWidth, 10),
-                letterSpacing: parseFloat(o.letterSpacing),
-                lineHeight: parseFloat(o.lineHeight),
-                width: parseFloat(o.width),
-                height: parseFloat(o.height),
-                left: parseFloat(o.left),
-                top: parseFloat(o.top),
-                rotation: parseFloat(o.rotation)
-            };
-
-            // State
-            WinShirtState.addLayer(layer);
-
-            // Canvas immédiat (si déjà initialisé)
-            if(window.WinShirtLayers && WinShirtLayers.$canvas){
-                WinShirtLayers.addLayerElement(layer);
-                WinShirtLayers.highlightSelected();
-            }
-
-            $(document).trigger('winshirt:textAdded', [layer, WinShirtState.currentSide]);
-            return layer;
-        },
-
-        /**
-         * Applique un ensemble de styles au calque sélectionné (ou à un calque par id)
-         * @param {Object} styles - ex: { fontSize: 40, color: '#ff0000' }
-         * @param {String|null} layerId
-         */
-        applyStyles(styles = {}, layerId = null) {
-            const id = layerId || WinShirtState.selectedLayerId;
-            if(!id){
-                console.warn('TextTools.applyStyles: aucun calque sélectionné');
-                return;
-            }
-
-            // Normalisation
-            const updates = {};
-            if(styles.text      !== undefined) updates.text        = String(styles.text);
-            if(styles.fontFamily!== undefined) updates.fontFamily  = String(styles.fontFamily);
-            if(styles.fontSize  !== undefined) updates.fontSize    = parseInt(styles.fontSize, 10);
-            if(styles.fontWeight!== undefined) updates.fontWeight  = styles.fontWeight; // 400/600/bold…
-            if(styles.textAlign !== undefined) updates.textAlign   = String(styles.textAlign); // left|center|right
-            if(styles.color     !== undefined) updates.color       = String(styles.color);
-            if(styles.strokeColor!==undefined) updates.strokeColor = String(styles.strokeColor);
-            if(styles.strokeWidth!==undefined) updates.strokeWidth = parseInt(styles.strokeWidth, 10);
-            if(styles.letterSpacing!==undefined) updates.letterSpacing = parseFloat(styles.letterSpacing);
-            if(styles.lineHeight !== undefined) updates.lineHeight = parseFloat(styles.lineHeight);
-            if(styles.width     !== undefined) updates.width       = parseFloat(styles.width);
-            if(styles.height    !== undefined) updates.height      = parseFloat(styles.height);
-            if(styles.left      !== undefined) updates.left        = parseFloat(styles.left);
-            if(styles.top       !== undefined) updates.top         = parseFloat(styles.top);
-            if(styles.rotation  !== undefined) updates.rotation    = parseFloat(styles.rotation);
-
-            // State
-            WinShirtState.updateLayer(id, updates);
-
-            // DOM refresh ciblé
-            if(window.WinShirtLayers && WinShirtLayers.$canvas){
-                const $el = WinShirtLayers.$canvas.find(`.ws-layer[data-id="${id}"]`);
-                if($el.length){
-                    // maj box + transform
-                    const css = {};
-                    if(updates.left  !== undefined) css.left = updates.left;
-                    if(updates.top   !== undefined) css.top = updates.top;
-                    if(updates.width !== undefined) css.width = updates.width;
-                    if(updates.height!== undefined) css.height = updates.height;
-                    if(updates.rotation !== undefined){
-                        const rot = updates.rotation;
-                        const prev = $el.css('transform'); // peu fiable, on remplace
-                        css.transform = `rotate(${rot}deg)`;
-                    }
-                    $el.css(css);
-
-                    // maj contenu texte
-                    const $txt = $el.find('.ws-text-content');
-                    if(!$txt.length){
-                        $el.empty().append('<div class="ws-text-content"></div>');
-                    }
-                    const $content = $el.find('.ws-text-content');
-                    if(updates.text !== undefined) $content.text(updates.text);
-
-                    const styleStr = [
-                        updates.fontFamily  !== undefined ? `font-family:${updates.fontFamily}` : null,
-                        updates.fontSize    !== undefined ? `font-size:${updates.fontSize}px` : null,
-                        updates.fontWeight  !== undefined ? `font-weight:${updates.fontWeight}` : null,
-                        updates.textAlign   !== undefined ? `text-align:${updates.textAlign}` : null,
-                        updates.color       !== undefined ? `color:${updates.color}` : null,
-                        updates.letterSpacing!==undefined ? `letter-spacing:${updates.letterSpacing}px` : null,
-                        updates.lineHeight  !== undefined ? `line-height:${updates.lineHeight}` : null,
-                        // stroke via text-shadow fallback simple (contour pauvre mais léger)
-                        (updates.strokeWidth !== undefined || updates.strokeColor !== undefined)
-                            ? TextTools._textStrokeCSS(
-                                updates.strokeWidth ?? WinShirtState.getSelectedLayer()?.strokeWidth ?? 0,
-                                updates.strokeColor ?? WinShirtState.getSelectedLayer()?.strokeColor ?? '#ffffff'
-                              )
-                            : null
-                    ].filter(Boolean).join(';');
-
-                    $content.attr('style', styleStr);
-                }
-            }
-
-            $(document).trigger('winshirt:textUpdated', [id, updates]);
-        },
-
-        /**
-         * Génére une approximation de contour texte (text-stroke CSS n’étant pas bien supporté partout)
-         * Via text-shadow multiples concentriques (simple/peu coûteux visuellement)
-         */
-        _textStrokeCSS(width, color){
-            width = parseInt(width, 10) || 0;
-            if(width <= 0) return '';
-            const shadows = [];
-            for(let r=1; r<=width; r++){
-                // 8 directions par rayon
-                shadows.push(`${r}px 0 0 ${color}`);
-                shadows.push(`-${r}px 0 0 ${color}`);
-                shadows.push(`0 ${r}px 0 ${color}`);
-                shadows.push(`0 -${r}px 0 ${color}`);
-                shadows.push(`${r}px ${r}px 0 ${color}`);
-                shadows.push(`-${r}px ${r}px 0 ${color}`);
-                shadows.push(`${r}px -${r}px 0 ${color}`);
-                shadows.push(`-${r}px -${r}px 0 ${color}`);
-            }
-            return `text-shadow:${shadows.join(',')}`;
-        }
-    };
-
-    // Expose global
-    window.WinShirtTextTools = TextTools;
-
-    // Hooks simples pour démos/liaisons rapides (facultatifs)
-    $(function(){
-        // Si un bouton global existe (ex: [data-ws-add-text])
-        $(document).on('click', '[data-ws-add-text]', function(e){
-            e.preventDefault();
-            TextTools.addText({ text: $(this).data('defaultText') || DEFAULTS.text });
-        });
-
-        // Exemple d’inputs liés (data-ws-text-*), utiles quand on branchera le L3 "Styles"
-        $(document).on('input change', '[data-ws-text-style]', function(){
-            const key = $(this).attr('name'); // ex: fontSize, color...
-            const val = $(this).val();
-            if(!key) return;
-
-            const styles = {};
-            styles[key] = val;
-            TextTools.applyStyles(styles);
-        });
+      if(window.WinShirtLayers && typeof WinShirtLayers.addText==='function'){
+        WinShirtLayers.addText({ text, size, bold, italic });
+      } else {
+        alert('Calques non initialisés.');
+      }
     });
+
+    // Edition live du layer sélectionné si c’est du texte
+    $(document).off('keyup.wstxt change.wstxt');
+    $(document).on('keyup.wstxt change.wstxt', '.ws-txt-content, .ws-txt-size, .ws-txt-bold, .ws-txt-italic', function(){
+      const L = window.WinShirtLayers;
+      if(!L || !L.$active || !L.$active.length || !L.$active.hasClass('ws-type-text')) return;
+
+      const $txt = L.$active.find('.ws-text');
+      if(!$txt.length) return;
+
+      const content = $body.find('.ws-txt-content').val();
+      const size    = parseInt($body.find('.ws-txt-size').val()||32,10);
+      const bold    = $body.find('.ws-txt-bold').is(':checked');
+      const italic  = $body.find('.ws-txt-italic').is(':checked');
+
+      if(typeof content === 'string') $txt.text(content);
+      $txt.css({
+        fontSize: size+'px',
+        fontWeight: bold ? '700' : '400',
+        fontStyle: italic ? 'italic' : 'normal'
+      });
+      // ajuste la bounding box
+      setTimeout(()=>{ L.clampInside(L.$active); }, 0);
+    });
+
+    // Quand on sélectionne un layer texte → refléter dans la UI
+    $('.winshirt-mockup-canvas').off('click.wstxt').on('click.wstxt', '.ws-type-text', function(){
+      const $txt = $(this).find('.ws-text');
+      $body.find('.ws-txt-content').val($txt.text());
+      $body.find('.ws-txt-size').val(parseInt($txt.css('font-size'),10)||32);
+      $body.find('.ws-txt-bold').prop('checked', ($txt.css('font-weight')||'400') >= '700');
+      $body.find('.ws-txt-italic').prop('checked', ($txt.css('font-style')||'normal') === 'italic');
+    });
+  }
+
+  $(document).on('winshirt:panel:text', function(e, ctx){
+    mount(ctx.l2);
+  });
 
 })(jQuery);
