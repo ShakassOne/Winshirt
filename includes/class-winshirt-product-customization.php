@@ -1,8 +1,7 @@
 <?php
 /**
  * WinShirt - Données produit => WinShirtData (mockups & zones)
- * Lit les métas du produit (_winshirt_enable, _winshirt_mockup_id) et, si présent,
- * récupère sur le CPT Mockup les URLs et zones d’impression.
+ * Lit _winshirt_mockup_id sur le produit, puis va chercher les images/zonings sur le CPT ws-mockup.
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -21,7 +20,6 @@ class WinShirt_Product_Customization {
 			$p = wc_get_product( get_the_ID() );
 			if ( $p ) return $p;
 		}
-		// fallback paramètre GET
 		if ( isset($_GET['product_id']) ) {
 			return wc_get_product( absint($_GET['product_id']) );
 		}
@@ -34,20 +32,16 @@ class WinShirt_Product_Customization {
 	}
 
 	// ---- Mockups ----
-
 	public static function provide_mockups( $mockups ) {
-		$product = self::current_product();
+		// Si le template ou un shortcode a déjà fourni des URLs, ne rien écraser
+		if ( ! empty( $mockups['front'] ) || ! empty( $mockups['back'] ) ) return $mockups;
+
+		$product   = self::current_product();
 		$mockup_id = self::get_mockup_id_for_product( $product );
 
-		// Shortcode/front_img/back_img déjà fournis ? → ne rien écraser
-		if ( ! empty( $mockups['front'] ) || ! empty( $mockups['back'] ) ) {
-			return $mockups;
-		}
-
-		// Si mockup sélectionné sur le produit, lire ses metas
 		if ( $mockup_id ) {
-			$front = self::read_first_image_meta( $mockup_id, [ '_winshirt_mockup_front', 'image_avant', 'front_image', '_mockup_front' ] );
-			$back  = self::read_first_image_meta( $mockup_id, [ '_winshirt_mockup_back',  'image_arriere','back_image',  '_mockup_back'  ] );
+			$front = self::read_first_image_meta( $mockup_id, [ 'image_avant', '_winshirt_mockup_front', 'front_image', '_mockup_front' ] );
+			$back  = self::read_first_image_meta( $mockup_id, [ 'image_arriere', '_winshirt_mockup_back', 'back_image',  '_mockup_back'  ] );
 
 			if ( $front || $back ) {
 				return [
@@ -57,26 +51,22 @@ class WinShirt_Product_Customization {
 			}
 		}
 
-		// Fallback : images du plugin si présentes
-		$fallback_front = WINSHIRT_URL . 'assets/img/mockup-front.png';
-		$fallback_back  = WINSHIRT_URL . 'assets/img/mockup-back.png';
+		// Fallback : images fournies par le plugin (crée ces fichiers si besoin)
 		return [
-			'front' => $fallback_front,
-			'back'  => $fallback_back,
+			'front' => WINSHIRT_URL . 'assets/img/mockup-front.png',
+			'back'  => WINSHIRT_URL . 'assets/img/mockup-back.png',
 		];
 	}
 
 	// ---- Zones ----
-
 	public static function provide_zones( $zones ) {
+		if ( isset($zones['front']) && isset($zones['back']) ) return $zones;
+
 		$product   = self::current_product();
 		$mockup_id = self::get_mockup_id_for_product( $product );
 
-		// Si déjà fourni (shortcode ou autre), ne rien écraser
-		if ( isset($zones['front']) && isset($zones['back']) ) return $zones;
-
 		if ( $mockup_id ) {
-			// Essayer plusieurs clés possibles (ACF / meta custom)
+			// Essaye plusieurs clés communes
 			$json = self::read_first_json_meta( $mockup_id, [ '_winshirt_zones', 'zones', 'zones_impression' ] );
 			if ( is_array( $json ) && isset( $json['front'] ) && isset( $json['back'] ) ) {
 				return [
@@ -94,20 +84,18 @@ class WinShirt_Product_Customization {
 	}
 
 	// ---- Helpers ----
-
 	private static function read_first_image_meta( $post_id, $keys = [] ) {
 		foreach ( (array) $keys as $k ) {
 			$val = get_post_meta( $post_id, $k, true );
 			if ( is_string($val) && $val ) return $val;
-			// ACF image peut renvoyer array
 			if ( is_array($val) ) {
 				if ( ! empty($val['url']) ) return $val['url'];
 				if ( ! empty($val[0]) && is_string($val[0]) ) return $val[0];
 			}
 		}
-		// Balayage large : première URL d'image trouvée dans les metas
-		$meta = get_post_meta( $post_id );
-		foreach ( $meta as $v ) {
+		// Balayage large : première URL image trouvée dans toutes les metas
+		$all = get_post_meta( $post_id );
+		foreach ( $all as $v ) {
 			$v = is_array($v) ? $v[0] : $v;
 			if ( is_string($v) && preg_match('#^https?://#', $v) && preg_match('#\.(png|jpe?g|webp|gif|svg)$#i', $v) ) {
 				return $v;
