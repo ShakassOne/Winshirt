@@ -1,664 +1,78 @@
-jQuery(function($){
-  var $modal = $('#winshirt-customizer-modal'),
-      $open  = $('#winshirt-open-modal'),
-      $close = $('#winshirt-close-modal');
+/**
+ * WinShirt - Modal (glue légère)
+ * - Ouvre/ferme le customizer
+ * - Initialise Layers sur le canvas
+ * - Déclenche l’ouverture du menu principal (router déjà prêt)
+ * - Évite doublons de roots / écouteurs
+ *
+ * Dépendances : jQuery, WinShirtState, WinShirtUIRouter, WinShirtLayers
+ */
+(function($){
+  'use strict';
 
-  $open.on('click', function(e){
-    e.preventDefault();
-    $modal.fadeIn(200);
-    initVisuels();
-    setSide('front');
-    initZones();
-    // TODO: ici lancer init de la librairie de personnalisation (canvas/SVG)
-  });
+  const Modal = {
+    booted: false,
 
-  $close.on('click', function(){
-    $modal.fadeOut(200);
-  });
+    open(){
+      const $modal = $('#winshirt-customizer-modal');
+      if(!$modal.length){ console.warn('WinShirt modal introuvable.'); return; }
 
-  // fermer au clic sur l'overlay
-  $modal.on('click', function(e){
-    if ( e.target === this ) {
-      $modal.fadeOut(200);
-    }
-  });
+      // Affiche le modal (adapte si tu as déjà un système d’overlay)
+      $modal.addClass('is-open').show();
 
-  // Interactive functionality
-  const $toolIcons = $('.tool-icon');
-  const $panels = $('.right-sidebar');
-  const isMobile = window.matchMedia('(max-width: 768px)').matches;
-
-  function closePanels(){
-    $('.mobile-panel').removeClass('open');
-    $('body').css('overflow', '');
-  }
-
-  if (isMobile) {
-    $panels.addClass('mobile-panel').each(function(){
-      if(!$(this).find('.panel-close').length){
-        $(this).prepend('<button class="panel-close">&times;</button>');
+      // Init unique
+      if(!this.booted){
+        this.boot();
       }
-    });
-  }
 
-  // Bouton clair pour fermer le volet latéral sur mobile
-  $('.panel-close').off('click').on('click', function(){
-    $(this).closest('.mobile-panel').removeClass('open');
-    $('body').css('overflow', '');
-  });
+      // Ouvre le menu principal (router) proprement
+      $(document).trigger('winshirt:openMainMenu');
+    },
 
-  // Gestion de l'ouverture correcte des panneaux latéraux
-  $toolIcons.on('click', function(){
-    $toolIcons.removeClass('active');
-    $(this).addClass('active');
-    let targetPanel = $($(this).data('target'));
-    if(isMobile){
-      if(targetPanel.hasClass('open')){
-        targetPanel.removeClass('open');
-        $('body').css('overflow', '');
-      } else {
-        $('.mobile-panel').removeClass('open');
-        targetPanel.addClass('open');
-        $('body').css('overflow', 'hidden');
+    close(){
+      $('#winshirt-customizer-modal').removeClass('is-open').hide();
+    },
+
+    boot(){
+      if(this.booted) return;
+      this.booted = true;
+
+      // Init Layers sur le canvas
+      const $canvas = $('.winshirt-mockup-canvas');
+      if($canvas.length && window.WinShirtLayers){
+        WinShirtLayers.init($canvas);
       }
-    } else {
-      $panels.hide();
-      targetPanel.css('display','flex');
-    }
-  });
 
-  const filterTabs = document.querySelectorAll('.filter-tab');
-  const designItems = document.querySelectorAll('.design-item');
-  const designArea  = document.getElementById('design-area');
-  const mockupImg   = document.getElementById('mockup-img');
-  let currentSide   = 'front';
-
-  function computePrintZone(){
-    if(!mockupImg || mockupImg.clientWidth === 0) return;
-    const zones = (window.WinShirtData && window.WinShirtData.zones && window.WinShirtData.zones[currentSide]) ? window.WinShirtData.zones[currentSide] : [];
-    if(!zones.length || !designArea) return;
-    const zone = zones[0];
-    const w = mockupImg.clientWidth * zone.width / 100;
-    const h = mockupImg.clientHeight * zone.height / 100;
-    const x = mockupImg.clientWidth * zone.left / 100;
-    const y = mockupImg.clientHeight * zone.top / 100;
-    designArea.style.width  = Math.round(w) + 'px';
-    designArea.style.height = Math.round(h) + 'px';
-    designArea.style.left   = Math.round(x) + 'px';
-    designArea.style.top    = Math.round(y) + 'px';
-  }
-
-  function initZones(){
-    const mock = document.querySelector('#tshirt img.mockup-img') || mockupImg;
-    const compute = () => {
-      computePrintZone();
-      requestAnimationFrame(()=>{
-        document.getElementById('design-area')?.classList.add('ready');
+      // Sélecteurs par défaut (tu peux binder tes propres boutons avec data-ws-open/close)
+      $(document).on('click', '[data-ws-open-customizer]', (e)=>{
+        e.preventDefault(); this.open();
       });
-    };
-    if(mock && !mock.complete) mock.addEventListener('load', compute, {once:true});
-    requestAnimationFrame(()=>requestAnimationFrame(compute));
-  }
-
-  function setSide(side){
-    if(!mockupImg || !window.WinShirtData) return;
-    const s = side==='back' ? 'back' : 'front';
-    currentSide = s;
-    mockupImg.src = window.WinShirtData[s] || '';
-    document.querySelectorAll('#design-area .design-element').forEach(el=>{
-      el.style.display = (el.dataset.side===s ? 'block' : 'none');
-    });
-  }
-
-  if(mockupImg){
-    mockupImg.addEventListener('load', computePrintZone);
-    if(mockupImg.complete){ computePrintZone(); }
-    const ro = new ResizeObserver(computePrintZone);
-    if(mockupImg.parentElement){ ro.observe(mockupImg.parentElement); }
-  }
-
-  const viewBtns = document.querySelectorAll('.view-btn');
-  viewBtns.forEach(btn => {
-    btn.addEventListener('click', function(){
-      const side = this.dataset.side;
-      viewBtns.forEach(b => b.setAttribute('aria-pressed', String(b === this)));
-      setSide(side);
-      requestAnimationFrame(()=>requestAnimationFrame(computePrintZone));
-    });
-  });
-
-  filterTabs.forEach(tab => {
-    tab.addEventListener('click', function(){
-      filterTabs.forEach(t => t.classList.remove('active'));
-      this.classList.add('active');
-      const term = this.dataset.term;
-      designItems.forEach(item => {
-        const terms = item.dataset.terms ? item.dataset.terms.split(' ') : [];
-        if (!term || term === 'all' || terms.includes(term)) {
-          item.style.display = 'flex';
-        } else {
-          item.style.display = 'none';
-        }
+      $(document).on('click', '[data-ws-close-customizer]', (e)=>{
+        e.preventDefault(); this.close();
       });
-    });
-  });
 
-  let activeLayerId = null;
-
-  function setActiveLayer(id){
-    activeLayerId = id;
-    document.querySelectorAll('.design-element').forEach(l => l.classList.toggle('selected', l.id === id));
-    layerItems.forEach(li => li.classList.toggle('active', li.dataset.layer === id));
-    const layer = document.getElementById(id);
-    if (layer && layerOpacity) {
-      layerOpacity.value = Math.round((parseFloat(layer.style.opacity) || 1) * 100);
-    } else if(layerOpacity){
-      layerOpacity.value = 100;
-    }
-  }
-
-  if(designArea){
-    designArea.addEventListener('mousedown', function(e){
-      const el = e.target.closest('.design-element');
-      if(el){
-        setActiveLayer(el.id);
-      } else {
-        setActiveLayer(null);
+      // Sécurité : empêcher double-root
+      const $roots = $('#winshirt-panel-root');
+      if($roots.length > 1){
+        // on garde le premier, on supprime les suivants
+        $roots.slice(1).remove();
       }
-    });
-  }
 
-  function addLayerItemListeners(li, layerDiv){
-    li.addEventListener('click', function(){ setActiveLayer(layerDiv.id); });
-    const visBtn = li.querySelector('.layer-vis');
-    const lockBtn = li.querySelector('.layer-lock');
-    const delBtn = li.querySelector('.layer-del');
-    if (visBtn) visBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.style.display = layerDiv.style.display === 'none' ? 'flex' : 'none'; });
-    if (lockBtn) lockBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.style.pointerEvents = layerDiv.style.pointerEvents === 'none' ? 'auto' : 'none'; });
-    if (delBtn) delBtn.addEventListener('click', function(e){ e.stopPropagation(); layerDiv.remove(); li.remove(); refreshLayerItems(); setActiveLayer(null); });
-  }
-
-  const layersList = document.getElementById('layers-list');
-  let layerItems = document.querySelectorAll('.layer-item');
-  const layerOpacity = document.getElementById('layer-opacity');
-  const posBtns = document.querySelectorAll('.pos-btn');
-  const newLayerBtn = document.getElementById('new-layer-btn');
-
-  function refreshLayerItems(){
-    layerItems = document.querySelectorAll('.layer-item');
-  }
-
-  function createLayer(name, content){
-    const id = 'layer-' + Date.now();
-    const layerDiv = document.createElement('div');
-    layerDiv.className = 'design-element';
-    layerDiv.id = id;
-    layerDiv.innerHTML = `<div class="content">${content}</div>`; // handles injected later
-    designArea.appendChild(layerDiv);
-    const li = document.createElement('li');
-    li.className = 'layer-item';
-    li.dataset.layer = id;
-    li.innerHTML = `<span class="layer-name">${name}</span><div class="layer-actions"><button class="layer-vis">👁️</button><button class="layer-lock">🔒</button><button class="layer-del">🗑️</button></div>`;
-    layersList.appendChild(li);
-    addLayerItemListeners(li, layerDiv);
-    refreshLayerItems();
-    setActiveLayer(id);
-    return layerDiv;
-  }
-
-  // Initialisation du visuel interactif
-  function initVisuels() {
-    $('.design-item').off('click').on('click', function(){
-      const url = this.dataset.full || this.dataset.img;
-      const layerDiv = createLayer('Design', `<img src="${url}" alt="" />`);
-      layerDiv.style.width = '120px';
-      layerDiv.style.height = '120px';
-      const img = layerDiv.querySelector('img');
-      if(img){
-        img.style.objectFit = 'contain';
-        img.style.pointerEvents = 'none';
-      }
-      if (isMobile) closePanels();
-    });
-  }
-
-  if (layerOpacity) {
-    layerOpacity.addEventListener('input', function(){
-      const layer = document.getElementById(activeLayerId);
-      if (layer) layer.style.opacity = this.value / 100;
-    });
-  }
-
-  posBtns.forEach(btn => {
-    btn.addEventListener('click', function(){
-      const layer = document.getElementById(activeLayerId);
-      if (!layer) return;
-      const pos = this.dataset.pos;
-      const v = pos.charAt(0);
-      const h = pos.charAt(1);
-      layer.style.alignItems = v === 't' ? 'flex-start' : v === 'c' ? 'center' : 'flex-end';
-      layer.style.justifyContent = h === 'l' ? 'flex-start' : h === 'c' ? 'center' : 'flex-end';
-    });
-  });
-
-  if (newLayerBtn) {
-    newLayerBtn.addEventListener('click', function(){
-      createLayer('Nouveau calque', '');
-    });
-  }
-
-  const uploadBtn = document.getElementById('upload-btn');
-  if (uploadBtn) {
-    uploadBtn.addEventListener('click', function(){
-      alert('Fonctionnalité d\'upload en cours de développement');
-    });
-  }
-
-  const textInput = document.getElementById('text-input');
-  const fontSelect = document.getElementById('font-select');
-  const fontSize = document.getElementById('font-size');
-  const sizeValue = document.getElementById('size-value');
-  const colorOptions = document.querySelectorAll('.color-option');
-  const styleBtns = document.querySelectorAll('.style-btn');
-  const addTextBtn = document.getElementById('add-text-btn');
-  const mockupColors = document.querySelectorAll('.color-btn');
-
-  let currentTextStyle = {
-    text: '',
-    font: 'Arial',
-    size: 48,
-    color: '#000000',
-    bold: false,
-    italic: false,
-    underline: false
-  };
-
-  let currentTextLayer = null;
-
-  function updateTextPreview(){
-    if (!currentTextLayer) return;
-    const text = textInput.value || 'Exemple de texte';
-    const fontWeight = currentTextStyle.bold ? 'bold' : 'normal';
-    const fontStyle = currentTextStyle.italic ? 'italic' : 'normal';
-    const textDecoration = currentTextStyle.underline ? 'underline' : 'none';
-    const textContent = currentTextLayer.querySelector('.content');
-    if(textContent){ textContent.textContent = text; }
-    currentTextLayer.style.fontSize = currentTextStyle.size + 'px';
-    currentTextLayer.style.color = currentTextStyle.color;
-    currentTextLayer.style.fontFamily = fontSelect.value;
-    currentTextLayer.style.fontWeight = fontWeight;
-    currentTextLayer.style.fontStyle = fontStyle;
-    currentTextLayer.style.textDecoration = textDecoration;
-    currentTextLayer.style.display = text ? 'flex' : 'none';
-  }
-
-  if (fontSize) {
-    fontSize.addEventListener('input', function(){
-      currentTextStyle.size = this.value;
-      sizeValue.textContent = this.value;
-      updateTextPreview();
-    });
-  }
-
-  colorOptions.forEach(option => {
-    option.addEventListener('click', function(){
-      colorOptions.forEach(c => c.classList.remove('active'));
-      this.classList.add('active');
-      currentTextStyle.color = this.dataset.color;
-      updateTextPreview();
-    });
-  });
-  mockupColors.forEach(btn => {
-    btn.addEventListener('click', function(){
-      mockupColors.forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-    });
-  });
-
-  styleBtns.forEach(btn => {
-    btn.addEventListener('click', function(){
-      this.classList.toggle('active');
-      if (btn.id === 'bold-btn') {
-        currentTextStyle.bold = !currentTextStyle.bold;
-      } else if (btn.id === 'italic-btn') {
-        currentTextStyle.italic = !currentTextStyle.italic;
-      } else if (btn.id === 'underline-btn') {
-        currentTextStyle.underline = !currentTextStyle.underline;
-      }
-      updateTextPreview();
-    });
-  });
-
-  if (addTextBtn) {
-    addTextBtn.addEventListener('click', function(){
-      if (!currentTextLayer) {
-        currentTextLayer = createLayer('Texte', '');
-      }
-      updateTextPreview();
-      if (isMobile) closePanels();
-    });
-  }
-
-  if (textInput) {
-    textInput.addEventListener('input', function(){
-      currentTextStyle.text = this.value;
-      updateTextPreview();
-    });
-  }
-
-  if (fontSelect) {
-    fontSelect.addEventListener('change', function(){
-      currentTextStyle.font = this.value;
-      updateTextPreview();
-    });
-  }
-
-  // Product panel
-  const productType = document.getElementById('product-type');
-  const productMaterial = document.getElementById('product-material');
-  const productPrice = document.getElementById('product-price');
-  const addToCartBtn = document.getElementById('add-to-cart-btn');
-
-  function updatePrice(){
-    let price = 20; // base price
-    if (productType) {
-      switch(productType.value){
-        case 'hoodie': price += 10; break;
-        case 'debardeur': price += 2; break;
-        case 'polo': price += 5; break;
-        case 'casquette': price += 3; break;
-        case 'sac': price += 4; break;
-      }
-    }
-    if (productMaterial) {
-      switch(productMaterial.value){
-        case 'mix': price += 2; break;
-        case 'bio': price += 3; break;
-        case 'premium': price += 5; break;
-      }
-    }
-    if (productPrice) productPrice.textContent = price.toFixed(2) + '€';
-  }
-
-  if (productType) productType.addEventListener('change', updatePrice);
-  if (productMaterial) productMaterial.addEventListener('change', updatePrice);
-
-  if (addToCartBtn) {
-    addToCartBtn.addEventListener('click', function(){
-      alert('Produit ajouté au panier (simulation).');
-    });
-  }
-
-  // QR Code panel
-  let qrDataInput;
-  const qrType = document.getElementById('qr-type');
-  const qrSize = document.getElementById('qr-size');
-  const qrColor = document.getElementById('qr-color');
-  const qrPreview = document.getElementById('qr-preview');
-  const applyQrBtn = document.getElementById('apply-qr-btn');
-  const qrInputWrapper = document.getElementById('qr-input-wrapper');
-  let currentQrLayer = null;
-
-  function hexToRgb(hex){
-    const bigint = parseInt(hex.slice(1), 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return r + '-' + g + '-' + b;
-  }
-
-  function getQrData(){
-    if (!qrType) return '';
-    if (qrType.value === 'vcard') {
-      const name = document.getElementById('qr-name')?.value || '';
-      const phone = document.getElementById('qr-phone')?.value || '';
-      const mail = document.getElementById('qr-mail')?.value || '';
-      return `BEGIN:VCARD\nVERSION:3.0\nN:${name}\nTEL:${phone}\nEMAIL:${mail}\nEND:VCARD`;
-    }
-    return qrDataInput && qrDataInput.value ? qrDataInput.value : '';
-  }
-
-  function updateQRPreview(){
-    if (!qrPreview) return;
-    const size = qrSize.value;
-    if (qrType.value === 'image') {
-      const file = qrDataInput && qrDataInput.files ? qrDataInput.files[0] : null;
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = e => {
-          qrPreview.innerHTML = `<img src="${e.target.result}" width="${size}" height="${size}" />`;
-        };
-        reader.readAsDataURL(file);
-      } else {
-        qrPreview.innerHTML = '';
-      }
-      return;
-    }
-    const data = getQrData() || ' ';
-    const color = hexToRgb(qrColor.value);
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&color=${color}&data=${encodeURIComponent(data)}`;
-    qrPreview.innerHTML = `<img src="${url}" width="${size}" height="${size}" />`;
-  }
-
-  function buildQrFields(){
-    if (!qrInputWrapper) return;
-    qrInputWrapper.innerHTML = '';
-    if (qrType.value === 'url') {
-      qrInputWrapper.innerHTML = '<label>URL :</label><input type="url" id="qr-data" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;" />';
-    } else if (qrType.value === 'text') {
-      qrInputWrapper.innerHTML = '<label>Texte :</label><textarea id="qr-data" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:15px;"></textarea>';
-    } else if (qrType.value === 'vcard') {
-      qrInputWrapper.innerHTML = '<label>Nom :</label><input type="text" id="qr-name" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:10px;" /><label>Téléphone :</label><input type="tel" id="qr-phone" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:10px;" /><label>Email :</label><input type="email" id="qr-mail" style="width:100%; padding:10px; border:1px solid #e0e0e0; border-radius:6px; margin-bottom:10px;" />';
-    } else if (qrType.value === 'image') {
-      qrInputWrapper.innerHTML = '<label>Image :</label><input type="file" id="qr-data" accept="image/*" style="margin-bottom:15px;" />';
-    }
-    qrDataInput = document.getElementById('qr-data');
-    const inputs = qrInputWrapper.querySelectorAll('input,textarea');
-    inputs.forEach(inp => inp.addEventListener('input', updateQRPreview));
-    if (qrType.value === 'image' && qrDataInput) {
-      qrDataInput.addEventListener('change', updateQRPreview);
-    }
-    updateQRPreview();
-  }
-
-  if (qrType) {
-    qrType.addEventListener('change', buildQrFields);
-    buildQrFields();
-  }
-
-  if (qrSize) qrSize.addEventListener('input', updateQRPreview);
-  if (qrColor) qrColor.addEventListener('input', updateQRPreview);
-
-  if (applyQrBtn) {
-    applyQrBtn.addEventListener('click', function(){
-      if (!currentQrLayer) {
-        currentQrLayer = createLayer('QR Code', qrPreview.innerHTML);
-      } else {
-        const qrContent = currentQrLayer.querySelector('.content');
-        if(qrContent){ qrContent.innerHTML = qrPreview.innerHTML; }
-      }
-      if (isMobile) closePanels();
-    });
-  }
-
-  // AI panel
-  const aiDescription = document.getElementById('ai-description');
-  const aiExamples = document.querySelectorAll('.ai-example');
-  const aiGenerateBtn = document.getElementById('ai-generate-btn');
-  const aiStatus = document.getElementById('ai-status');
-  const aiResults = document.getElementById('ai-results');
-
-  aiExamples.forEach(btn => {
-    btn.addEventListener('click', function(){
-      if (aiDescription) aiDescription.value = this.dataset.prompt;
-    });
-  });
-
-  if (aiGenerateBtn) {
-    aiGenerateBtn.addEventListener('click', function(){
-      if (aiStatus) aiStatus.textContent = 'Génération...';
-      setTimeout(function(){
-        if (aiStatus) aiStatus.textContent = 'Résultats';
-        if (aiResults) {
-          aiResults.innerHTML = '';
-          for (let i=0; i<9; i++) {
-            const img = document.createElement('div');
-            img.className = 'design-item';
-            img.innerHTML = `<img src="https://via.placeholder.com/150?text=IA" alt="AI" />`;
-            img.addEventListener('click', function(){
-              createLayer('Image', this.innerHTML);
-            });
-            aiResults.appendChild(img);
-          }
-        }
-      }, 2000);
-    });
-  }
-
-});
-
-// ===================== WINSHIRT START: Drag/Resize/Rotate =====================
-(function(){
-  const STAGE = document.getElementById('design-area');
-  if(!STAGE){ console.error('WinShirt: #design-area manquant'); return; }
-
-  let cur = null, ctx = null, moving=false;
-
-  const px = n=>`${Math.round(n)}px`;
-  const sRect = ()=> STAGE.getBoundingClientRect();
-  const clamp = ()=>{
-    const r=sRect(); return {l:0,t:0,r:r.width,b:r.height};
-  };
-  const point = ev=>{
-    const r=sRect(); const e=(ev.touches && ev.touches[0])||ev;
-    return {x:e.clientX - r.left, y:e.clientY - r.top};
-  };
-
-  function select(el){
-    STAGE.querySelectorAll('.design-element').forEach(d=>d.classList.remove('selected'));
-    el.classList.add('selected'); cur=el;
-    let max=1; STAGE.querySelectorAll('.design-element').forEach(d=>{
-      const z=parseInt(getComputedStyle(d).zIndex||1,10); if(z>max) max=z;
-    });
-    el.style.zIndex = String(max+1);
-  }
-
-  function startDrag(ev, el){
-    const p=point(ev), r=el.getBoundingClientRect(), s=sRect();
-    ctx={mode:'move', el, dx:p.x-(r.left-s.left), dy:p.y-(r.top-s.top), clamp:clamp()};
-    attach(); ev.preventDefault();
-  }
-  function doDrag(p){
-    const {el,dx,dy,clamp:c}=ctx, w=el.offsetWidth, h=el.offsetHeight;
-    let L=p.x-dx, T=p.y-dy;
-    L=Math.max(c.l, Math.min(L, c.r-w)); T=Math.max(c.t, Math.min(T, c.b-h));
-    el.style.left=px(L); el.style.top=px(T);
-  }
-
-  function startRotate(ev, el){
-    const r=el.getBoundingClientRect(), s=sRect();
-    ctx={mode:'rot', el, cx:(r.left-s.left)+r.width/2, cy:(r.top-s.top)+r.height/2};
-    attach(); ev.preventDefault();
-  }
-  function doRotate(p){
-    const {el,cx,cy}=ctx, a=(Math.atan2(p.y-cy,p.x-cx)*180/Math.PI)+90;
-    el.style.transform=`rotate(${a}deg)`; el.dataset.angle=String(a);
-  }
-
-  function startResize(ev, el, lock){
-    const r=el.getBoundingClientRect(), s=sRect();
-    ctx={mode:'rsz', el, lock:!!lock,
-         sx:point(ev).x, sy:point(ev).y,
-         w:r.width, h:r.height, L:r.left-s.left, T:r.top-s.top,
-         ratio:r.width/r.height, clamp:clamp()};
-    attach(); ev.preventDefault();
-  }
-  function doResize(p){
-    const d=ctx; let dX=p.x-d.sx, dY=p.y-d.sy;
-    let w=d.w+(d.lock?Math.max(dX,dY):dX);
-    let h=d.lock?(w/d.ratio):(d.h+dY);
-    w=Math.max(30, Math.min(w, d.clamp.r - d.L));
-    h=Math.max(30, Math.min(h, d.clamp.b - d.T));
-    d.el.style.width=px(w); d.el.style.height=px(h);
-  }
-
-  function del(el){ el.remove(); if(cur===el) cur=null; }
-
-  STAGE.addEventListener('mousedown', (e)=>{
-    const el = e.target.closest('.design-element');
-    if(!el) return;
-    if(e.target.classList.contains('handle')){
-      const k=e.target.dataset.handle;
-      if(k==='delete') return del(el);
-      if(k==='rotate') return startRotate(e, el);
-      return startResize(e, el, k==='resize-locked');
-    }
-    select(el); startDrag(e, el);
-  });
-  STAGE.addEventListener('touchstart', (e)=>{
-    const el=e.target.closest('.design-element'); if(!el) return;
-    if(e.target.classList.contains('handle')){
-      const k=e.target.dataset.handle;
-      if(k==='delete') return del(el);
-      if(k==='rotate') return startRotate(e, el);
-      return startResize(e, el, k==='resize-locked');
-    }
-    select(el); startDrag(e, el);
-  }, {passive:false});
-
-  function onMove(e){
-    if(!ctx) return; const p=point(e);
-    if(ctx.mode==='move') doDrag(p);
-    else if(ctx.mode==='rot') doRotate(p);
-    else if(ctx.mode==='rsz') doResize(p);
-  }
-  function onUp(){ detach(); ctx=null; }
-  function attach(){
-    if(moving) return; moving=true;
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchmove', onMove, {passive:false});
-    window.addEventListener('touchend', onUp);
-  }
-  function detach(){
-    if(!moving) return; moving=false;
-    window.removeEventListener('mousemove', onMove);
-    window.removeEventListener('mouseup', onUp);
-    window.removeEventListener('touchmove', onMove);
-    window.removeEventListener('touchend', onUp);
-  }
-
-  const injectHandles = (el)=>{
-    if(!el.querySelector('.resize-handles')){
-      const box=document.createElement('div');
-      box.className='resize-handles';
-      box.innerHTML=`
-        <div class="handle handle-tl" data-handle="rotate"></div>
-        <div class="handle handle-tr" data-handle="delete"></div>
-        <div class="handle handle-bl" data-handle="resize-locked"></div>
-        <div class="handle handle-br" data-handle="resize-free"></div>`;
-      el.appendChild(box);
-    }
-    if(!el.dataset.side){
-      const active=document.querySelector('.view-btn[aria-pressed="true"]');
-      el.dataset.side = active ? active.dataset.side : 'front';
-    }
-    if(!el.style.left){ el.style.left=px((STAGE.clientWidth - el.offsetWidth)/2 || 10); }
-    if(!el.style.top ){ el.style.top =px((STAGE.clientHeight- el.offsetHeight)/2 || 10); }
-  };
-
-  const mo = new MutationObserver(muts=>{
-    muts.forEach(m=>{
-      m.addedNodes.forEach(n=>{
-        if(n.nodeType===1 && n.classList.contains('design-element')){
-          injectHandles(n);
-          n.style.display = (n.dataset.side==='back' ? 'none' : 'block');
-        }
+      // À l’ouverture du template, recalcul des zones (au cas où)
+      $(document).on('winshirt:templateReady', ()=>{
+        $(window).trigger('resize');
       });
-    });
-  });
-  mo.observe(STAGE, {childList:true, subtree:false});
+    }
+  };
 
-  STAGE.querySelectorAll('.design-element').forEach(injectHandles);
-})();
-// ===================== WINSHIRT END =====================
+  // Expose (si besoin)
+  window.WinShirtModal = Modal;
+
+  // Auto-bind : si un bouton “Personnaliser” existe déjà
+  $(function(){
+    // Par convention : un bouton avec data-ws-open-customizer
+    // Sinon, laisse l’intégrateur binder manuellement.
+    // Exemple : $('body').on('click', '.btn-personnaliser', ()=>WinShirtModal.open());
+  });
+
+})(jQuery);
