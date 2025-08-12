@@ -1,9 +1,8 @@
 /**
  * WinShirt - Layers
- * - Gestion des calques : image/texte
- * - Sélection, déplacement, redimensionnement (souris + tactile)
+ * - Calques image/texte : sélection, déplacement, redimensionnement (souris + tactile)
  * - Contrainte à la zone d’impression du côté courant
- * - API publique: init($canvas), addImage(url), addText(opts), renderSide(side)
+ * - Utilise WinShirtCanvas.getZoneRect() pour centrer les ajouts
  */
 (function($){
   'use strict';
@@ -11,7 +10,7 @@
   const Layers = {
     $canvas: null,
     $active: null,
-    side() { return (window.WinShirtState && WinShirtState.currentSide) || 'front'; },
+    side() { return (window.WinShirtCanvas && window.WinShirtCanvas.currentSide && window.WinShirtCanvas.currentSide()) || (window.WinShirtState && WinShirtState.currentSide) || 'front'; },
 
     init($canvas){
       if(!$canvas || !$canvas.length) return;
@@ -20,38 +19,36 @@
       // Sélection / déselection
       $canvas.on('mousedown touchstart', '.ws-layer', (e)=>{ this.select($(e.currentTarget)); });
       $(document).on('mousedown touchstart', (e)=>{
-        // clic en dehors du canvas => deselect
         if(!this.$canvas) return;
         const $t = $(e.target);
-        if(!$t.closest('.ws-layer, .ws-panel-l2, .ws-panel-l3').length && !$t.closest('#winshirt-panel-root').length){
+        if(!$t.closest('.ws-layer, #winshirt-panel-root').length){
           this.deselect();
         }
       });
 
-      // Drag
       this.bindDrag();
-
-      // Resize
       this.bindResize();
 
-      // Switch côté
       $(document).on('winshirt:sideChanged', (e, side)=>{ this.renderSide(side); });
 
-      // Rendre le côté courant
       this.renderSide(this.side());
     },
-
-    // ---------- API publique ----------
 
     addImage(url){
       if(!this.$canvas || !url) return;
       const side = this.side();
-      const $zone = this.zone(side);
-      const off = $zone.position();
-      const w = Math.max(80, $zone.width()*0.45);
+      const zr = (window.WinShirtCanvas && window.WinShirtCanvas.getZoneRect) ? window.WinShirtCanvas.getZoneRect(side) : null;
+
+      // Fallback si pas de zone
+      let left = 20, top = 20, w = 200;
+      if(zr){
+        w = Math.max(80, Math.round(zr.width * 0.6));
+        left = Math.round(zr.left + (zr.width - w)/2);
+        top  = Math.round(zr.top  + (zr.height - (w*0.8))/2);
+      }
 
       const $el = $(`
-        <div class="ws-layer ws-type-image" data-side="${side}" data-locked="0" style="left:${off.left+10}px; top:${off.top+10}px; width:${w}px; height:auto;">
+        <div class="ws-layer ws-type-image" data-side="${side}" data-locked="0" style="left:${left}px; top:${top}px; width:${w}px; height:auto;">
           <img src="${url}" alt="" style="display:block; max-width:100%; height:auto;">
           ${this.handlesHTML()}
         </div>
@@ -62,24 +59,27 @@
     },
 
     addText(opts = {}){
-      if(!this.$canvas) return;
       const side = this.side();
-      const $zone = this.zone(side);
-      const off = $zone.position();
+      const zr = (window.WinShirtCanvas && window.WinShirtCanvas.getZoneRect) ? window.WinShirtCanvas.getZoneRect(side) : null;
 
       const text = (opts.text || 'Votre texte').replace(/</g,'&lt;');
       const size = parseInt(opts.size||32,10);
       const weight = opts.bold ? '700' : '400';
       const fontStyle = opts.italic ? 'italic' : 'normal';
 
+      let left = 20, top = 20;
+      if(zr){
+        left = Math.round(zr.left + zr.width*0.2);
+        top  = Math.round(zr.top  + zr.height*0.2);
+      }
+
       const $el = $(`
-        <div class="ws-layer ws-type-text" data-side="${side}" data-locked="0"
-             style="left:${off.left+15}px; top:${off.top+15}px; min-width:60px;">
+        <div class="ws-layer ws-type-text" data-side="${side}" data-locked="0" style="left:${left}px; top:${top}px; min-width:60px;">
           <div class="ws-text" contenteditable="true"
                style="font-size:${size}px; font-weight:${weight}; font-style:${fontStyle}; line-height:1.1; white-space:pre;">
             ${text}
           </div>
-          ${this.handlesHTML(/* no aspect lock for text */)}
+          ${this.handlesHTML()}
         </div>
       `);
       this.$canvas.append($el);
@@ -92,10 +92,7 @@
         const show = $(this).data('side') === side;
         $(this).toggle(show);
       });
-      // afficher la bonne zone (mockup-canvas.js s’en occupe déjà, ici on s’aligne)
     },
-
-    // ---------- Internes ----------
 
     select($el){
       if(this.$active && this.$active.is($el)) return;
@@ -103,44 +100,42 @@
       this.$active = $el.addClass('selected');
     },
     deselect(){
-      if(!this.$canvas) return;
       this.$canvas.find('.ws-layer').removeClass('selected');
       this.$active = null;
     },
 
-    zone(side){
-      return this.$canvas.find(`.ws-print-zone[data-side="${side}"]`);
-    },
-
-    rects($el){
-      const c = this.$canvas.offset();
-      const e = $el.offset();
-      const z = this.zone($el.data('side') || this.side()).offset();
-      return {
-        canvas: { left:c.left, top:c.top, width:this.$canvas.innerWidth(), height:this.$canvas.innerHeight() },
-        zone:   { left:z.left, top:z.top, width:this.zone(this.side()).outerWidth(), height:this.zone(this.side()).outerHeight() },
-        el:     { left:e.left, top:e.top, width:$el.outerWidth(), height:$el.outerHeight() }
-      };
+    zoneRect(side){
+      return (window.WinShirtCanvas && window.WinShirtCanvas.getZoneRect) ? window.WinShirtCanvas.getZoneRect(side) : null;
     },
 
     clampInside($el){
       const side = $el.data('side') || this.side();
-      const $zone = this.zone(side);
-      const zOff = $zone.position();
-      const zW = $zone.width(), zH = $zone.height();
-      let left = parseFloat($el.css('left')) || 0;
-      let top  = parseFloat($el.css('top')) || 0;
-      let w    = $el.outerWidth();
-      let h    = $el.outerHeight();
+      const zr = this.zoneRect(side);
+      if(!zr){
+        // Pas de zone → clamp au canvas
+        const maxW = this.$canvas.innerWidth();
+        const maxH = this.$canvas.innerHeight();
+        let left = parseFloat($el.css('left'))||0;
+        let top  = parseFloat($el.css('top'))||0;
+        let w = $el.outerWidth(), h=$el.outerHeight();
+        left = Math.max(0, Math.min(left, maxW - w));
+        top  = Math.max(0, Math.min(top,  maxH - h));
+        $el.css({ left, top });
+        return;
+      }
+
+      let left = parseFloat($el.css('left'))||0;
+      let top  = parseFloat($el.css('top'))||0;
+      let w = $el.outerWidth(), h=$el.outerHeight();
 
       // clamp position
-      left = Math.max(zOff.left, Math.min(left, zOff.left + zW - w));
-      top  = Math.max(zOff.top,  Math.min(top,  zOff.top  + zH - h));
+      left = Math.max(zr.left, Math.min(left, zr.left + zr.width  - w));
+      top  = Math.max(zr.top,  Math.min(top,  zr.top  + zr.height - h));
 
-      // clamp taille (min)
+      // clamp taille min/max
       const minW = 30, minH = 24;
-      w = Math.max(minW, Math.min(w, zW));
-      h = Math.max(minH, Math.min(h, zH));
+      w = Math.max(minW, Math.min(w, zr.width));
+      h = Math.max(minH, Math.min(h, zr.height));
 
       $el.css({ left, top, width:w, height:h });
     },
@@ -156,20 +151,9 @@
       `;
     },
 
-    // ---- Drag logic ----
     bindDrag(){
       const self = this;
       let dragging = false, start = null, $el = null;
-
-      function onMove(ev){
-        if(!dragging || !$el) return;
-        const p = getPoint(ev);
-        const dx = p.x - start.x, dy = p.y - start.y;
-        const left = start.left + dx, top = start.top + dy;
-        $el.css({ left, top });
-        self.clampInside($el);
-      }
-      function onUp(){ dragging=false; $el=null; $(document).off('.wsdrag'); }
 
       function getPoint(ev){
         if(ev.originalEvent && ev.originalEvent.touches && ev.originalEvent.touches[0]){
@@ -177,11 +161,17 @@
         }
         return { x: ev.pageX, y: ev.pageY };
       }
+      function onMove(ev){
+        if(!dragging || !$el) return;
+        const p = getPoint(ev);
+        const dx = p.x - start.x, dy = p.y - start.y;
+        $el.css({ left: start.left + dx, top: start.top + dy });
+        self.clampInside($el);
+      }
+      function onUp(){ dragging=false; $el=null; $(document).off('.wsdrag'); }
 
       this.$canvas.on('mousedown touchstart', '.ws-layer', function(ev){
-        // ignore si on clique une poignée
-        if($(ev.target).closest('.ws-h').length) return;
-
+        if($(ev.target).closest('.ws-h').length) return; // ignore handles
         dragging = true;
         $el = $(this);
         self.select($el);
@@ -198,7 +188,6 @@
       });
     },
 
-    // ---- Resize logic ----
     bindResize(){
       const self = this;
       let resizing = false, dir=null, start=null, $el=null, aspect=1, isImage=false;
@@ -209,7 +198,6 @@
         }
         return { x: ev.pageX, y: ev.pageY };
       }
-
       function onMove(ev){
         if(!resizing || !$el) return;
         const p = getPoint(ev);
@@ -219,10 +207,10 @@
         let left=start.left, top=start.top, w=start.w, h=start.h;
 
         switch(dir){
-          case 'se': w = start.w + dx; h = isImage ? w/aspect : start.h + dy; break;
-          case 'ne': w = start.w + dx; h = isImage ? w/aspect : start.h - dy; top = start.top + (start.h - h); break;
-          case 'sw': w = start.w - dx; h = isImage ? w/aspect : start.h + dy; left = start.left + (start.w - w); break;
-          case 'nw': w = start.w - dx; h = isImage ? w/aspect : start.h - dy; left = start.left + (start.w - w); top = start.top + (start.h - h); break;
+          case 'se': w = start.w + dx; h = isImage ? Math.round(w/aspect) : start.h + dy; break;
+          case 'ne': w = start.w + dx; h = isImage ? Math.round(w/aspect) : start.h - dy; top = start.top + (start.h - h); break;
+          case 'sw': w = start.w - dx; h = isImage ? Math.round(w/aspect) : start.h + dy; left = start.left + (start.w - w); break;
+          case 'nw': w = start.w - dx; h = isImage ? Math.round(w/aspect) : start.h - dy; left = start.left + (start.w - w); top = start.top + (start.h - h); break;
         }
 
         $el.css({ left, top, width:w, height:h });
@@ -254,5 +242,10 @@
   };
 
   window.WinShirtLayers = Layers;
+
+  $(function(){
+    const $canvas = $('#winshirt-canvas.winshirt-mockup-canvas');
+    Layers.init($canvas);
+  });
 
 })(jQuery);
