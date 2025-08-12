@@ -1,10 +1,4 @@
 <?php
-/**
- * WinShirt - Router (page/shortcode du customizer)
- * - Shortcode [winshirt_customizer]
- * - Helper pour charger le template 'templates/modal-customizer.php'
- */
-
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 if ( ! class_exists( 'WinShirt_Router' ) ) {
@@ -12,45 +6,49 @@ if ( ! class_exists( 'WinShirt_Router' ) ) {
 class WinShirt_Router {
 
 	public static function init() {
-		add_shortcode( 'winshirt_customizer', [ __CLASS__, 'shortcode_customizer' ] );
+		add_action( 'wp_ajax_winshirt_modal',        [ __CLASS__, 'ajax_modal' ] );
+		add_action( 'wp_ajax_nopriv_winshirt_modal', [ __CLASS__, 'ajax_modal' ] );
 	}
 
 	/**
-	 * [winshirt_customizer product_id="123"]
+	 * Retourne le HTML du customizer (template) pour affichage dans le modal.
+	 * Accepte product_id en GET/POST, sinon essaie d’inférer.
 	 */
-	public static function shortcode_customizer( $atts = [] ) {
-		$atts = shortcode_atts( [
-			'product_id' => 0,
-			'front_img'  => '',
-			'back_img'   => '',
-		], $atts, 'winshirt_customizer' );
+	public static function ajax_modal() {
+		// Sécurité basique : nonce REST si dispo
+		if ( isset( $_REQUEST['_wpnonce'] ) && ! wp_verify_nonce( $_REQUEST['_wpnonce'], 'wp_rest' ) ) {
+			wp_send_json_error( [ 'message' => 'Invalid nonce' ], 403 );
+		}
 
-		// Si product_id passé en shortcode, on le pousse dans l’URL (utilisé par WinShirtData)
-		if ( $atts['product_id'] && empty($_GET['product_id']) ) {
-			$_GET['product_id'] = (int) $atts['product_id'];
+		$product_id = isset( $_REQUEST['product_id'] ) ? absint( $_REQUEST['product_id'] ) : 0;
+		if ( ! $product_id && function_exists( 'is_product' ) && is_product() ) {
+			global $product;
+			if ( $product && method_exists( $product, 'get_id' ) ) {
+				$product_id = (int) $product->get_id();
+			}
+		}
+
+		// Préparer le contexte si besoin (pas obligatoire pour le template actuel)
+		if ( $product_id ) {
+			// Forcer global $post si nécessaire
+			$GLOBALS['post'] = get_post( $product_id );
+			setup_postdata( $GLOBALS['post'] );
+		}
+
+		$template = WINSHIRT_PATH . 'templates/modal-customizer.php';
+		if ( ! file_exists( $template ) ) {
+			wp_send_json_error( [ 'message' => 'Template not found' ], 500 );
 		}
 
 		ob_start();
-		self::load_template( 'modal-customizer.php', [
-			'front_img' => $atts['front_img'],
-			'back_img'  => $atts['back_img'],
-		] );
-		return ob_get_clean();
-	}
+		include $template;
+		$html = ob_get_clean();
 
-	/**
-	 * Inclut un template depuis /templates
-	 */
-	private static function load_template( $file, $args = [] ) {
-		$path = WINSHIRT_PATH . 'templates/' . ltrim( $file, '/\\' );
-		if ( ! file_exists( $path ) ) {
-			echo '<div class="notice notice-error">Template WinShirt introuvable: '.esc_html($file).'</div>';
-			return;
+		if ( $product_id ) {
+			wp_reset_postdata();
 		}
-		if ( is_array( $args ) ) {
-			extract( $args, EXTR_SKIP );
-		}
-		include $path;
+
+		wp_send_json_success( [ 'html' => $html ] );
 	}
 }
 
