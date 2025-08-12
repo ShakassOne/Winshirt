@@ -120,3 +120,32 @@
   });
 
 })(jQuery);
+// --- WinShirt bridge: clic vignette -> addImage sur canvas ---
+(function(){
+  'use strict';
+
+  function onClickThumbnail(e){
+    const t = e.target.closest('[data-ws-add-image], .ws-grid-item img, .ws-gallery img, .ws-panel--images img, .ws-design-thumb img');
+    if(!t) return;
+    e.preventDefault();
+
+    const card = t.closest('[data-src]');
+    const url = (card && card.getAttribute('data-src')) || t.getAttribute('data-ws-add-image') || t.getAttribute('src');
+    if(!url) return;
+
+    if(window.WinShirtLayers && typeof WinShirtLayers.addImage==='function'){
+      WinShirtLayers.addImage(url);
+    } else if (window.WinShirtCanvas && typeof WinShirtCanvas.addImage==='function'){
+      WinShirtCanvas.addImage(url);
+    }
+  }
+
+  document.addEventListener('click', onClickThumbnail);
+
+  // évite le drag natif (ghost) sur les thumbs
+  document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.ws-gallery img, .ws-grid-item img, .ws-panel--images img, [data-ws-add-image]').forEach(function(img){
+      img.addEventListener('dragstart', function(e){ e.preventDefault(); return false; });
+    });
+  });
+})();
