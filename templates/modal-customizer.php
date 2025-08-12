@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 ?>
 <style>
-/* === CRITICAL CSS (fixé) === */
+/* === CRITICAL CSS === */
 .winshirt-shell{
   box-sizing:border-box;
   display:grid;
@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 .ws-panels{ display:block }
 .ws-panel{
   display:none; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px;
-  max-height:720px; overflow:auto;  /* scroll si contenu long */
+  max-height:720px; overflow:auto;
 }
 .ws-panel.is-open{ display:block }
 .ws-panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px }
@@ -42,6 +42,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 .ws-layers-list{ display:flex; flex-direction:column; gap:8px }
 .ws-print-zone{ border:1px dashed rgba(0,0,0,.25); pointer-events:none }
 
+/* Barre mobile : masquée par défaut (desktop) */
+.ws-mobile-bar{ display:none; }
+
 @media(max-width:1024px){
   .winshirt-shell{ display:block }
   .ws-nav-left{ display:none }
@@ -50,8 +53,9 @@ if ( ! defined( 'ABSPATH' ) ) exit;
   .ws-panel{ display:none; border:none; border-top:1px solid #e5e7eb; border-radius:0; padding:12px; max-height:none; }
   .ws-panel.is-open{ display:block }
   .ws-mobile-bar{
+    display:flex;
     position:sticky; bottom:0; background:#fff; border-top:1px solid #e5e7eb;
-    padding:10px 12px; display:flex; gap:10px; justify-content:space-between; z-index:20
+    padding:10px 12px; gap:10px; justify-content:space-between; z-index:20
   }
   .ws-mobile-bar .ws-btn{ flex:1 1 auto; appearance:none; border:1px solid #e5e7eb; background:#f9fafb; padding:10px; border-radius:10px; text-align:center }
   .ws-mobile-bar .ws-btn.is-active{ background:#111827; color:#fff; border-color:#111827 }
@@ -88,16 +92,51 @@ if ( ! defined( 'ABSPATH' ) ) exit;
   <!-- PANNEAUX DROITE -->
   <aside id="winshirt-panel-root">
     <div class="ws-panels">
+
+      <!-- IMAGES -->
       <section class="ws-panel" data-panel="images" aria-hidden="true">
         <header class="ws-panel-head">
           <span class="title"><?php esc_html_e('Images', 'winshirt'); ?></span>
           <button class="ws-back" data-ws-close>&larr; <?php esc_html_e('Retour', 'winshirt'); ?></button>
         </header>
+
         <div class="ws-gallery">
-          <?php do_action( 'winshirt_panel_images_content' ); ?>
+          <?php
+          /**
+           * Priorité aux hooks (ex: ta classe Images).
+           */
+          do_action( 'winshirt_panel_images_content' );
+
+          /**
+           * Fallback : si aucun hook n’a produit de contenu, on liste les CPT ws-design.
+           */
+          global $wp_filter;
+          $had_hook = ! empty( $wp_filter['winshirt_panel_images_content'] );
+          if ( ! $had_hook ) :
+            $q = new WP_Query([
+              'post_type'      => 'ws-design',
+              'post_status'    => 'publish',
+              'posts_per_page' => 12,
+              'no_found_rows'  => true,
+            ]);
+            if ( $q->have_posts() ) :
+              while ( $q->have_posts() ) : $q->the_post();
+                $src = get_the_post_thumbnail_url( get_the_ID(), 'medium' );
+                if ( ! $src ) continue;
+                ?>
+                <div class="ws-thumb"><img src="<?php echo esc_url( $src ); ?>" alt=""></div>
+                <?php
+              endwhile;
+              wp_reset_postdata();
+            else :
+              echo '<p style="opacity:.6">'.esc_html__('Aucun visuel pour le moment.','winshirt').'</p>';
+            endif;
+          endif;
+          ?>
         </div>
       </section>
 
+      <!-- TEXTE -->
       <section class="ws-panel" data-panel="text" aria-hidden="true">
         <header class="ws-panel-head">
           <span class="title"><?php esc_html_e('Texte', 'winshirt'); ?></span>
@@ -114,6 +153,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         </form>
       </section>
 
+      <!-- CALQUES -->
       <section class="ws-panel" data-panel="layers" aria-hidden="true">
         <header class="ws-panel-head">
           <span class="title"><?php esc_html_e('Calques', 'winshirt'); ?></span>
@@ -122,6 +162,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
         <div class="ws-layers-list"><?php do_action( 'winshirt_panel_layers_content' ); ?></div>
       </section>
 
+      <!-- QR -->
       <section class="ws-panel" data-panel="qr" aria-hidden="true">
         <header class="ws-panel-head">
           <span class="title"><?php esc_html_e('QR Code', 'winshirt'); ?></span>
@@ -132,6 +173,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
           <button class="button" data-ws-add-qr><?php esc_html_e('Ajouter un QR', 'winshirt'); ?></button>
         </div>
       </section>
+
     </div>
   </aside>
 
@@ -152,24 +194,56 @@ if ( ! defined( 'ABSPATH' ) ) exit;
   function openPanel(name){
     qsa('[data-ws-open]').forEach(b=> b.classList.toggle('is-active', b.getAttribute('data-ws-open')===name));
     qsa('.ws-panel').forEach(p=>{
-      const isOk = p.getAttribute('data-panel')===name;
-      p.classList.toggle('is-open', isOk);
-      p.setAttribute('aria-hidden', isOk ? 'false' : 'true');
+      const ok = p.getAttribute('data-panel')===name;
+      p.classList.toggle('is-open', ok);
+      p.setAttribute('aria-hidden', ok ? 'false' : 'true');
     });
-    const root = qs('#winshirt-panel-root');
-    if(root){ root.setAttribute('data-active-level','1'); root.setAttribute('data-active', name); }
+    const root = qs('#winshirt-panel-root'); if(root){ root.setAttribute('data-active-level','1'); root.setAttribute('data-active', name); }
   }
 
-  // Desktop & mobile nav
+  // Nav desktop & mobile
   qsa('[data-ws-open]').forEach(b=> b.addEventListener('click', e=>{e.preventDefault(); openPanel(b.getAttribute('data-ws-open'));}));
-
-  // "Retour" → revient à Images (au lieu de tout fermer)
+  // Retour => revient sur Images
   qsa('[data-ws-close]').forEach(b=> b.addEventListener('click', e=>{e.preventDefault(); openPanel('images');}));
-
   // Par défaut : Images
   openPanel('images');
 
-  // Galerie : clic → ajoute une image via API si dispo
+  // Fallback MOCKUP : si WinShirtCanvas pas prêt, on affiche les images front/back depuis WinShirtData
+  try{
+    const data = window.WinShirtData || {};
+    const mocks = (data.mockups && data.mockups.length ? data.mockups : []);
+    if(mocks.length && !qs('#winshirt-canvas img.winshirt-mockup-img')){
+      const m = mocks[0]; // fallback: premier mockup dispo
+      const front = m.front || (m.images && m.images.front) || '';
+      const back  = m.back  || (m.images && m.images.back ) || '';
+      const wrap = qs('#winshirt-canvas');
+      if(wrap && front){
+        const f = new Image(); f.src = front; f.alt = 'Mockup Recto';
+        f.className = 'winshirt-mockup-img'; f.setAttribute('data-side','front');
+        f.style.cssText = 'position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;display:block;';
+        wrap.appendChild(f);
+      }
+      if(wrap && back){
+        const b = new Image(); b.src = back; b.alt = 'Mockup Verso';
+        b.className = 'winshirt-mockup-img'; b.setAttribute('data-side','back');
+        b.style.cssText = 'position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;display:none;';
+        wrap.appendChild(b);
+      }
+      // Bascule recto/verso
+      qsa('[data-ws-side]').forEach(btn=>{
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          const side = this.getAttribute('data-ws-side')==='back' ? 'back' : 'front';
+          qsa('#winshirt-canvas img.winshirt-mockup-img').forEach(img=>{
+            img.style.display = (img.getAttribute('data-side')===side ? 'block' : 'none');
+          });
+          document.dispatchEvent(new CustomEvent('winshirt:sideChanged',{detail:{side}}));
+        });
+      });
+    }
+  }catch(e){}
+
+  // Galerie : clic → ajoute image si API présente
   qsa('.ws-gallery img').forEach(img=>{
     img.addEventListener('dragstart', e=> e.preventDefault());
     img.addEventListener('mousedown', e=> e.preventDefault());
@@ -182,16 +256,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
     });
   });
 
-  // Recto/Verso : propage l’info si le canvas l’écoute
-  qsa('[data-ws-side]').forEach(b=>{
-    b.addEventListener('click', function(e){
-      e.preventDefault();
-      const side = this.getAttribute('data-ws-side')==='back' ? 'back':'front';
-      document.dispatchEvent(new CustomEvent('winshirt:sideChanged',{detail:{side}}));
-    });
-  });
-
-  // Ajouter texte (si API calques présente)
+  // Ajout texte
   const addTextBtn = qs('[data-ws-add-text]');
   if(addTextBtn){
     addTextBtn.addEventListener('click', function(e){
