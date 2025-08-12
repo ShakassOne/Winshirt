@@ -1,0 +1,13 @@
+.ws-ze-rect{
+  position:absolute;
+  outline:1px dashed rgba(0,0,0,.35);
+  background: rgba(59,130,246,.08);
+  box-sizing: border-box;
+}
+.ws-ze-rect .ws-h{
+  position:absolute;
+  width:12px; height:12px;
+  right:-6px; bottom:-6px;
+  background:#111827; border-radius:6px;
+  cursor:nwse-resize;
+}
