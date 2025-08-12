@@ -2,7 +2,7 @@
  * WinShirt - Layers
  * - Calques image/texte : sélection, déplacement, redimensionnement (souris + tactile)
  * - Contrainte à la zone d’impression du côté courant
- * - Utilise WinShirtCanvas.getZoneRect() pour centrer les ajouts
+ * - Empêche le drag natif des images (ghost)
  */
 (function($){
   'use strict';
@@ -16,12 +16,16 @@
       if(!$canvas || !$canvas.length) return;
       this.$canvas = $canvas;
 
+      // Empêche le drag natif des images de calque (ghost)
+      this.$canvas.on('dragstart', '.ws-layer img', e => e.preventDefault());
+      this.$canvas.on('mousedown', '.ws-layer img', e => e.preventDefault());
+
       // Sélection / déselection
       $canvas.on('mousedown touchstart', '.ws-layer', (e)=>{ this.select($(e.currentTarget)); });
       $(document).on('mousedown touchstart', (e)=>{
         if(!this.$canvas) return;
         const $t = $(e.target);
-        if(!$t.closest('.ws-layer, #winshirt-panel-root').length){
+        if(!$t.closest('.ws-layer, #winshirt-panel-root, .ws-mobile-bar').length){
           this.deselect();
         }
       });
@@ -39,7 +43,6 @@
       const side = this.side();
       const zr = (window.WinShirtCanvas && window.WinShirtCanvas.getZoneRect) ? window.WinShirtCanvas.getZoneRect(side) : null;
 
-      // Fallback si pas de zone
       let left = 20, top = 20, w = 200;
       if(zr){
         w = Math.max(80, Math.round(zr.width * 0.6));
@@ -49,7 +52,7 @@
 
       const $el = $(`
         <div class="ws-layer ws-type-image" data-side="${side}" data-locked="0" style="left:${left}px; top:${top}px; width:${w}px; height:auto;">
-          <img src="${url}" alt="" style="display:block; max-width:100%; height:auto;">
+          <img src="${url}" alt="" draggable="false" style="display:block; max-width:100%; height:auto; user-select:none;">
           ${this.handlesHTML()}
         </div>
       `);
@@ -112,7 +115,6 @@
       const side = $el.data('side') || this.side();
       const zr = this.zoneRect(side);
       if(!zr){
-        // Pas de zone → clamp au canvas
         const maxW = this.$canvas.innerWidth();
         const maxH = this.$canvas.innerHeight();
         let left = parseFloat($el.css('left'))||0;
@@ -128,11 +130,9 @@
       let top  = parseFloat($el.css('top'))||0;
       let w = $el.outerWidth(), h=$el.outerHeight();
 
-      // clamp position
       left = Math.max(zr.left, Math.min(left, zr.left + zr.width  - w));
       top  = Math.max(zr.top,  Math.min(top,  zr.top  + zr.height - h));
 
-      // clamp taille min/max
       const minW = 30, minH = 24;
       w = Math.max(minW, Math.min(w, zr.width));
       h = Math.max(minH, Math.min(h, zr.height));
