@@ -1,197 +1,234 @@
 /**
- * WinShirt - Mockup Canvas
- * - Affiche les mockups recto/verso
- * - Calcule la taille affichée et positionne les zones (xPct,yPct,wPct,hPct)
- * - Bascule recto/verso
- * - Expose une API pour Layers: getZoneRect(side)
+ * WinShirt – Mockup Canvas
+ * - Monte le mockup (front/back) à partir de WinShirtData.mockups
+ * - Affiche les zones d'impression (WinShirtData.zones)
+ * - Expose une API minimale: addImage(url), addText(opts), setSide('front'|'back')
+ * - Fournit un fallback WinShirtLayers si non présent (pour que la galerie fonctionne déjà)
  */
-(function($){
+(function(){
   'use strict';
 
-  const Canvas = {
-    $area: null,     // .winshirt-mockup-area
-    $canvas: null,   // #winshirt-canvas.winshirt-mockup-canvas
-    $imgF: null,     // <img data-side="front">
-    $imgB: null,     // <img data-side="back">
-    zones: null,     // WinShirtData.zones
-    side:  'front',
-
-    init(){
-      this.$area   = $('.winshirt-mockup-area');
-      this.$canvas = $('#winshirt-canvas.winshirt-mockup-canvas');
-      if(!this.$area.length || !this.$canvas.length) return;
-
-      this.zones = (window.WinShirtData && WinShirtData.zones) || { front:[], back:[] };
-      const mockups = (window.WinShirtData && WinShirtData.mockups) || { front:'', back:'' };
-      this.side = (window.WinShirtData && WinShirtData.state && WinShirtData.state.side) || 'front';
-
-      // Assure positionnement relatif du canvas
-      this.$canvas.css({ position:'relative', overflow:'visible' });
-
-      // Installe/Met à jour les deux <img>
-      this.ensureImages(mockups);
-
-      // Rendu initial
-      this.renderAll();
-
-      // Bascule recto/verso
-      $(document).on('click', '[data-ws-side]', (e)=>{
-        e.preventDefault();
-        const side = $(e.currentTarget).data('ws-side');
-        this.switchSide(side === 'back' ? 'back' : 'front');
-      });
-
-      // Resize → recalcul
-      let tid=null;
-      $(window).on('resize', ()=>{
-        clearTimeout(tid);
-        tid = setTimeout(()=> this.renderAll(), 100);
-      });
-    },
-
-    ensureImages(mockups){
-      // Crée les <img> si absents
-      this.$imgF = this.$canvas.find('img.winshirt-mockup-img[data-side="front"]');
-      this.$imgB = this.$canvas.find('img.winshirt-mockup-img[data-side="back"]');
-
-      if(!this.$imgF.length){
-        this.$imgF = $('<img>',{
-          class:'winshirt-mockup-img',
-          'data-side':'front',
-          alt:'Mockup Recto'
-        }).appendTo(this.$canvas);
-      }
-      if(!this.$imgB.length){
-        this.$imgB = $('<img>',{
-          class:'winshirt-mockup-img',
-          'data-side':'back',
-          alt:'Mockup Verso'
-        }).appendTo(this.$canvas);
-      }
-
-      // Style d’affichage (absolu centré, object-fit contain)
-      this.$canvas.find('img.winshirt-mockup-img').css({
-        position:'absolute',
-        inset:0,
-        margin:'auto',
-        maxWidth:'100%',
-        maxHeight:'100%',
-        objectFit:'contain',
-        display:'block'
-      });
-
-      // Source
-      if(mockups.front) this.$imgF.attr('src', mockups.front);
-      if(mockups.back)  this.$imgB.attr('src',  mockups.back);
-
-      // Visibilité côté courant
-      this.$imgF.toggle(this.side === 'front');
-      this.$imgB.toggle(this.side === 'back');
-
-      // Quand une image charge → recalcule
-      this.$imgF.on('load', ()=> this.renderAll());
-      this.$imgB.on('load', ()=> this.renderAll());
-    },
-
-    // Dimensions affichées de l'image active (boîte de content)
-    activeImageBox(){
-      const $img = (this.side==='back') ? this.$imgB : this.$imgF;
-      if(!$img || !$img.length) return null;
-
-      // Taille affichée (après object-fit)
-      const cw = this.$canvas.innerWidth();
-      const ch = this.$canvas.innerHeight();
-
-      // Si le canvas n’a pas encore de taille, on lui donne une base (responsive)
-      if(cw < 50 || ch < 50){
-        // Essaie d’occuper 70vh sans dépasser la largeur dispo du conteneur
-        const $container = this.$area.length ? this.$area : this.$canvas.parent();
-        const maxW = Math.max(300, Math.min($container.innerWidth() - 40, 1000));
-        const maxH = Math.max(300, Math.min($(window).height()*0.7, 900));
-        this.$canvas.css({ width:maxW+'px', height:maxH+'px' });
-      }
-
-      const off = this.$canvas.position();
-      const pos = this.$canvas.offset();
-      const rect = {
-        left: pos.left,
-        top:  pos.top,
-        width: this.$canvas.innerWidth(),
-        height:this.$canvas.innerHeight()
-      };
-      return rect;
-    },
-
-    // Retourne le rect PIXELS d’une zone (dans le repère du canvas)
-    getZoneRect(side){
-      const box = this.activeImageBox();
-      if(!box) return null;
-      const arr = (this.zones && this.zones[side]) || [];
-      const z   = arr[0]; // une zone par défaut
-      if(!z) return null;
-
-      const x = Math.round(box.width  * (z.xPct/100));
-      const y = Math.round(box.height * (z.yPct/100));
-      const w = Math.round(box.width  * (z.wPct/100));
-      const h = Math.round(box.height * (z.hPct/100));
-      return { left:x, top:y, width:w, height:h };
-    },
-
-    // Installe/positionne les .ws-print-zone
-    renderZones(){
-      const sides = ['front','back'];
-      for(const s of sides){
-        const rect = this.getZoneRect(s);
-        let $z = this.$canvas.find(`.ws-print-zone[data-side="${s}"]`);
-        if(!rect){
-          $z.hide();
-          continue;
-        }
-        if(!$z.length){
-          $z = $(`<div class="ws-print-zone" data-side="${s}"></div>`).appendTo(this.$canvas);
-        }
-        $z.css({
-          position:'absolute',
-          border:'1px dashed rgba(0,0,0,.25)',
-          pointerEvents:'none',
-          left: rect.left + 'px',
-          top:  rect.top  + 'px',
-          width: rect.width + 'px',
-          height:rect.height+ 'px',
-          display: (this.side===s) ? 'block' : 'none'
-        });
-      }
-    },
-
-    switchSide(side){
-      if(side!=='back') side='front';
-      this.side = side;
-      this.$imgF.toggle(side==='front');
-      this.$imgB.toggle(side==='back');
-      this.renderZones();
-      $(document).trigger('winshirt:sideChanged', [side]);
-    },
-
-    renderAll(){
-      // Ajuste le canvas pour remplir au mieux son conteneur (si le template l’a déjà fait, on respecte)
-      if(this.$area.length){
-        // occupe la largeur dispo de l’aire centrale, mais garde un max raisonnable
-        const availW = this.$area.innerWidth();
-        const targetW = Math.max(320, Math.min(availW - 24, 1100));
-        // hauteur ~ 110% de la largeur (tee-shirt portrait), bornée
-        const targetH = Math.round(Math.max(360, Math.min(targetW * 1.1, $(window).height()*0.75)));
-        this.$canvas.css({ width: targetW+'px', height: targetH+'px' });
-      }
-
-      this.renderZones();
+  const WS = {
+    el: null,                 // #winshirt-canvas
+    side: 'front',            // 'front' | 'back'
+    imgs: { front:null, back:null }, // mockup <img>
+    zoneEls: [],              // overlays de zones
+    items: [],                // éléments posés (images/textes)
+    cfg: {
+      strictPercent: true
     }
   };
 
-  window.WinShirtCanvas = {
-    getZoneRect: (side)=> Canvas.getZoneRect(side || Canvas.side),
-    currentSide: ()=> Canvas.side
+  function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+  function px(n){ return (Math.round(n*100)/100)+'px'; }
+
+  function getData(){
+    const d = (window.WinShirtData||{});
+    WS.cfg.strictPercent = !!(d.config && d.config.strictPercent);
+    return d;
+  }
+
+  function ensureCanvas(){
+    WS.el = document.getElementById('winshirt-canvas');
+    return !!WS.el;
+  }
+
+  function clear(el){ while(el.firstChild) el.removeChild(el.firstChild); }
+
+  function loadMockupImages(){
+    const d = getData();
+    const mocks = Array.isArray(d.mockups) ? d.mockups : [];
+    const m = mocks[0] || {};
+    const front = m.front || (m.images && m.images.front) || '';
+    const back  = m.back  || (m.images && m.images.back ) || '';
+
+    // Si déjà en place, ne pas dupliquer
+    const already = WS.el.querySelector('img.winshirt-mockup-img');
+    if(already) return;
+
+    if(front){
+      const f = new Image();
+      f.src = front; f.alt = 'Mockup Recto';
+      f.className = 'winshirt-mockup-img'; f.dataset.side = 'front';
+      f.style.cssText = 'position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;display:block;';
+      WS.el.appendChild(f);
+      WS.imgs.front = f;
+    }
+    if(back){
+      const b = new Image();
+      b.src = back; b.alt = 'Mockup Verso';
+      b.className = 'winshirt-mockup-img'; b.dataset.side = 'back';
+      b.style.cssText = 'position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;display:none;';
+      WS.el.appendChild(b);
+      WS.imgs.back = b;
+    }
+  }
+
+  function setSide(side){
+    WS.side = (side==='back'?'back':'front');
+    const imgs = WS.el.querySelectorAll('img.winshirt-mockup-img');
+    imgs.forEach(img=>{
+      img.style.display = (img.dataset.side===WS.side ? 'block' : 'none');
+    });
+    drawZones();
+  }
+
+  function canvasRect(){
+    return WS.el.getBoundingClientRect();
+  }
+
+  function drawZones(){
+    // clear zones
+    WS.zoneEls.forEach(z=> z.remove());
+    WS.zoneEls = [];
+
+    const d = getData();
+    const zones = Array.isArray(d.zones) ? d.zones : [];
+    const sideZones = zones.filter(z=> (z.side||'front')===WS.side);
+
+    const C = canvasRect();
+    sideZones.forEach(z=>{
+      // z: {left, top, width, height} en % si strictPercent, sinon pixels
+      let left, top, width, height;
+      if(WS.cfg.strictPercent){
+        left   = (z.left   || 0) * 0.01 * C.width;
+        top    = (z.top    || 0) * 0.01 * C.height;
+        width  = (z.width  || 0) * 0.01 * C.width;
+        height = (z.height || 0) * 0.01 * C.height;
+      } else {
+        left   = z.left||0;  top = z.top||0;  width = z.width||100; height = z.height||100;
+      }
+      const div = document.createElement('div');
+      div.className = 'ws-print-zone';
+      div.dataset.side = WS.side;
+      div.style.position = 'absolute';
+      div.style.left   = px(left);
+      div.style.top    = px(top);
+      div.style.width  = px(width);
+      div.style.height = px(height);
+      div.style.pointerEvents = 'none';
+      WS.el.appendChild(div);
+      WS.zoneEls.push(div);
+    });
+  }
+
+  function currentZoneRect(){
+    // on prend la première zone visible pour placer par défaut
+    const z = WS.zoneEls[0];
+    if(!z) return null;
+    const r = z.getBoundingClientRect();
+    const c = canvasRect();
+    return { // coordonnées relatives au canvas
+      x: r.left - c.left,
+      y: r.top  - c.top,
+      w: r.width,
+      h: r.height
+    };
+  }
+
+  function makeDraggable(el){
+    let sx=0, sy=0, ox=0, oy=0, moving=false;
+
+    el.addEventListener('pointerdown', (e)=>{
+      moving=true; el.setPointerCapture(e.pointerId);
+      sx=e.clientX; sy=e.clientY;
+      const tr = el.style.transform.match(/translate\(([-0-9.]+)px,\s*([-0-9.]+)px\)/);
+      if(tr){ ox=parseFloat(tr[1]||0); oy=parseFloat(tr[2]||0); } else { ox=0; oy=0; el.style.transform='translate(0px,0px)'; }
+      e.preventDefault();
+    });
+    el.addEventListener('pointermove', (e)=>{
+      if(!moving) return;
+      const dx=e.clientX-sx, dy=e.clientY-sy;
+      el.style.transform = `translate(${px(ox+dx)}, ${px(oy+dy)})`;
+    });
+    el.addEventListener('pointerup', ()=>{ moving=false; });
+    el.addEventListener('pointercancel', ()=>{ moving=false; });
+  }
+
+  function addImage(url){
+    if(!url) return;
+    const zone = currentZoneRect();
+    const img = new Image();
+    img.src = url; img.alt = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'ws-item ws-item-image';
+    wrap.style.position='absolute';
+    // taille de base: 50% de la zone
+    const baseW = zone ? Math.min(zone.w*0.6, canvasRect().width*0.6) : 240;
+    const baseH = baseW;
+    // centrer dans zone/canvas
+    const cx = zone ? (zone.x + (zone.w-baseW)/2) : ( (canvasRect().width-baseW)/2 );
+    const cy = zone ? (zone.y + (zone.h-baseH)/2) : ( (canvasRect().height-baseH)/2 );
+
+    wrap.style.left = px(cx); wrap.style.top = px(cy);
+    wrap.style.width = px(baseW); wrap.style.height = px(baseH);
+    wrap.style.transform = 'translate(0px,0px)';
+    wrap.style.cursor = 'move';
+    wrap.style.userSelect='none';
+
+    img.style.position='absolute';
+    img.style.inset='0';
+    img.style.margin='auto';
+    img.style.maxWidth='100%';
+    img.style.maxHeight='100%';
+    img.style.pointerEvents='none';
+
+    wrap.appendChild(img);
+    WS.el.appendChild(wrap);
+    makeDraggable(wrap);
+    WS.items.push(wrap);
+  }
+
+  function addText(opts){
+    const o = Object.assign({ text:'Votre texte', size:32, bold:false, italic:false }, opts||{});
+    const zone = currentZoneRect();
+    const el = document.createElement('div');
+    el.className='ws-item ws-item-text';
+    el.style.position='absolute';
+    el.style.left = px(zone ? (zone.x + zone.w*0.1) : canvasRect().width*0.25);
+    el.style.top  = px(zone ? (zone.y + zone.h*0.1) : canvasRect().height*0.25);
+    el.style.transform='translate(0px,0px)';
+    el.style.cursor='move';
+    el.style.userSelect='none';
+    el.style.whiteSpace='pre';
+    el.style.fontSize = px(o.size);
+    el.style.fontWeight = o.bold ? '700' : '400';
+    el.style.fontStyle  = o.italic ? 'italic' : 'normal';
+    el.style.fontFamily = 'system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif';
+    el.textContent = o.text;
+    WS.el.appendChild(el);
+    makeDraggable(el);
+    WS.items.push(el);
+  }
+
+  // API publique
+  const API = {
+    setSide,
+    addImage,
+    addText,
+    getZoneRect: currentZoneRect
   };
 
-  $(function(){ Canvas.init(); });
+  // Boot sequence : on monte au moment où le template est injecté
+  function mount(){
+    if(!ensureCanvas()) return;
+    loadMockupImages();
+    setSide(WS.side);
+  }
 
-})(jQuery);
+  // Ecoute les signaux venant du template ou d’autres scripts
+  document.addEventListener('winshirt:mounted', mount);
+  ready(mount);
+  document.addEventListener('winshirt:sideChanged', (e)=> setSide((e.detail&&e.detail.side)||'front'));
+
+  // Expose
+  window.WinShirtCanvas = API;
+
+  // Fallback WinShirtLayers (si layers.js pas encore chargé)
+  if(!window.WinShirtLayers){
+    window.WinShirtLayers = {
+      addImage: addImage,
+      addText: addText
+    };
+  }
+})();
