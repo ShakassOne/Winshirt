@@ -49,30 +49,34 @@ class WinShirt_Mockups_Admin {
 		$screen = get_current_screen();
 		if ( ! $screen || $screen->post_type !== 'ws-mockup' ) return;
 
-		// Media frame WP
+		// Media frame WP + jQuery
 		wp_enqueue_media();
+		wp_enqueue_script( 'jquery' );
 
-		// Un peu de style
-		wp_add_inline_style( 'wp-admin', '
-			.ws-field { margin-bottom:14px; }
-			.ws-field label { display:block; font-weight:600; margin-bottom:6px; }
-			.ws-row { display:flex; gap:12px; align-items:center; }
-			.ws-url { width:100%; }
-			.ws-thumb { width:120px; height:120px; border:1px solid #e0e0e0; background:#fafafa; display:flex; align-items:center; justify-content:center; overflow:hidden }
-			.ws-thumb img { max-width:100%; max-height:100%; display:block }
-			.ws-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-			.ws-textarea { width:100%; min-height:120px; font-family:inherit; }
-			.ws-help { font-size:12px; opacity:.75; }
-		' );
+		// Un peu de style minimal (inline pour éviter un handle de style dédié)
+		add_action('admin_print_styles', function(){
+			echo '<style>
+				.ws-field{margin-bottom:14px}
+				.ws-field label{display:block;font-weight:600;margin-bottom:6px}
+				.ws-row{display:flex;gap:12px;align-items:center}
+				.ws-url{width:100%}
+				.ws-thumb{width:120px;height:120px;border:1px solid #e0e0e0;background:#fafafa;display:flex;align-items:center;justify-content:center;overflow:hidden}
+				.ws-thumb img{max-width:100%;max-height:100%;display:block}
+				.ws-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+				.ws-textarea{width:100%;min-height:120px;font-family:inherit}
+				.ws-help{font-size:12px;opacity:.75}
+			</style>';
+		});
 
-		// JS pour boutons "Téléverser"
-		wp_add_inline_script( 'jquery-core', "
+		// JS pour boutons "Téléverser" (attaché à 'jquery')
+		$inline = <<<JS
 		(function($){
 			$(document).on('click','.ws-pick',function(e){
 				e.preventDefault();
-				var $wrap = $(this).closest('.ws-row');
-				var $inp  = $wrap.find('input[type=text]');
-				var $th   = $wrap.find('.ws-thumb');
+				e.stopPropagation();
+				var \$wrap = $(this).closest('.ws-row');
+				var \$inp  = \$wrap.find('input[type=text]');
+				var \$th   = \$wrap.find('.ws-thumb');
 
 				var frame = wp.media({
 					title: 'Choisir une image',
@@ -81,20 +85,22 @@ class WinShirt_Mockups_Admin {
 				});
 				frame.on('select', function(){
 					var att = frame.state().get('selection').first().toJSON();
-					$inp.val(att.url).trigger('change');
-					$th.html('<img src=\"'+att.url+'\" alt=\"\">');
+					\$inp.val(att.url).trigger('change');
+					\$th.html('<img src="'+att.url+'" alt="">');
 				});
 				frame.open();
 			});
 
 			$(document).on('change','.ws-url',function(){
 				var url = $(this).val();
-				var $th = $(this).closest('.ws-row').find('.ws-thumb');
-				if(url){ $th.html('<img src=\"'+url+'\" alt=\"\">'); }
-				else   { $th.html('—'); }
+				var \$th = $(this).closest('.ws-row').find('.ws-thumb');
+				if(url){ \$th.html('<img src="'+url+'" alt="">'); }
+				else   { \$th.html('—'); }
 			});
 		})(jQuery);
-		" );
+		JS;
+
+		wp_add_inline_script( 'jquery', $inline );
 	}
 
 	// --- BOXES ---
@@ -108,8 +114,8 @@ class WinShirt_Mockups_Admin {
 		echo '<div class="ws-field">';
 		echo '<label>'.esc_html__('Image avant (recto)', 'winshirt').'</label>';
 		echo '<div class="ws-row">';
-		printf('<input class="ws-url" type="text" name="_winshirt_mockup_front" value="%s" placeholder="https://…" />', esc_attr($front) );
-		echo '<button class="button ws-pick">'.esc_html__('Téléverser', 'winshirt').'</button>';
+		printf('<input class="ws-url" type="text" name="_winshirt_mockup_front" value="%s" placeholder="https://…">', esc_attr($front) );
+		echo '<button type="button" class="button ws-pick">'.esc_html__('Téléverser', 'winshirt').'</button>';
 		echo '<div class="ws-thumb">'.( $front ? '<img src="'.esc_url($front).'" alt="">' : '—' ).'</div>';
 		echo '</div>';
 		echo '</div>';
@@ -117,8 +123,8 @@ class WinShirt_Mockups_Admin {
 		echo '<div class="ws-field">';
 		echo '<label>'.esc_html__('Image arrière (verso)', 'winshirt').'</label>';
 		echo '<div class="ws-row">';
-		printf('<input class="ws-url" type="text" name="_winshirt_mockup_back" value="%s" placeholder="https://…" />', esc_attr($back) );
-		echo '<button class="button ws-pick">'.esc_html__('Téléverser', 'winshirt').'</button>';
+		printf('<input class="ws-url" type="text" name="_winshirt_mockup_back" value="%s" placeholder="https://…">', esc_attr($back) );
+		echo '<button type="button" class="button ws-pick">'.esc_html__('Téléverser', 'winshirt').'</button>';
 		echo '<div class="ws-thumb">'.( $back ? '<img src="'.esc_url($back).'" alt="">' : '—' ).'</div>';
 		echo '</div>';
 		echo '</div>';
@@ -129,7 +135,7 @@ class WinShirt_Mockups_Admin {
 
 		echo '<div class="ws-field">';
 		echo '<label>'.esc_html__('Couleurs disponibles (CSV)', 'winshirt').'</label>';
-		printf('<input class="regular-text ws-mono" type="text" name="_winshirt_mockup_colors" value="%s" placeholder="#000000,#FFFFFF,red,blue" />', esc_attr($colors) );
+		printf('<input class="regular-text ws-mono" type="text" name="_winshirt_mockup_colors" value="%s" placeholder="#000000,#FFFFFF,red,blue">', esc_attr($colors) );
 		echo '<p class="ws-help">'.esc_html__('Liste séparée par des virgules (hex ou noms CSS). Optionnel.', 'winshirt').'</p>';
 		echo '</div>';
 	}
@@ -160,23 +166,19 @@ class WinShirt_Mockups_Admin {
 		if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) return;
 		if ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
-		// URLs images
 		$front = isset($_POST['_winshirt_mockup_front']) ? esc_url_raw( trim($_POST['_winshirt_mockup_front']) ) : '';
 		$back  = isset($_POST['_winshirt_mockup_back'])  ? esc_url_raw( trim($_POST['_winshirt_mockup_back']) )  : '';
 		update_post_meta( $post_id, '_winshirt_mockup_front', $front );
 		update_post_meta( $post_id, '_winshirt_mockup_back',  $back );
 
-		// Couleurs CSV
 		$colors = isset($_POST['_winshirt_mockup_colors']) ? sanitize_text_field( $_POST['_winshirt_mockup_colors'] ) : '';
 		update_post_meta( $post_id, '_winshirt_mockup_colors', $colors );
 
-		// Zones JSON
 		$zones_raw = isset($_POST['_winshirt_zones']) ? wp_unslash( $_POST['_winshirt_zones'] ) : '';
 		$zones_dec = json_decode( (string) $zones_raw, true );
 		if ( is_array($zones_dec) && isset($zones_dec['front']) && isset($zones_dec['back']) ) {
 			update_post_meta( $post_id, '_winshirt_zones', $zones_dec );
 		} else {
-			// On enregistre tel quel pour que l’admin puisse corriger — mais on ne casse pas
 			update_post_meta( $post_id, '_winshirt_zones', $zones_raw );
 		}
 	}
