@@ -34,6 +34,9 @@ if ( ! class_exists( 'WinShirt_Assets' ) ) {
 			add_action( 'wp_enqueue_scripts', [ __CLASS__, 'enqueue_public_assets' ], 20 );
 		}
 
+		/**
+		 * Enregistre tous les assets (déclarés une fois, utilisés selon contexte).
+		 */
 		public static function register_public_assets() {
 			$css = [
 				'winshirt-modal'   => 'assets/css/winshirt-modal.css',
@@ -80,21 +83,31 @@ if ( ! class_exists( 'WinShirt_Assets' ) ) {
 				);
 			}
 
-			wp_localize_script( 'winshirt-state', 'WinShirtData', self::build_front_data() );
+			// IMPORTANT : plus de wp_localize_script ici (trop tôt).
+			// On localisera dans enqueue_public_assets(), quand is_product() est disponible.
 		}
 
+		/**
+		 * Enqueue effectif si contexte "customizer" détecté.
+		 */
 		public static function enqueue_public_assets() {
 			if ( ! self::should_enqueue() ) return;
 
+			// Localisation ICI (au bon moment)
+			wp_localize_script( 'winshirt-state', 'WinShirtData', self::build_front_data() );
+
+			// CSS
 			wp_enqueue_style( 'winshirt-helpers' );
 			wp_enqueue_style( 'winshirt-panels' );
 			wp_enqueue_style( 'winshirt-layers' );
 			wp_enqueue_style( 'winshirt-modal' );
 			wp_enqueue_style( 'winshirt-mobile' );
 
+			// JS
 			wp_enqueue_script( 'winshirt-state' );
 			wp_enqueue_script( 'winshirt-ui-router' );
 			wp_enqueue_script( 'winshirt-ui-panels' );
+			wp_enqueue_script( 'winshirt-mockup-canvas' );
 			wp_enqueue_script( 'winshirt-layers' );
 			wp_enqueue_script( 'winshirt-text-tools' );
 			wp_enqueue_script( 'winshirt-image-tools' );
@@ -105,6 +118,9 @@ if ( ! class_exists( 'WinShirt_Assets' ) ) {
 			wp_enqueue_script( 'winshirt-modal' );
 		}
 
+		/**
+		 * Construit les données front centralisées (filter-friendly).
+		 */
 		private static function build_front_data() {
 			$current_user = get_current_user_id();
 			$product_id   = self::detect_product_id();
@@ -118,13 +134,8 @@ if ( ! class_exists( 'WinShirt_Assets' ) ) {
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
 				'locale'    => determine_locale(),
 
-				'user'      => [
-					'id' => (int) $current_user,
-				],
-
-				'product'   => [
-					'id' => (int) $product_id,
-				],
+				'user'      => [ 'id' => (int) $current_user ],
+				'product'   => [ 'id' => (int) $product_id ],
 
 				'config'    => [
 					'maxPreviewSize' => 1600,
