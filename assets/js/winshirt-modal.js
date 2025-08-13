@@ -1,71 +1,50 @@
-/**
- * WinShirt - Modal shell (open/close + bulles d'événements stables)
- * - Ouvre sur [data-ws-open-customizer]
- * - Ferme sur backdrop, bouton Fermer, ou ESC
- * - Empêche le clic intérieur de fermer le modal (stopPropagation)
- */
-
-(function ($) {
+/* ===== WinShirt – Contrôleur de modal (ouverture/fermeture + click traps) ===== */
+(function($){
   'use strict';
 
-  const SEL = {
-    modal:        '#winshirt-modal',
-    backdrop:     '#winshirt-modal .ws-backdrop',
-    dialog:       '#winshirt-modal .winshirt-customizer-dialog',
-    body:         '#winshirt-modal .winshirt-customizer-body',
-    close:        '#winshirt-modal .ws-close',
-    openTrigger:  '[data-ws-open-customizer]'
-  };
+  const M = {
+    $modal: null, $dialog: null,
+    open(){
+      if(!this.$modal){ this.mount(); }
+      $('html,body').addClass('ws-modal-open');
+      this.$modal.addClass('is-open');
+      $(document).trigger('winshirt:modal:open');
+    },
+    close(){
+      if(!this.$modal) return;
+      this.$modal.removeClass('is-open');
+      $('html,body').removeClass('ws-modal-open');
+      $(document).trigger('winshirt:modal:close');
+    },
+    mount(){
+      // attend que le template HTML soit déjà présent dans la page (templates/modal-customizer.php)
+      this.$modal  = $('.winshirt-customizer-modal');
+      this.$dialog = this.$modal.find('.winshirt-customizer-dialog');
 
-  const CSS = {
-    open: 'ws-open',
-    bodyLock: 'ws-modal-open'
-  };
-
-  function open() {
-    const $modal = $(SEL.modal);
-    if (!$modal.length) return;
-    $('body').addClass(CSS.bodyLock);
-    $modal.addClass(CSS.open);
-    // Déclencheur pour brancher les panneaux/outils
-    $(document).trigger('winshirt:modal:open', { modal: $modal });
-  }
-
-  function close() {
-    const $modal = $(SEL.modal);
-    if (!$modal.length) return;
-    $modal.removeClass(CSS.open);
-    $('body').removeClass(CSS.bodyLock);
-    $(document).trigger('winshirt:modal:close', { modal: $modal });
-  }
-
-  function bind() {
-    // Ouvrir
-    $(document).on('click.ws', SEL.openTrigger, function (e) {
-      e.preventDefault();
-      open();
-    });
-
-    // Fermer (backdrop + bouton)
-    $(document).on('click.ws', `${SEL.backdrop}, ${SEL.close}`, function (e) {
-      e.preventDefault();
-      close();
-    });
-
-    // Bloquer la propagation des clics à l’intérieur du dialog (sinon ça ferme)
-    $(document).on('click.ws', `${SEL.dialog}, ${SEL.body}`, function (e) {
-      e.stopPropagation();
-    });
-
-    // ESC pour fermer
-    $(document).on('keydown.ws', function (e) {
-      if (e.key === 'Escape') {
-        close();
+      if(!this.$modal.length){
+        console.warn('WinShirt modal: HTML introuvable (template).');
+        return;
       }
-    });
-  }
 
-  // Boot
-  if (document.readyState !== 'loading') bind();
-  else document.addEventListener('DOMContentLoaded', bind);
+      // clic sur overlay => fermer
+      this.$modal.on('click', (e)=>{ if(e.target === e.currentTarget){ this.close(); } });
+      // bloquer les clics dans la boîte
+      this.$dialog.on('click', (e)=> e.stopPropagation());
+      // bouton Fermer
+      this.$modal.on('click', '.ws-close', ()=> this.close());
+
+      // raccourci clavier ESC
+      $(document).on('keydown.wsModal', (e)=>{ if(e.key === 'Escape'){ this.close(); } });
+    }
+  };
+
+  // Bouton "Personnaliser"
+  $(document).on('click', '[data-winshirt-open]', function(e){
+    e.preventDefault();
+    M.open();
+  });
+
+  // exposer pour debug
+  window.WinShirtModal = M;
+
 })(jQuery);
