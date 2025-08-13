@@ -1,141 +1,172 @@
 <?php
+/**
+ * WinShirt – Mockups (CPT) + Payload helper
+ *
+ * - CPT: ws-mockup (visible en BO, pas public)
+ * - Meta keys standardisées:
+ *     _winshirt_mockup_front   (string URL)
+ *     _winshirt_mockup_back    (string URL)
+ *     _winshirt_mockup_colors  (CSV "#000000,#FFFFFF,blue")
+ *     _winshirt_zones          (JSON {"front":[{left,top,width,height}], "back":[...]} en %)
+ *
+ * - API interne:
+ *     WinShirt_Mockups::get_payload( $mockup_id ) => array
+ *     WinShirt_Mockups::get_latest_mockup_id()    => int|0
+ */
+
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! class_exists( 'WinShirt_Mockups' ) ) {
 
 class WinShirt_Mockups {
 
-    const PT      = 'ws-mockup';
-    const META_F  = '_ws_front';
-    const META_B  = '_ws_back';
-    const META_Z  = '_ws_zones';
-    const META_COL= '_ws_colors_csv';
+	public static function init() {
+		add_action( 'init', [ __CLASS__, 'register_cpt' ] );
+	}
 
-    public static function init() {
-        add_action( 'init', [ __CLASS__, 'register_cpt' ] );
-        add_action( 'add_meta_boxes', [ __CLASS__, 'add_metaboxes' ] );
-        add_action( 'save_post_' . self::PT, [ __CLASS__, 'save' ] );
+	public static function register_cpt() {
+		$labels = [
+			'name'               => __( 'Mockups', 'winshirt' ),
+			'singular_name'      => __( 'Mockup', 'winshirt' ),
+			'add_new'            => __( 'Ajouter', 'winshirt' ),
+			'add_new_item'       => __( 'Ajouter un mockup', 'winshirt' ),
+			'edit_item'          => __( 'Modifier le mockup', 'winshirt' ),
+			'new_item'           => __( 'Nouveau mockup', 'winshirt' ),
+			'view_item'          => __( 'Voir le mockup', 'winshirt' ),
+			'search_items'       => __( 'Rechercher des mockups', 'winshirt' ),
+			'not_found'          => __( 'Aucun mockup', 'winshirt' ),
+			'not_found_in_trash' => __( 'Aucun mockup dans la corbeille', 'winshirt' ),
+			'menu_name'          => __( 'Mockups', 'winshirt' ),
+		];
 
-        // Admin assets uniquement sur l’édition de mockups
-        add_action( 'admin_enqueue_scripts', [ __CLASS__, 'admin_assets' ] );
-    }
+		register_post_type( 'ws-mockup', [
+			'labels'              => $labels,
+			'public'              => false,
+			'show_ui'             => true,
+			'show_in_menu'        => false, // le menu est géré via class-winshirt-admin.php
+			'supports'            => [ 'title' ],
+			'capability_type'     => 'post',
+			'map_meta_cap'        => true,
+			'has_archive'         => false,
+			'hierarchical'        => false,
+			'rewrite'             => false,
+			'show_in_rest'        => false,
+		] );
+	}
 
-    public static function register_cpt() {
-        register_post_type( self::PT, [
-            'label'  => __( 'Mockups', 'winshirt' ),
-            'labels' => [
-                'name' => __( 'Mockups', 'winshirt' ),
-                'singular_name' => __( 'Mockup', 'winshirt' ),
-                'add_new' => __( 'Ajouter', 'winshirt' ),
-                'add_new_item' => __( 'Ajouter un mockup', 'winshirt' ),
-                'edit_item' => __( 'Modifier le mockup', 'winshirt' ),
-                'new_item' => __( 'Nouveau mockup', 'winshirt' ),
-                'view_item' => __( 'Voir', 'winshirt' ),
-                'search_items' => __( 'Rechercher', 'winshirt' ),
-                'not_found' => __( 'Aucun mockup', 'winshirt' ),
-            ],
-            'public' => false,
-            'show_ui' => true,
-            'show_in_menu' => false,          // on gère via menu WinShirt
-            'supports' => [ 'title' ],
-            'capability_type' => 'post',
-        ] );
-    }
+	/**
+	 * Renvoie un payload normalisé pour le front.
+	 *
+	 * @param int $mockup_id
+	 * @return array{
+	 *   id:int,
+	 *   images: array{front:string,back:string},
+	 *   zones:  array{front:array<int, array{left:float,top:float,width:float,height:float}>, back:array<int, array{left:float,top:float,width:float,height:float}>},
+	 *   colors: array<int,string>
+	 * }
+	 */
+	public static function get_payload( $mockup_id ) {
+		$mockup_id = absint( $mockup_id );
+		if ( ! $mockup_id || 'ws-mockup' !== get_post_type( $mockup_id ) ) {
+			return [];
+		}
 
-    public static function add_metaboxes() {
-        add_meta_box(
-            'ws_mockup_images',
-            __( 'Images du mockup', 'winshirt' ),
-            [ __CLASS__, 'box_images' ],
-            self::PT, 'normal', 'high'
-        );
+		// URLs images (support des anciennes metas pour compat)
+		$front = get_post_meta( $mockup_id, '_winshirt_mockup_front', true );
+		if ( ! $front ) $front = get_post_meta( $mockup_id, 'ws_mockup_front', true );
 
-        add_meta_box(
-            'ws_mockup_colors',
-            __( 'Couleurs disponibles (optionnel)', 'winshirt' ),
-            [ __CLASS__, 'box_colors' ],
-            self::PT, 'normal', 'default'
-        );
+		$back  = get_post_meta( $mockup_id, '_winshirt_mockup_back', true );
+		if ( ! $back ) $back = get_post_meta( $mockup_id, 'ws_mockup_back', true );
 
-        add_meta_box(
-            'ws_mockup_zones',
-            __( 'Zones d’impression', 'winshirt' ),
-            [ __CLASS__, 'box_zones' ],
-            self::PT, 'normal', 'high'
-        );
-    }
+		$images = [
+			'front' => is_string( $front ) ? esc_url_raw( $front ) : '',
+			'back'  => is_string( $back )  ? esc_url_raw( $back )  : '',
+		];
 
-    public static function box_images( $post ) {
-        $front = get_post_meta( $post->ID, self::META_F, true );
-        $back  = get_post_meta( $post->ID, self::META_B, true );
-        ?>
-        <p><label for="ws_front"><?php _e('Image avant (recto) URL', 'winshirt'); ?></label>
-            <input type="text" id="ws_front" name="ws_front" class="widefat" value="<?php echo esc_attr( $front ); ?>">
-        </p>
-        <p><label for="ws_back"><?php _e('Image arrière (verso) URL', 'winshirt'); ?></label>
-            <input type="text" id="ws_back" name="ws_back" class="widefat" value="<?php echo esc_attr( $back ); ?>">
-        </p>
-        <p class="description"><?php _e('Tu peux coller directement les URLs de la médiathèque.', 'winshirt'); ?></p>
-        <?php
-    }
+		// Couleurs CSV
+		$colors_csv = get_post_meta( $mockup_id, '_winshirt_mockup_colors', true );
+		if ( ! $colors_csv ) $colors_csv = get_post_meta( $mockup_id, 'ws_mockup_colors', true );
+		$colors = [];
+		if ( is_string( $colors_csv ) && $colors_csv !== '' ) {
+			$tmp = array_map( 'trim', explode( ',', $colors_csv ) );
+			$colors = array_values( array_filter( $tmp, static function( $v ){ return $v !== ''; } ) );
+		}
 
-    public static function box_colors( $post ) {
-        $csv = get_post_meta( $post->ID, self::META_COL, true );
-        ?>
-        <p><label for="ws_colors_csv"><?php _e('Couleurs (HEX ou noms CSS), séparées par des virgules', 'winshirt'); ?></label>
-            <input type="text" id="ws_colors_csv" name="ws_colors_csv" class="widefat" value="<?php echo esc_attr( $csv ); ?>" placeholder="#000000,#FFFFFF,red,blue">
-        </p>
-        <?php
-    }
+		// Zones JSON
+		$zones_json = get_post_meta( $mockup_id, '_winshirt_zones', true );
+		if ( ! $zones_json ) $zones_json = get_post_meta( $mockup_id, 'ws_mockup_zones', true );
 
-    public static function box_zones( $post ) {
-        $front = get_post_meta( $post->ID, self::META_F, true );
-        $back  = get_post_meta( $post->ID, self::META_B, true );
-        $zones = get_post_meta( $post->ID, self::META_Z, true );
-        if ( empty( $zones ) ) $zones = '{}';
-        ?>
-        <div class="ws-zone-editor" data-front="<?php echo esc_url( $front ); ?>" data-back="<?php echo esc_url( $back ); ?>">
-            <div class="ws-ze-toolbar" style="margin:8px 0;display:flex;gap:8px;align-items:center;">
-                <button type="button" class="button button-secondary ws-ze-side" data-side="front"><?php _e('Recto','winshirt'); ?></button>
-                <button type="button" class="button button-secondary ws-ze-side" data-side="back"><?php _e('Verso','winshirt'); ?></button>
-                <span style="flex:1"></span>
-                <button type="button" class="button ws-ze-add"><?php _e('Ajouter une zone','winshirt'); ?></button>
-                <button type="button" class="button ws-ze-clear"><?php _e('Tout effacer','winshirt'); ?></button>
-            </div>
+		$zones = [ 'front' => [], 'back' => [] ];
+		if ( is_string( $zones_json ) && $zones_json !== '' ) {
+			$decoded = json_decode( $zones_json, true );
+			if ( is_array( $decoded ) ) {
+				$zones['front'] = self::sanitize_zones_array( $decoded['front'] ?? [] );
+				$zones['back']  = self::sanitize_zones_array( $decoded['back']  ?? [] );
+			}
+		}
 
-            <div id="ws-ze-canvas" style="position:relative;width:100%;max-width:900px;aspect-ratio:3/4;background:#f8f8f8;border:1px solid #e5e7eb;overflow:hidden;">
-                <img id="ws-ze-img" alt="" style="position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;">
-            </div>
+		$payload = [
+			'id'     => $mockup_id,
+			'images' => $images,
+			'zones'  => $zones,
+			'colors' => $colors,
+		];
 
-            <input type="hidden" id="ws-ze-data" name="ws_zones" value="<?php echo esc_attr( $zones ); ?>">
-            <p class="description"><?php _e('Les positions sont enregistrées en % du canvas.', 'winshirt'); ?></p>
-        </div>
-        <?php
-    }
+		/**
+		 * Laisse d’autres modules enrichir/modifier le payload.
+		 *
+		 * @param array $payload
+		 * @param int   $mockup_id
+		 */
+		return apply_filters( 'winshirt_mockup_payload', $payload, $mockup_id );
+	}
 
-    public static function save( $post_id ) {
-        if ( isset($_POST['ws_front']) ) {
-            update_post_meta( $post_id, self::META_F, esc_url_raw( $_POST['ws_front'] ) );
-        }
-        if ( isset($_POST['ws_back']) ) {
-            update_post_meta( $post_id, self::META_B, esc_url_raw( $_POST['ws_back'] ) );
-        }
-        if ( isset($_POST['ws_colors_csv']) ) {
-            update_post_meta( $post_id, self::META_COL, sanitize_text_field( $_POST['ws_colors_csv'] ) );
-        }
-        if ( isset($_POST['ws_zones']) ) {
-            // on stocke tel quel (JSON déjà en %)
-            update_post_meta( $post_id, self::META_Z, wp_kses_post( wp_unslash( $_POST['ws_zones'] ) ) );
-        }
-    }
+	/**
+	 * Renvoie l’ID du dernier mockup publié (fallback).
+	 */
+	public static function get_latest_mockup_id() {
+		$q = new WP_Query( [
+			'post_type'      => 'ws-mockup',
+			'posts_per_page' => 1,
+			'post_status'    => 'publish',
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'no_found_rows'  => true,
+			'fields'         => 'ids',
+		] );
+		if ( ! empty( $q->posts ) ) {
+			return (int) $q->posts[0];
+		}
+		return 0;
+	}
 
-    public static function admin_assets( $hook ) {
-        global $post_type;
-        if ( $post_type !== self::PT ) return;
+	/**
+	 * Nettoie un tableau de zones [{left,top,width,height}] (en %).
+	 *
+	 * @param array $list
+	 * @return array<int, array{left:float,top:float,width:float,height:float}>
+	 */
+	private static function sanitize_zones_array( $list ) {
+		if ( ! is_array( $list ) ) return [];
 
-        // CSS du rectangle + handle
-        wp_enqueue_style( 'winshirt-admin-zones', plugins_url( 'assets/css/admin-zones.css', dirname(__FILE__) ), [], WINSHIRT_VERSION ?? '1.0.0' );
+		$out = [];
+		foreach ( $list as $z ) {
+			$left   = isset( $z['left'] )   ? floatval( $z['left'] )   : ( isset( $z['xPct'] ) ? floatval( $z['xPct'] ) : 0.0 );
+			$top    = isset( $z['top'] )    ? floatval( $z['top'] )    : ( isset( $z['yPct'] ) ? floatval( $z['yPct'] ) : 0.0 );
+			$width  = isset( $z['width'] )  ? floatval( $z['width'] )  : ( isset( $z['wPct'] ) ? floatval( $z['wPct'] ) : 0.0 );
+			$height = isset( $z['height'] ) ? floatval( $z['height'] ) : ( isset( $z['hPct'] ) ? floatval( $z['hPct'] ) : 0.0 );
 
-        // JS éditeur zones (fichier ENTIER que tu as collé)
-        wp_enqueue_script( 'winshirt-admin-zones', plugins_url( 'assets/js/admin-zones.js', dirname(__FILE__) ), [], WINSHIRT_VERSION ?? '1.0.0', true );
-    }
+			$out[] = [
+				'left'   => max( 0.0, min( 100.0, $left   ) ),
+				'top'    => max( 0.0, min( 100.0, $top    ) ),
+				'width'  => max( 0.0, min( 100.0, $width  ) ),
+				'height' => max( 0.0, min( 100.0, $height ) ),
+			];
+		}
+		return $out;
+	}
 }
+
 WinShirt_Mockups::init();
+
+}
