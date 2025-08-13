@@ -7,12 +7,40 @@
   function boot(){
     const root = document.querySelector('.ws-zone-editor');
     if(!root) return;
+
+    // ===== Colors repeater (in the other metabox) =====
+    const colorsWrap = document.querySelector('.ws-colors-table');
+    if (colorsWrap){
+      const tbody = document.getElementById('ws-colors-rows');
+      const addBtn = document.querySelector('.ws-colors-add');
+      colorsWrap.addEventListener('click', e=>{
+        if(e.target && e.target.classList.contains('ws-colors-del')){
+          const tr = e.target.closest('tr');
+          if(tr && tbody.children.length > 1) tr.remove();
+        }
+      });
+      if(addBtn){
+        addBtn.addEventListener('click', ()=>{
+          const tr = document.createElement('tr');
+          tr.className = 'ws-color-row';
+          tr.innerHTML = `
+            <td><input type="text" class="widefat" name="ws_color_label[]" placeholder="Noir"></td>
+            <td><input type="text" class="widefat" name="ws_color_hex[]"   placeholder="#000000"></td>
+            <td><input type="text" class="widefat" name="ws_color_front[]" placeholder="https://.../recto.png"></td>
+            <td><input type="text" class="widefat" name="ws_color_back[]"  placeholder="https://.../verso.png"></td>
+            <td><button type="button" class="button ws-colors-del">–</button></td>`;
+          tbody.appendChild(tr);
+        });
+      }
+    }
+
+    // ===== Zones editor =====
     const canvas = root.querySelector('#ws-ze-canvas');
     const img = root.querySelector('#ws-ze-img');
     const input = root.querySelector('#ws-ze-data');
-    let side = 'front';
+    const list = root.querySelector('#ws-ze-list');
 
-    // charger les zones existantes
+    let side = 'front';
     let zones = {};
     try{ zones = JSON.parse(input.value||'{}')||{}; }catch(e){ zones={}; }
     if(!zones.front) zones.front=[];
@@ -51,6 +79,7 @@
     }
 
     function render(){
+      // rectangles
       canvas.querySelectorAll('.ws-ze-rect').forEach(n=> n.remove());
       (zones[side]||[]).forEach((z,i)=>{
         const r = toPixelsRect(z);
@@ -59,16 +88,36 @@
         el.style.left=px(r.x); el.style.top=px(r.y); el.style.width=px(r.w); el.style.height=px(r.h);
         el.dataset.index=i;
 
+        // badge with index
+        const badge = document.createElement('div');
+        badge.className='ws-badge';
+        badge.textContent = (z.name||('Zone '+(i+1)));
+        el.appendChild(badge);
+
         const h = document.createElement('div'); h.className='ws-h'; el.appendChild(h);
         makeDraggable(el); makeResizable(el,h);
         canvas.appendChild(el);
+      });
+
+      // sidebar list
+      list.innerHTML = '';
+      (zones[side]||[]).forEach((z,i)=>{
+        const row = document.createElement('div');
+        row.className = 'ws-ze-row';
+        row.innerHTML = `
+          <div class="ws-ze-row-title">#${i+1}</div>
+          <label>Nom<br><input type="text" class="ws-ze-name" data-i="${i}" value="${(z.name||'').replace(/"/g,'&quot;')}"></label>
+          <label>Prix (€)<br><input type="number" min="0" step="0.01" class="ws-ze-price" data-i="${i}" value="${(typeof z.price==='number'?z.price:0)}"></label>
+          <button type="button" class="button button-link-delete ws-ze-remove" data-i="${i}">Supprimer</button>
+        `;
+        list.appendChild(row);
       });
     }
 
     function makeDraggable(el){
       let sx=0, sy=0, ox=0, oy=0, moving=false;
       el.addEventListener('pointerdown', e=>{
-        if(e.target.classList.contains('ws-h')) return; // resize handle
+        if(e.target.classList.contains('ws-h')) return;
         moving=true; el.setPointerCapture(e.pointerId);
         sx=e.clientX; sy=e.clientY;
         const s=el.style; ox=parseFloat(s.left)||0; oy=parseFloat(s.top)||0;
@@ -109,11 +158,13 @@
     function commit(el){
       const i=parseInt(el.dataset.index,10);
       const rect = { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
-      zones[side][i] = toPercentRect(rect);
-      save();
+      const p = toPercentRect(rect);
+      const z = zones[side][i] || {};
+      zones[side][i] = Object.assign({}, z, p); // keep name/price
+      save(); render(); // refresh badges positions/text
     }
 
-    // UI
+    // UI: side switch + add/clear
     root.querySelectorAll('.ws-ze-side').forEach(b=>{
       b.addEventListener('click', ()=> setSide(b.getAttribute('data-side')));
     });
@@ -123,7 +174,8 @@
         const c=canvasRect();
         const w=Math.min( c.width*0.5, 420 ), h=Math.min( c.height*0.5, 420 );
         const rectPct = toPercentRect({ x:(c.width-w)/2, y:(c.height-h)/2, w, h });
-        zones[side].push(rectPct); save(); render();
+        zones[side].push( Object.assign({ name:'', price:0 }, rectPct) );
+        save(); render();
       });
     }
     const clearBtn = root.querySelector('.ws-ze-clear');
@@ -133,6 +185,35 @@
         zones[side] = []; save(); render();
       });
     }
+
+    // Sidebar inputs events
+    list.addEventListener('input', e=>{
+      if(e.target.classList.contains('ws-ze-name')){
+        const i = parseInt(e.target.dataset.i,10);
+        if(zones[side] && zones[side][i]) {
+          zones[side][i].name = e.target.value;
+          save();
+          // update badge text quickly
+          const rect = canvas.querySelector(`.ws-ze-rect[data-index="${i}"] .ws-badge`);
+          if(rect) rect.textContent = zones[side][i].name || ('Zone '+(i+1));
+        }
+      } else if(e.target.classList.contains('ws-ze-price')){
+        const i = parseInt(e.target.dataset.i,10);
+        if(zones[side] && zones[side][i]) {
+          zones[side][i].price = parseFloat(e.target.value||'0') || 0;
+          save();
+        }
+      }
+    });
+    list.addEventListener('click', e=>{
+      if(e.target.classList.contains('ws-ze-remove')){
+        const i = parseInt(e.target.dataset.i,10);
+        if(zones[side] && zones[side][i]){
+          zones[side].splice(i,1);
+          save(); render();
+        }
+      }
+    });
 
     // init
     setSide('front');
