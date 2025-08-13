@@ -1,100 +1,76 @@
-/* Reset robuste dans le modal pour neutraliser le thème */
-.winshirt-customizer-modal, 
-.winshirt-customizer-modal * { box-sizing: border-box; }
-.winshirt-customizer-modal { all: initial; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+/* ===== WinShirt – Modal solide, cliquable, layout 3 zones ===== */
 
-/* Overlay */
 .winshirt-customizer-modal{
-  position:fixed; left:0; top:0; width:100vw; height:100vh;
-  z-index:99999; display:none;
+  position:fixed; inset:0; z-index:99999;
+  background:rgba(17,17,19,.65);
+  display:none; /* .is-open => flex */
+  align-items:center; justify-content:center;
 }
-.winshirt-customizer-modal.ws-open{ display:block; }
-body.ws-modal-open{ overflow:hidden; }
+.winshirt-customizer-modal.is-open{ display:flex; }
 
-/* Backdrop derrière le dialog */
-.ws-backdrop{
-  position:absolute; inset:0; background:rgba(0,0,0,.45); z-index:0;
-}
+/* empêcher le scroll du body quand le modal est ouvert */
+html.ws-modal-open, body.ws-modal-open{ overflow:hidden!important; }
 
-/* Dialog plein écran au-dessus du backdrop */
+/* la boîte */
 .winshirt-customizer-dialog{
-  position:absolute; inset:0;
-  display:flex; flex-direction:column;
-  width:100vw; height:100vh;        /* <- clé */
-  z-index:1;
+  background:#fff; color:#111; width: min(1280px, 96vw);
+  height: min(90vh, 920px);
+  border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; overflow:hidden; position:relative;
 }
 
-/* Corps = grille stable 220 | 1fr | 320 */
+/* header droite (fermer) */
+.winshirt-customizer-dialog .ws-head{
+  height:48px; display:flex; align-items:center; justify-content:flex-end; gap:8px;
+  padding:0 12px; border-bottom:1px solid #eee; background:#fafafa;
+}
+.winshirt-customizer-dialog .ws-close{
+  appearance:none; border:1px solid #ddd; background:#fff; padding:6px 10px; border-radius:8px; cursor:pointer;
+}
+
+/* corps: nav gauche / centre / tiroir droit */
 .winshirt-customizer-body{
-  position:relative;
-  width:100%; height:100%;          /* <- clé */
-  display:grid;
-  grid-template-columns: 220px minmax(0,1fr) 320px; /* minmax(0,1fr) évite l’effondrement */
-  gap:16px;
-  padding:12px;
-  overflow:hidden;
-  background:transparent;
+  flex:1; display:grid; gap:0;
+  grid-template-columns: 220px 1fr 300px;
+  height:100%; overflow:hidden;
 }
 
-/* Panneau gauche (L1) */
-.ws-l1{
-  background:#0f172a; color:#fff; border-radius:12px; padding:8px;
-  display:flex; flex-direction:column; gap:8px; align-self:start;
+/* NAV gauche */
+.ws-l1{ border-right:1px solid #eee; background:#0d141a; color:#fff; padding:12px }
+.ws-l1 .ws-nav-btn{
+  width:100%; height:42px; border-radius:10px; margin:8px 0; display:flex; align-items:center; justify-content:flex-start;
+  padding:0 12px; background:#0f1820; color:#cfe3ff; border:1px solid rgba(255,255,255,.05); cursor:pointer;
 }
-.ws-l1-item{
-  background:transparent; border:1px solid rgba(255,255,255,.2); color:#fff;
-  border-radius:10px; padding:10px 12px; text-align:left; cursor:pointer
-}
-.ws-l1-item.is-active,.ws-l1-item:hover{ background:#111827; border-color:#fff }
+.ws-l1 .ws-nav-btn.is-active{ background:#1a2430; color:#fff; border-color:#2e3b4a }
 
-/* Panneau de droite (L2) */
-.ws-l2{
-  background:#fff; border-radius:12px; padding:10px;
-  overflow:auto; max-height:calc(100vh - 24px);
+/* CENTRE : mockup canvas */
+#winshirt-mockup-area{ position:relative; overflow:auto; background:#fff }
+#winshirt-canvas{ position:relative; margin:24px auto; width:min(800px, 90%); height:auto; }
+#winshirt-canvas .winshirt-mockup-img{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:contain; display:none;
 }
-.ws-l2-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px }
-.ws-l2-title{ margin:0; font-size:16px }
-.ws-l2-back{ opacity:.8 }
+#winshirt-canvas .winshirt-mockup-img.is-visible{ display:block; }
 
-/* Zone centrale (mockup) */
-.winshirt-mockup-area{
-  background:#fff; border-radius:12px; padding:16px;
-  display:flex; flex-direction:column; align-items:center; gap:16px;
-  overflow:auto;     /* laisse scroller le contenu central si nécessaire */
+/* zones d’impression */
+.ws-print-zone{
+  position:absolute; border:1px dashed rgba(0,0,0,.35);
+  background: rgba(0,102,255,.06);
+  pointer-events: none; /* l’utilisateur manipule les calques, pas la zone */
 }
-.winshirt-canvas{
-  position:relative; width:min(820px, 78vw); aspect-ratio:3/4; background:transparent;
-}
-.winshirt-mockup-img{
-  position:absolute; inset:0; margin:auto;
-  max-width:100%; max-height:100%; object-fit:contain; display:none;
-}
-.winshirt-mockup-img.ws-show{ display:block }
+.ws-print-zone.is-active{ border-color:#0066ff }
 
-/* Zones d’impression + boutons */
-.ws-print-zone{ position:absolute; border:2px dashed rgba(0,0,0,.35); border-radius:8px; pointer-events:auto }
-.ws-print-zone.is-active{ border-color:#111827; box-shadow:0 0 0 3px rgba(17,24,39,.15) inset }
-.ws-zone-label{ position:absolute; top:-22px; left:0; background:#111827; color:#fff; font-size:11px; padding:2px 6px; border-radius:8px }
-.ws-side-switch{ display:flex; gap:8px }
-.ws-side-btn{ border:1px solid #111827; background:#fff; border-radius:999px; padding:8px 14px; cursor:pointer }
-.ws-side-btn.is-active{ background:#111827; color:#fff }
-.ws-zone-buttons{ display:flex; gap:8px; flex-wrap:wrap }
-.ws-zone-buttons .ws-zone-btn{ border:1px solid #cbd5e1; border-radius:999px; padding:6px 12px; background:#f8fafc; cursor:pointer }
-.ws-zone-buttons .ws-zone-btn.is-active{ background:#111827; color:#fff; border-color:#111827 }
+/* TIROIR droit (contenus Images / Texte / Calques / etc.) */
+.ws-l2{ border-left:1px solid #eee; padding:12px; overflow:auto; background:#fff }
+.ws-l2 .ws-l2-title{ font-weight:700; margin-bottom:8px }
+.ws-l2 .ws-back{ appearance:none; border:1px solid #ddd; background:#fff; padding:6px 10px; border-radius:8px; cursor:pointer }
 
-/* CTA */
-.ws-cta{ display:flex; gap:8px }
-
-/* Close */
-.ws-close{
-  position:absolute; top:12px; right:12px; z-index:2;
-  background:#111827; color:#fff; border:none; border-radius:10px; padding:8px 10px; cursor:pointer
+/* boutons dessous (Recto / Verso + actions) */
+.ws-footer{
+  display:flex; gap:10px; align-items:center; justify-content:center; height:60px;
+  border-top:1px solid #eee; background:#fafafa; padding:8px;
 }
-
-/* Responsive */
-@media (max-width:1024px){
-  .winshirt-customizer-body{ grid-template-columns: 1fr; gap:12px }
-  .ws-l1{ flex-direction:row; position:sticky; top:8px; z-index:2 }
-  .ws-l2{ order:3 }
-  .winshirt-mockup-area{ order:2 }
+.ws-pill{
+  padding:8px 14px; border-radius:999px; border:1px solid #ddd; background:#fff; cursor:pointer
 }
+.ws-pill.is-active{ border-color:#111; font-weight:700 }
+.ws-cta{ padding:10px 14px; border-radius:10px; border:1px solid #111; background:#111; color:#fff; cursor:pointer }
