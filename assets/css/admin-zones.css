@@ -1,3 +1,20 @@
+/* Layout */
+.ws-zone-editor.ws-has-sidebar .ws-ze-topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  margin:4px 0 10px;
+}
+.ws-zone-editor.ws-has-sidebar .ws-ze-layout{
+  display:grid; grid-template-columns: 1fr 280px; gap:16px;
+}
+.ws-ze-canvas-wrap{ max-width:700px; }
+#ws-ze-canvas{ position:relative; border:1px solid rgba(0,0,0,.12); background:#fff; }
+#ws-ze-canvas img{ width:100%; height:auto; display:block; object-fit:contain; }
+
+.ws-ze-sidebar{ border:1px solid rgba(0,0,0,.12); padding:10px; background:#fff; border-radius:4px; }
+.ws-ze-row{ display:grid; grid-template-columns: 40px 1fr 110px auto; gap:8px; align-items:end; margin-bottom:8px; }
+.ws-ze-row-title{ font-weight:600; align-self:center; }
+
+/* Rectangles */
 .ws-zone-editor { --ws-accent:#2563eb; }
 .ws-ze-rect{
   position:absolute;
@@ -11,3 +28,11 @@
   background:#fff; border:2px solid var(--ws-accent); border-radius:4px;
   cursor:nwse-resize;
 }
+.ws-ze-rect .ws-badge{
+  position:absolute; left:0; top:-20px;
+  background:var(--ws-accent); color:#fff; font-size:11px; padding:2px 6px; border-radius:3px;
+  white-space:nowrap; transform:translateY(-3px);
+}
+
+/* Colors table tweaks */
+.ws-colors-table input[type="text"]{ font-family: var(--wp--preset--font-family--system,inherit); }
