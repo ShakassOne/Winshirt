@@ -1,121 +1,281 @@
-(function(){
+/* assets/js/mockup-canvas.js */
+(function($){
   'use strict';
-  const WS = { el:null, side:'front', imgs:{front:null,back:null}, zoneEls:[], items:[], cfg:{ strictPercent:true } };
-  function ready(fn){ if(document.readyState!=='loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
-  function px(n){ return (Math.round(n*100)/100)+'px'; }
-  function getData(){ const d=(window.WinShirtData||{}); WS.cfg.strictPercent=!!(d.config&&d.config.strictPercent); return d; }
-  function ensureCanvas(){ WS.el=document.getElementById('winshirt-canvas'); return !!WS.el; }
-  function canvasRect(){ return WS.el.getBoundingClientRect(); }
-  function clearZones(){ WS.zoneEls.forEach(z=>z.remove()); WS.zoneEls=[]; }
 
-  function loadMockupImages(){
-    // 1) Source WinShirtData.mockups
-    let front='', back='';
-    const d=getData(), mocks=Array.isArray(d.mockups)?d.mockups:[];
-    if(mocks.length){
-      const m=mocks[0]||{}; front=m.front||(m.images&&m.images.front)||''; back=m.back||(m.images&&m.images.back)||'';
+  // ---- Helpers --------------------------------------------------------------
+  function cssPx(n){ return (Math.round(n*100)/100)+'px'; }
+  function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+  function pct(n){ return (Math.round(n*1000)/1000); }
+
+  function readJsonAttr($el, name, fallback){
+    try{
+      const raw = $el.attr(name);
+      if(!raw) return fallback;
+      return JSON.parse(raw);
+    }catch(e){ return fallback; }
+  }
+
+  function pickData(){
+    // Source 1: dataset sur #winshirt-canvas (privilégié)
+    const $c = $('#winshirt-canvas');
+
+    const frontUrl = $c.data('front') || (window.WinShirtData && WinShirtData.mockup && WinShirtData.mockup.frontUrl) || '';
+    const backUrl  = $c.data('back')  || (window.WinShirtData && WinShirtData.mockup && WinShirtData.mockup.backUrl)  || '';
+
+    let zones = $c.data('zones');
+    if(!zones){
+      // Source 2: attribut data-zones (string JSON)
+      zones = readJsonAttr($c, 'data-zones', null);
     }
-    // 2) Fallback data-attributes du canvas (posés par le template)
-    if(!front || !back){
-      const f=WS.el.getAttribute('data-front')||''; const b=WS.el.getAttribute('data-back')||'';
-      front = front || f; back = back || b;
+    if(!zones && window.WinShirtData){
+      // Source 3: WinShirtData.zones (filtrable côté PHP)
+      zones = WinShirtData.zones || null;
     }
-    // Ne pas dupliquer
-    if(WS.el.querySelector('img.winshirt-mockup-img')) return;
+    zones = zones || { front:[], back:[] };
 
-    if(front){
-      const f = new Image();
-      f.src=front; f.alt='Mockup Recto'; f.className='winshirt-mockup-img'; f.dataset.side='front';
-      f.style.cssText='position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;display:block;';
-      WS.el.appendChild(f); WS.imgs.front=f;
+    return { frontUrl, backUrl, zones };
+  }
+
+  // Transforme un rect % => pixels sur base d’un conteneur
+  function rectPctToPx($base, z){
+    const w = $base.innerWidth(), h = $base.innerHeight();
+    return {
+      x: z.left/100 * w,
+      y: z.top/100 * h,
+      w: z.width/100 * w,
+      h: z.height/100 * h
+    };
+  }
+
+  // ---- Module principal -----------------------------------------------------
+  const WinShirtCanvas = {
+    $root: null,
+    $stage: null,
+    $mockFront: null,
+    $mockBack: null,
+    $zonesWrap: null,
+    $zoneButtons: null,
+
+    data: { frontUrl:'', backUrl:'', zones:{front:[], back:[]} },
+    currentSide: 'front',
+    currentZoneIndex: 0,
+
+    boot(){
+      // Crée la structure si manquante
+      this.$root = $('#winshirt-canvas');
+      if(!this.$root.length){
+        // On essaie de deviner une zone dans le modal
+        const $area = $('.winshirt-mockup-area, .winshirt-customizer-body, body').first();
+        this.$root = $('<div id="winshirt-canvas" class="winshirt-mockup-canvas"></div>').appendTo($area);
+      }
+
+      this.injectBaseCss();
+
+      // Récup data (urls & zones)
+      this.data = pickData();
+
+      // Stage (ratio auto)
+      this.$stage = $('<div class="ws-stage"></div>').appendTo(this.$root);
+      this.$mockFront = $('<img class="ws-mockup" data-side="front" alt="Mockup Recto">').appendTo(this.$stage);
+      this.$mockBack  = $('<img class="ws-mockup" data-side="back"  alt="Mockup Verso" style="display:none">').appendTo(this.$stage);
+
+      // Zones wrapper
+      this.$zonesWrap = $('<div class="ws-zones"></div>').appendTo(this.$stage);
+
+      // Boutons (zones)
+      this.$zoneButtons = $('<div class="ws-zone-buttons" role="group" aria-label="Zones"></div>')
+        .insertAfter(this.$root);
+
+      // Side toggles (si présents dans le template)
+      $(document).on('click', '[data-ws-side]', (e)=>{
+        e.preventDefault();
+        const s = $(e.currentTarget).attr('data-ws-side');
+        this.setSide(s);
+      });
+
+      // Init images mockup
+      if(this.data.frontUrl){ this.$mockFront.attr('src', this.data.frontUrl); }
+      if(this.data.backUrl){  this.$mockBack.attr('src',  this.data.backUrl);  }
+
+      // Render initial
+      const side = (window.WinShirtState && WinShirtState.currentSide) || 'front';
+      this.setSide(side);
+
+      // Reflow sur resize
+      $(window).on('resize', ()=> this.renderZones() );
+    },
+
+    injectBaseCss(){
+      if(document.getElementById('ws-mockup-canvas-css')) return;
+      const css = `
+      .winshirt-mockup-canvas{display:flex;justify-content:center}
+      .ws-stage{position:relative;max-width:min(92vw,900px)}
+      .ws-mockup{display:block;max-width:100%;height:auto;user-select:none;pointer-events:none}
+      .ws-zones{position:absolute;inset:0;pointer-events:none}
+      .ws-print-zone{
+        position:absolute;border:2px dashed rgba(0,0,0,.35);
+        box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+        pointer-events:auto;
+      }
+      .ws-print-zone.ws-active{border-color:#111; box-shadow: inset 0 0 0 2px rgba(0,0,0,.12)}
+      .ws-zone-buttons{
+        display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:12px 0 22px;
+      }
+      .ws-zone-btn{
+        border-radius:999px; padding:8px 14px; line-height:1;
+        border:1px solid rgba(0,0,0,.1); background:#fff; cursor:pointer;
+      }
+      .ws-zone-btn.is-active{background:#111;color:#fff;border-color:#111}
+      `;
+      const tag = document.createElement('style');
+      tag.id = 'ws-mockup-canvas-css';
+      tag.textContent = css;
+      document.head.appendChild(tag);
+    },
+
+    setSide(side){
+      this.currentSide = (side === 'back') ? 'back' : 'front';
+
+      if(this.currentSide === 'front'){
+        this.$mockFront.show(); this.$mockBack.hide();
+      }else{
+        this.$mockFront.hide(); this.$mockBack.show();
+      }
+
+      // Par défaut : première zone si existante
+      const list = this.data.zones[this.currentSide] || [];
+      if(list.length){ this.currentZoneIndex = clamp(this.currentZoneIndex, 0, list.length-1); }
+      else { this.currentZoneIndex = 0; }
+
+      if(window.WinShirtState){ WinShirtState.currentSide = this.currentSide; }
+      this.renderZones();
+      this.renderZoneButtons();
+    },
+
+    renderZoneButtons(){
+      const list = this.data.zones[this.currentSide] || [];
+      const $b = this.$zoneButtons.empty();
+
+      if(!list.length){
+        $b.append('<div style="opacity:.6;font-size:13px">Aucune zone définie pour ce côté.</div>');
+        return;
+      }
+
+      list.forEach((z, i)=>{
+        const name = z.name || ('Zone '+(i+1));
+        const price = z.price ? ` (${z.price}€)` : '';
+        const $btn = $(`<button type="button" class="ws-zone-btn" data-index="${i}">${name}${price}</button>`);
+        if(i === this.currentZoneIndex) $btn.addClass('is-active');
+        $b.append($btn);
+      });
+
+      $b.off('click.ws');
+      $b.on('click.ws', '.ws-zone-btn', (e)=>{
+        const i = parseInt($(e.currentTarget).attr('data-index'), 10) || 0;
+        this.setActiveZone(i);
+      });
+    },
+
+    setActiveZone(index){
+      const list = this.data.zones[this.currentSide] || [];
+      if(!list.length) return;
+
+      this.currentZoneIndex = clamp(index, 0, list.length-1);
+      this.renderZones();
+      this.$zoneButtons.find('.ws-zone-btn').removeClass('is-active')
+        .filter(`[data-index="${this.currentZoneIndex}"]`).addClass('is-active');
+    },
+
+    renderZones(){
+      const list = this.data.zones[this.currentSide] || [];
+      this.$zonesWrap.empty();
+
+      if(!list.length) return;
+
+      list.forEach((z, i)=>{
+        const box = rectPctToPx(this.$stage, z);
+        const $zone = $('<div class="ws-print-zone" tabindex="0" aria-label="Zone d\'impression"></div>')
+          .attr('data-side', this.currentSide)
+          .attr('data-index', i)
+          .css({
+            left: cssPx(box.x),
+            top: cssPx(box.y),
+            width: cssPx(box.w),
+            height: cssPx(box.h)
+          })
+          .appendTo(this.$zonesWrap);
+
+        if(i === this.currentZoneIndex) $zone.addClass('ws-active');
+
+        // Cliquer sur la zone = la sélectionner
+        $zone.on('click', ()=> this.setActiveZone(i) );
+      });
+    },
+
+    // API appelée par l’outil Images (ou par toi)
+    addImage(src){
+      if(!src) return;
+      const list = this.data.zones[this.currentSide] || [];
+      if(!list.length) return;
+
+      const z = list[this.currentZoneIndex] || list[0];
+      const rect = rectPctToPx(this.$stage, z);
+
+      // Création d’un layer simple centré dans la zone (fallback si WinShirtLayers absent)
+      const $img = $(`<img class="ws-layer ws-img" alt="">`).attr('src', src).css({
+        position:'absolute',
+        left: cssPx(rect.x + rect.w*0.1),
+        top:  cssPx(rect.y + rect.h*0.1),
+        width: cssPx(rect.w*0.8),
+        height: 'auto',
+        pointerEvents:'auto',
+        cursor: 'move',
+        zIndex: 10
+      });
+
+      this.$stage.append($img);
+
+      // Drag dans la zone (très simple)
+      this.makeDraggableWithin($img, rect);
+    },
+
+    makeDraggableWithin($el, rect){
+      let dragging=false, sx=0, sy=0, ox=0, oy=0;
+
+      $el.on('pointerdown', (e)=>{
+        dragging=true; $el[0].setPointerCapture(e.originalEvent.pointerId);
+        sx=e.clientX; sy=e.clientY;
+        const s=$el.position(); ox=s.left; oy=s.top;
+        e.preventDefault();
+      });
+      $el.on('pointermove', (e)=>{
+        if(!dragging) return;
+        let nx = ox + (e.clientX - sx);
+        let ny = oy + (e.clientY - sy);
+        const w = $el.outerWidth(), h = $el.outerHeight();
+
+        nx = clamp(nx, rect.x, rect.x + rect.w - w);
+        ny = clamp(ny, rect.y, rect.y + rect.h - h);
+
+        $el.css({ left: cssPx(nx), top: cssPx(ny) });
+      });
+      $el.on('pointerup pointercancel', ()=> dragging=false );
     }
-    if(back){
-      const b = new Image();
-      b.src=back; b.alt='Mockup Verso'; b.className='winshirt-mockup-img'; b.dataset.side='back';
-      b.style.cssText='position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;object-fit:contain;display:none;';
-      WS.el.appendChild(b); WS.imgs.back=b;
-    }
+  };
+
+  // Expose global (utilisé par image-tools.js)
+  window.WinShirtCanvas = WinShirtCanvas;
+
+  // Boot au chargement
+  if(document.readyState !== 'loading') WinShirtCanvas.boot();
+  else document.addEventListener('DOMContentLoaded', ()=> WinShirtCanvas.boot());
+
+  // Bridge optionnel : si WinShirtLayers existe, on peut déléguer
+  // (tu pourras l’activer plus tard)
+  if(!window.WinShirtLayers){
+    window.WinShirtLayers = {
+      addImage: function(src){ WinShirtCanvas.addImage(src); }
+    };
   }
 
-  function setSide(side){
-    WS.side = (side==='back'?'back':'front');
-    WS.el.querySelectorAll('img.winshirt-mockup-img').forEach(img=>{
-      img.style.display = (img.dataset.side===WS.side ? 'block' : 'none');
-    });
-    drawZones();
-  }
-
-  function drawZones(){
-    clearZones();
-    const d=getData(), zones=Array.isArray(d.zones)?d.zones:[];
-    const sideZones=zones.filter(z=>(z.side||'front')===WS.side);
-    const C=canvasRect();
-    sideZones.forEach(z=>{
-      let left, top, width, height;
-      if(WS.cfg.strictPercent){
-        left=(z.left||0)*0.01*C.width; top=(z.top||0)*0.01*C.height;
-        width=(z.width||0)*0.01*C.width; height=(z.height||0)*0.01*C.height;
-      } else { left=z.left||0; top=z.top||0; width=z.width||100; height=z.height||100; }
-      const div=document.createElement('div');
-      div.className='ws-print-zone'; div.dataset.side=WS.side;
-      div.style.cssText=`position:absolute;left:${px(left)};top:${px(top)};width:${px(width)};height:${px(height)};pointer-events:none;`;
-      WS.el.appendChild(div); WS.zoneEls.push(div);
-    });
-  }
-
-  function currentZoneRect(){
-    const z=WS.zoneEls[0]; if(!z) return null;
-    const r=z.getBoundingClientRect(), c=canvasRect();
-    return { x:r.left-c.left, y:r.top-c.top, w:r.width, h:r.height };
-  }
-
-  function makeDraggable(el){
-    let sx=0, sy=0, ox=0, oy=0, moving=false;
-    el.addEventListener('pointerdown', (e)=>{ moving=true; el.setPointerCapture(e.pointerId);
-      sx=e.clientX; sy=e.clientY;
-      const tr=el.style.transform.match(/translate\(([-0-9.]+)px,\s*([-0-9.]+)px\)/);
-      if(tr){ ox=parseFloat(tr[1]||0); oy=parseFloat(tr[2]||0); } else { ox=0; oy=0; el.style.transform='translate(0px,0px)'; }
-      e.preventDefault();
-    });
-    el.addEventListener('pointermove', (e)=>{ if(!moving) return;
-      const dx=e.clientX-sx, dy=e.clientY-sy; el.style.transform=`translate(${px(ox+dx)}, ${px(oy+dy)})`;
-    });
-    el.addEventListener('pointerup', ()=>{ moving=false; });
-    el.addEventListener('pointercancel', ()=>{ moving=false; });
-  }
-
-  function addImage(url){
-    if(!url) return;
-    const zone=currentZoneRect(), C=canvasRect();
-    const wrap=document.createElement('div'); wrap.className='ws-item ws-item-image';
-    wrap.style.position='absolute';
-    const baseW=zone?Math.min(zone.w*0.6,C.width*0.6):240, baseH=baseW;
-    const cx=zone?(zone.x+(zone.w-baseW)/2):((C.width-baseW)/2);
-    const cy=zone?(zone.y+(zone.h-baseH)/2):((C.height-baseH)/2);
-    wrap.style.left=px(cx); wrap.style.top=px(cy); wrap.style.width=px(baseW); wrap.style.height=px(baseH);
-    wrap.style.transform='translate(0px,0px)'; wrap.style.cursor='move'; wrap.style.userSelect='none';
-    const img=new Image(); img.src=url; img.alt='';
-    img.style.position='absolute'; img.style.inset='0'; img.style.margin='auto'; img.style.maxWidth='100%'; img.style.maxHeight='100%'; img.style.pointerEvents='none';
-    wrap.appendChild(img); WS.el.appendChild(wrap); makeDraggable(wrap); WS.items.push(wrap);
-  }
-
-  function addText(opts){
-    const o=Object.assign({text:'Votre texte',size:32,bold:false,italic:false},opts||{});
-    const zone=currentZoneRect(), C=canvasRect();
-    const el=document.createElement('div'); el.className='ws-item ws-item-text'; el.style.position='absolute';
-    el.style.left=px(zone?(zone.x+zone.w*0.1):C.width*0.25); el.style.top=px(zone?(zone.y+zone.h*0.1):C.height*0.25);
-    el.style.transform='translate(0px,0px)'; el.style.cursor='move'; el.style.userSelect='none'; el.style.whiteSpace='pre';
-    el.style.fontSize=px(o.size); el.style.fontWeight=o.bold?'700':'400'; el.style.fontStyle=o.italic?'italic':'normal';
-    el.style.fontFamily='system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif'; el.textContent=o.text;
-    WS.el.appendChild(el); makeDraggable(el); WS.items.push(el);
-  }
-
-  function mount(){ if(!ensureCanvas()) return; loadMockupImages(); setSide(WS.side); }
-
-  document.addEventListener('winshirt:mounted', mount);
-  ready(mount);
-  document.addEventListener('winshirt:sideChanged', (e)=> setSide((e.detail&&e.detail.side)||'front'));
-
-  window.WinShirtCanvas = { setSide, addImage, addText, getZoneRect: currentZoneRect };
-  if(!window.WinShirtLayers){ window.WinShirtLayers = { addImage, addText }; }
-})();
+})(jQuery);
