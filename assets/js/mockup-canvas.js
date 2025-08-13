@@ -1,180 +1,78 @@
-(function(){
+/* ===== WinShirt – Rendu du mockup + zones ===== */
+(function($){
   'use strict';
 
-  const state = {
-    side : 'front',
-    productId : 0,
-    zones : { front:[], back:[] },
-    mockups : { front:'', back:'' }
+  const C = {
+    side: 'front',
+    $area: null, $canvas: null,
+    data(){ return window.WinShirtData || {}; },
+
+    mount(){
+      this.$area   = $('#winshirt-mockup-area');
+      this.$canvas = $('#winshirt-canvas');
+      if(!this.$area.length || !this.$canvas.length) return;
+
+      // boutons Recto / Verso
+      $(document).on('click', '.js-ws-side', (e)=>{
+        this.side = $(e.currentTarget).data('side') === 'back' ? 'back' : 'front';
+        $('.js-ws-side').removeClass('is-active');
+        $(e.currentTarget).addClass('is-active');
+        $(document).trigger('winshirt:sideChanged', [this.side]);
+        this.render();
+      });
+
+      this.render();
+    },
+
+    render(){
+      const d = this.data();
+      const front = (d.mockups && d.mockups.front) || '';
+      const back  = (d.mockups && d.mockups.back)  || '';
+
+      // image mockup
+      let $imgFront = this.$canvas.find('img[data-side="front"]');
+      let $imgBack  = this.$canvas.find('img[data-side="back"]');
+      if(!$imgFront.length){
+        $imgFront = $('<img class="winshirt-mockup-img" data-side="front" alt="Mockup Recto">').appendTo(this.$canvas);
+        $imgBack  = $('<img class="winshirt-mockup-img" data-side="back"  alt="Mockup Verso">').appendTo(this.$canvas);
+      }
+      $imgFront.attr('src', front || d.assetsUrl+'img/mockup-front.png');
+      $imgBack.attr('src',  back  || d.assetsUrl+'img/mockup-back.png');
+      $imgFront.toggleClass('is-visible', this.side==='front');
+      $imgBack.toggleClass('is-visible',  this.side==='back');
+
+      // zones : reset
+      this.$canvas.find('.ws-print-zone').remove();
+
+      const zones = (d.zones && d.zones[this.side]) || [];
+      const w = this.$canvas.width();
+      const h = this.$canvas.height();
+
+      if(!zones.length){
+        $('.ws-zone-empty').remove();
+        $('<div class="ws-zone-empty" style="text-align:center;opacity:.6;margin-top:8px">Aucune zone définie pour ce côté.</div>')
+          .appendTo(this.$area);
+        return;
+      } else {
+        $('.ws-zone-empty').remove();
+      }
+
+      zones.forEach((z, i)=>{
+        const $z = $('<div class="ws-print-zone">').attr('data-idx', i);
+        // z left/top/width/height sont en %
+        const left = (z.left||0)/100 * w;
+        const top  = (z.top||0)/100 * h;
+        const zw   = (z.width||0)/100 * w;
+        const zh   = (z.height||0)/100 * h;
+
+        $z.css({ left, top, width: zw, height: zh });
+        if(i===0) $z.addClass('is-active');
+        this.$canvas.append($z);
+      });
+    }
   };
 
-  function px(n){ return (Math.round(n*100)/100)+'%'; }
-  function qs(s,ctx){ return (ctx||document).querySelector(s); }
-  function qsa(s,ctx){ return Array.from((ctx||document).querySelectorAll(s)); }
+  $(function(){ C.mount(); });
+  window.WinShirtCanvas = C;
 
-  function readData(){
-    if(!window.WinShirtData) return;
-
-    state.productId = (WinShirtData.product && WinShirtData.product.id) ? WinShirtData.product.id : 0;
-
-    // mockups (via filtres PHP)
-    if(WinShirtData.mockups){
-      state.mockups.front = WinShirtData.mockups.front || '';
-      state.mockups.back  = WinShirtData.mockups.back  || '';
-    }
-
-    // zones (noms + prix inclus si fournis)
-    if(WinShirtData.zones){
-      state.zones.front = Array.isArray(WinShirtData.zones.front) ? WinShirtData.zones.front : [];
-      state.zones.back  = Array.isArray(WinShirtData.zones.back)  ? WinShirtData.zones.back  : [];
-    }
-  }
-
-  function setSide(side){
-    state.side = (side === 'back') ? 'back' : 'front';
-
-    const front = qs('#ws-mockup-front');
-    const back  = qs('#ws-mockup-back');
-
-    if(state.mockups.front) front.src = state.mockups.front;
-    if(state.mockups.back)  back.src  = state.mockups.back;
-
-    front.classList.toggle('ws-show', state.side==='front');
-    back .classList.toggle('ws-show', state.side==='back');
-
-    renderZones();
-    renderZoneButtons();
-    // marquer bouton actif
-    qsa('.ws-side-btn').forEach(b=>{
-      b.classList.toggle('is-active', b.getAttribute('data-side')===state.side);
-    });
-  }
-
-  function renderZones(){
-    const canvas = qs('#winshirt-canvas');
-    if(!canvas) return;
-
-    // purge
-    qsa('.ws-print-zone', canvas).forEach(n=> n.remove());
-
-    const zones = state.zones[state.side] || [];
-    zones.forEach((z, idx)=>{
-      const box = document.createElement('div');
-      box.className = 'ws-print-zone';
-      box.style.left   = px(z.left);
-      box.style.top    = px(z.top);
-      box.style.width  = px(z.width);
-      box.style.height = px(z.height);
-      box.dataset.index = String(idx);
-
-      // label nom / prix si fournis
-      const label = document.createElement('div');
-      label.className = 'ws-zone-label';
-      label.textContent = (z.name || ('Zone '+(idx+1))) + (z.price ? ('  —  '+z.price+'€') : '');
-      box.appendChild(label);
-
-      box.addEventListener('click', ()=>{
-        qsa('.ws-print-zone', canvas).forEach(n=>n.classList.remove('is-active'));
-        box.classList.add('is-active');
-      });
-
-      canvas.appendChild(box);
-    });
-
-    // activer la première zone par défaut
-    const first = qs('.ws-print-zone', canvas);
-    if(first) first.classList.add('is-active');
-  }
-
-  function renderZoneButtons(){
-    const wrap = qs('#ws-zone-buttons');
-    if(!wrap) return;
-    wrap.innerHTML = '';
-
-    const zones = state.zones[state.side] || [];
-    zones.forEach((z, idx)=>{
-      const b = document.createElement('button');
-      b.className = 'ws-zone-btn';
-      b.type = 'button';
-      b.textContent = (z.name || ('Zone '+(idx+1))) + (z.price ? (' ('+z.price+'€)') : '');
-      b.addEventListener('click', ()=>{
-        const canvas = qs('#winshirt-canvas');
-        const target = qs(`.ws-print-zone[data-index="${idx}"]`, canvas);
-        if(!target) return;
-        qsa('.ws-print-zone', canvas).forEach(n=>n.classList.remove('is-active'));
-        target.classList.add('is-active');
-        target.scrollIntoView({block:'center', behavior:'smooth'});
-        // marquer bouton actif
-        qsa('.ws-zone-btn', wrap).forEach(bb=>bb.classList.remove('is-active'));
-        b.classList.add('is-active');
-      });
-      wrap.appendChild(b);
-    });
-
-    const first = qs('.ws-zone-btn', wrap);
-    if(first) first.classList.add('is-active');
-
-    // message si aucune zone
-    if(!zones.length){
-      const m = document.createElement('div');
-      m.style.opacity = .7;
-      m.textContent = 'Aucune zone définie pour ce côté.';
-      wrap.appendChild(m);
-    }
-  }
-
-  function insertImage(src){
-    const canvas = qs('#winshirt-canvas');
-    if(!canvas) return;
-    const active = qs('.ws-print-zone.is-active', canvas) || qs('.ws-print-zone', canvas);
-    if(!active) return;
-
-    // place l’image à ~40% de la zone
-    const img = document.createElement('img');
-    img.className = 'ws-layer';
-    img.src = src;
-    img.style.position = 'absolute';
-    img.style.left  = `calc(${active.style.left} + 10px)`;
-    img.style.top   = `calc(${active.style.top} + 10px)`;
-    img.style.width = `calc(${active.style.width} * .4)`;
-    img.style.height = 'auto';
-    canvas.appendChild(img);
-  }
-
-  function wireEvents(){
-    // Recto / Verso
-    qsa('.ws-side-btn').forEach(b=>{
-      b.addEventListener('click', ()=> setSide(b.getAttribute('data-side')) );
-    });
-
-    // Galerie → insertion simple (fallback quand WinShirtLayers n’est pas chargé)
-    document.addEventListener('click', function(e){
-      const item = e.target.closest('.ws-grid-item');
-      if(!item) return;
-      const src = item.getAttribute('data-src') || item.getAttribute('data-full') || '';
-      if(!src) return;
-
-      if(window.WinShirtLayers && typeof WinShirtLayers.addImage === 'function'){
-        WinShirtLayers.addImage(src);
-      }else{
-        insertImage(src);
-      }
-    });
-  }
-
-  function boot(){
-    const modal = document.getElementById('winshirt-customizer-modal');
-    if(!modal) return;
-
-    readData();
-    wireEvents();
-
-    // initialisation au moment de l’ouverture du modal
-    document.addEventListener('winshirt:modal:open', ()=>{
-      readData();
-      setSide('front');
-    });
-  }
-
-  if(document.readyState !== 'loading') boot(); else document.addEventListener('DOMContentLoaded', boot);
-})();
+})(jQuery);
