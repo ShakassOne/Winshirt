@@ -1,13 +1,13 @@
+.ws-zone-editor { --ws-accent:#2563eb; }
 .ws-ze-rect{
   position:absolute;
-  outline:1px dashed rgba(0,0,0,.35);
-  background: rgba(59,130,246,.08);
-  box-sizing: border-box;
+  border:1px dashed rgba(37,99,235,.8);
+  background:rgba(37,99,235,.10);
+  box-shadow:0 0 0 1px rgba(37,99,235,.25) inset;
 }
 .ws-ze-rect .ws-h{
-  position:absolute;
-  width:12px; height:12px;
-  right:-6px; bottom:-6px;
-  background:#111827; border-radius:6px;
+  position:absolute; right:-8px; bottom:-8px;
+  width:14px; height:14px;
+  background:#fff; border:2px solid var(--ws-accent); border-radius:4px;
   cursor:nwse-resize;
 }
