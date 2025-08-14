@@ -1,0 +1,634 @@
+/**
+ * WinShirt - Styles Admin Mockup Editor
+ */
+
+/* ==========================================================================
+   Layout Global
+   ========================================================================== */
+
+.winshirt-admin {
+    max-width: 1400px;
+    margin: 0;
+}
+
+.winshirt-admin h1 {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.winshirt-admin h2 {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+/* ==========================================================================
+   Grille des Mockups
+   ========================================================================== */
+
+.winshirt-mockups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.winshirt-mockup-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.winshirt-mockup-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.mockup-preview {
+    height: 200px;
+    background: #f5f5f5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.mockup-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.mockup-placeholder {
+    color: #666;
+    font-style: italic;
+}
+
+.mockup-info {
+    padding: 15px;
+}
+
+.mockup-info h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+}
+
+.mockup-stats {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    font-size: 13px;
+    color: #666;
+}
+
+.mockup-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.mockup-actions .button {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+}
+
+/* État vide */
+.winshirt-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: #f9f9f9;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.winshirt-empty-state h3 {
+    margin: 0 0 10px 0;
+    color: #666;
+}
+
+/* ==========================================================================
+   Sections de l'Éditeur
+   ========================================================================== */
+
+.winshirt-editor-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.winshirt-editor-section h2 {
+    background: #f8f9fa;
+    margin: 0;
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+}
+
+.winshirt-editor-section .form-table {
+    margin: 0;
+    padding: 20px;
+}
+
+/* ==========================================================================
+   Gestion des Couleurs
+   ========================================================================== */
+
+#colors-container {
+    padding: 20px;
+}
+
+.color-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    background: #f9f9f9;
+    transition: all 0.3s ease;
+}
+
+.color-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.color-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.color-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid #ddd;
+    flex-shrink: 0;
+}
+
+.color-name {
+    flex: 1;
+    max-width: 200px;
+}
+
+.color-hex {
+    width: 60px;
+    height: 40px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.color-header label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    font-size: 13px;
+}
+
+.remove-color {
+    background: #dc3545;
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remove-color:hover {
+    background: #c82333;
+}
+
+/* Images des couleurs */
+.color-images {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    padding: 15px;
+}
+
+.image-upload {
+    text-align: center;
+}
+
+.image-upload label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.image-preview {
+    width: 100%;
+    height: 150px;
+    background: #f0f0f0;
+    border: 2px dashed #ddd;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    overflow: hidden;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.image-preview:empty::after {
+    content: "Aucune image";
+    color: #999;
+    font-style: italic;
+}
+
+/* ==========================================================================
+   Éditeur de Zones
+   ========================================================================== */
+
+.zones-editor {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 20px;
+    padding: 20px;
+}
+
+.side-switcher {
+    margin-left: auto;
+}
+
+.side-btn {
+    background: #f1f1f1;
+    border: 1px solid #ddd;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 0;
+}
+
+.side-btn:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+.side-btn:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-left: none;
+}
+
+.side-btn.active {
+    background: #0073aa;
+    color: white;
+    border-color: #0073aa;
+}
+
+/* Canvas */
+.canvas-container {
+    position: relative;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    min-height: 500px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#zones-canvas {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    cursor: crosshair;
+}
+
+#zones-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+/* Zones interactives */
+.zone-element {
+    position: absolute;
+    border: 2px solid #0073aa;
+    background: rgba(0, 115, 170, 0.1);
+    cursor: move;
+    pointer-events: all;
+    min-width: 20px;
+    min-height: 20px;
+}
+
+.zone-element:hover {
+    border-color: #005a87;
+    background: rgba(0, 115, 170, 0.2);
+}
+
+.zone-element.selected {
+    border-color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.zone-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #0073aa;
+    border: 1px solid white;
+    cursor: se-resize;
+}
+
+.zone-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+.zone-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+.zone-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.zone-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+
+.zone-label {
+    position: absolute;
+    top: -25px;
+    left: 0;
+    background: #0073aa;
+    color: white;
+    padding: 2px 8px;
+    font-size: 11px;
+    border-radius: 3px;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+/* Liste des zones */
+.zones-list {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 15px;
+}
+
+.zones-list h3 {
+    margin: 0 0 15px 0;
+    font-size: 14px;
+    color: #333;
+}
+
+#zones-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.zone-item {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.zone-item input,
+.zone-item select {
+    font-size: 12px;
+    padding: 4px 6px;
+}
+
+.zone-name {
+    grid-column: 1 / -1;
+}
+
+.zone-price {
+    width: 70px;
+}
+
+.zone-side {
+    width: 80px;
+}
+
+.remove-zone {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.remove-zone:hover {
+    background: #c82333;
+}
+
+/* ==========================================================================
+   Messages de Status
+   ========================================================================== */
+
+#winshirt-save-status {
+    position: fixed;
+    top: 32px;
+    right: 20px;
+    z-index: 100000;
+    max-width: 300px;
+}
+
+.winshirt-notice {
+    background: white;
+    border-left: 4px solid #00a32a;
+    padding: 12px 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border-radius: 0 4px 4px 0;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease;
+}
+
+.winshirt-notice.error {
+    border-left-color: #dc3545;
+}
+
+.winshirt-notice.warning {
+    border-left-color: #ffc107;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* ==========================================================================
+   Boutons et Actions
+   ========================================================================== */
+
+#winshirt-save-mockup {
+    background: #00a32a !important;
+    border-color: #00a32a !important;
+    color: white !important;
+}
+
+#winshirt-save-mockup:hover {
+    background: #008a20 !important;
+    border-color: #008a20 !important;
+}
+
+#winshirt-save-mockup:disabled {
+    background: #ccc !important;
+    border-color: #ccc !important;
+    cursor: not-allowed;
+}
+
+.winshirt-delete-mockup {
+    background: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+.winshirt-delete-mockup:hover {
+    background: #c82333 !important;
+    border-color: #c82333 !important;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1200px) {
+    .zones-editor {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .zones-list {
+        order: -1;
+    }
+}
+
+@media (max-width: 768px) {
+    .winshirt-mockups-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .color-header {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .color-images {
+        grid-template-columns: 1fr;
+    }
+    
+    .mockup-actions {
+        flex-direction: column;
+    }
+}
+
+/* ==========================================================================
+   Loading States
+   ========================================================================== */
+
+.winshirt-loading {
+    position: relative;
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.winshirt-loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Drag & Drop States
+   ========================================================================== */
+
+.zone-element.dragging {
+    z-index: 1000;
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.canvas-container.drop-zone {
+    border-color: #0073aa;
+    background-color: rgba(0, 115, 170, 0.05);
+}
+
+/* ==========================================================================
+   Form Controls
+   ========================================================================== */
+
+.winshirt-admin input[type="text"],
+.winshirt-admin input[type="number"],
+.winshirt-admin select {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.winshirt-admin input[type="text"]:focus,
+.winshirt-admin input[type="number"]:focus,
+.winshirt-admin select:focus {
+    border-color: #0073aa;
+    box-shadow: 0 0 0 1px #0073aa;
+    outline: none;
+}
+
+/* ==========================================================================
+   Utilitaires
+   ========================================================================== */
+
+.winshirt-hidden {
+    display: none !important;
+}
+
+.winshirt-text-center {
+    text-align: center;
+}
+
+.winshirt-mt-20 {
+    margin-top: 20px;
+}
+
+.winshirt-mb-20 {
+    margin-bottom: 20px;
+}
