@@ -51,6 +51,9 @@ winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
 // 5. Roadmap et tracking ⭐ NOUVEAU
 winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
 
+// 3.6. Interface admin pour mockups ⭐ NOUVEAU  
+winshirt_require_if_exists( 'includes/class-winshirt-mockup-admin.php' );
+
 // 6. Settings et WooCommerce
 winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
 
