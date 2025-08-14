@@ -1,68 +1,137 @@
-wp_enqueue_script( 'winshirt-modal' );
+<?php
+/**
+ * WinShirt - Enqueue & Front Data
+ * - Unifie le chargement CSS/JS (supprime les conflits)
+ * - Injecte WinShirtData (produit, mockups, zones, couleurs…)
+ */
+if ( ! defined( 'ABSPATH' ) ) exit;
 
-/* ---- SAFETY NET: ouvre la modale sur tous les sélecteurs historiques ---- */
-wp_add_inline_script( 'winshirt-modal', <<<JS
-(function($){
-  var SELECTORS = [
-    '[data-winshirt-open]',
-    '[data-ws-open-customizer]',
-    '#winshirt-open',
-    '.ws-open-customizer',
-    '.winshirt-open',
-    '.winshirt-btn-open',
-    '.button-personnaliser',
-    '.button.winshirt-open'
-  ].join(',');
+if ( ! class_exists( 'WinShirt_Assets' ) ) {
 
-  $(document).on('click', SELECTORS, function(e){
-    e.preventDefault(); e.stopPropagation();
-    if (window.WinShirtModal && typeof WinShirtModal.open === 'function') {
-      WinShirtModal.open();
-    } else {
-      // fallback: on essaie de créer le squelette si le contrôleur n’est pas prêt
-      var $existing = $('.winshirt-customizer-modal');
-      if (!$existing.length) {
-        $('body').append([
-          '<div class="winshirt-customizer-modal" aria-hidden="true" style="display:none">',
-          '  <div class="winshirt-customizer-dialog" role="dialog" aria-modal="true">',
-          '    <div class="ws-head"><button type="button" class="ws-close" aria-label="Fermer">Fermer</button></div>',
-          '    <div class="winshirt-customizer-body">',
-          '      <aside class="ws-l1">',
-          '        <button class="ws-nav-btn is-active" data-panel="images">Images</button>',
-          '        <button class="ws-nav-btn" data-panel="text">Texte</button>',
-          '        <button class="ws-nav-btn" data-panel="layers">Calques</button>',
-          '        <button class="ws-nav-btn" data-panel="qr">QR Code</button>',
-          '      </aside>',
-          '      <main id="winshirt-mockup-area"><div id="winshirt-canvas" style="position:relative;width:min(800px,90%);aspect-ratio:1/1;margin:24px auto"></div></main>',
-          '      <aside class="ws-l2"><div class="ws-l2-title">Images</div><button class="ws-back" type="button">← Retour</button><div class="ws-l2-body"></div></aside>',
-          '    </div>',
-          '    <div class="ws-footer">',
-          '      <button class="ws-pill js-ws-side is-active" data-side="front">Recto</button>',
-          '      <button class="ws-pill js-ws-side" data-side="back">Verso</button>',
-          '      <span style="flex:1"></span>',
-          '      <button class="ws-cta js-ws-save">Enregistrer le design</button>',
-          '      <button class="ws-cta js-ws-addcart">Ajouter au panier</button>',
-          '    </div>',
-          '  </div>',
-          '</div>'
-        ].join(''));
-      }
-      $('html,body').addClass('ws-modal-open');
-      $('.winshirt-customizer-modal').show().attr('aria-hidden','false').addClass('is-open');
-    }
-  });
+class WinShirt_Assets {
 
-  // fermer proprement
-  $(document).on('click', '.winshirt-customizer-modal', function(e){
-    if (e.target !== this) return;
-    $(this).removeClass('is-open').hide().attr('aria-hidden','true');
-    $('html,body').removeClass('ws-modal-open');
-  });
-  $(document).on('click', '.winshirt-customizer-modal .ws-close', function(){
-    var $m = $('.winshirt-customizer-modal');
-    $m.removeClass('is-open').hide().attr('aria-hidden','true');
-    $('html,body').removeClass('ws-modal-open');
-  });
-})(jQuery);
-JS
-);
+	private static $version   = '1.0.0';
+	private static $base_url  = '';
+	private static $base_path = '';
+
+	public static function init() {
+		if ( defined( 'WINSHIRT_VERSION' ) ) {
+			self::$version = WINSHIRT_VERSION;
+		}
+		$plugin_main     = dirname( __DIR__ ) . '/winshirt.php';
+		self::$base_url  = trailingslashit( plugins_url( '', $plugin_main ) );
+		self::$base_path = plugin_dir_path( $plugin_main );
+
+		add_action( 'init',               [ __CLASS__, 'register_assets' ] );
+		add_action( 'wp_enqueue_scripts', [ __CLASS__, 'maybe_enqueue_front' ], 20 );
+	}
+
+	private static function v( $rel ) {
+		$path = self::$base_path . ltrim( $rel, '/' );
+		return file_exists( $path ) ? self::$version . '.' . filemtime( $path ) : self::$version;
+	}
+
+	public static function register_assets() {
+		// CSS — garder uniquement les feuilles utiles (évite les conflits)
+		wp_register_style( 'winshirt-modal',   self::$base_url . 'assets/css/winshirt-modal.css',   [], self::v('assets/css/winshirt-modal.css') );
+		wp_register_style( 'winshirt-panels',  self::$base_url . 'assets/css/winshirt-panels.css',  [], self::v('assets/css/winshirt-panels.css') );
+		wp_register_style( 'winshirt-layers',  self::$base_url . 'assets/css/winshirt-layers.css',  [], self::v('assets/css/winshirt-layers.css') );
+		// ⚠️ ne pas charger winshirt-helpers.css ni anciens styles conflictuels
+
+		$jq = [ 'jquery' ];
+
+		// State de base
+		wp_register_script( 'winshirt-state', self::$base_url . 'assets/js/state.js', $jq, self::v('assets/js/state.js'), true );
+
+		// UI simple (pas le router complexe)
+		wp_register_script( 'winshirt-ui-panels', self::$base_url . 'assets/js/ui-panels.js', [ 'winshirt-state', 'jquery' ], self::v('assets/js/ui-panels.js'), true );
+
+		// NOUVEAU : moteur mockup + zones (front)
+		wp_register_script( 'winshirt-mockup-canvas', self::$base_url . 'assets/js/mockup-canvas.js', [ 'winshirt-state', 'jquery' ], self::v('assets/js/mockup-canvas.js'), true );
+
+		// Gestionnaire de calques (déplacement / redim / ordre)
+		// (peut remplacer l’ancien layers.js)
+		wp_register_script( 'winshirt-layers', self::$base_url . 'assets/js/layer-manager.js', [ 'winshirt-state', 'jquery' ], self::v('assets/js/layer-manager.js'), true );
+
+		// Outils
+		wp_register_script( 'winshirt-image-tools', self::$base_url . 'assets/js/image-tools.js', [ 'winshirt-layers', 'jquery' ], self::v('assets/js/image-tools.js'), true );
+		wp_register_script( 'winshirt-text-tools',  self::$base_url . 'assets/js/text-tools.js',  [ 'winshirt-layers', 'jquery' ], self::v('assets/js/text-tools.js'),  true );
+
+		// Glue de la modale
+		wp_register_script( 'winshirt-modal', self::$base_url . 'assets/js/winshirt-modal.js',
+			[ 'winshirt-state', 'winshirt-ui-panels', 'winshirt-mockup-canvas', 'winshirt-layers', 'winshirt-image-tools', 'winshirt-text-tools' ],
+			self::v('assets/js/winshirt-modal.js'), true
+		);
+
+		// Données
+		wp_localize_script( 'winshirt-state', 'WinShirtData', self::front_data() );
+	}
+
+	private static function should_load() {
+		if ( apply_filters( 'winshirt_force_enqueue', false ) ) return true;
+		if ( function_exists('is_product') && is_product() ) return true;
+		if ( function_exists('is_page')    && is_page('personnalisez') ) return true;
+		return apply_filters( 'winshirt_should_enqueue', false );
+	}
+
+	public static function maybe_enqueue_front() {
+		if ( ! self::should_load() ) return;
+
+		// CSS
+		wp_enqueue_style( 'winshirt-modal' );
+		wp_enqueue_style( 'winshirt-panels' );
+		wp_enqueue_style( 'winshirt-layers' );
+
+		// JS
+		wp_enqueue_script( 'winshirt-state' );
+		wp_enqueue_script( 'winshirt-ui-panels' );
+		wp_enqueue_script( 'winshirt-mockup-canvas' );
+		wp_enqueue_script( 'winshirt-layers' );
+		wp_enqueue_script( 'winshirt-image-tools' );
+		wp_enqueue_script( 'winshirt-text-tools' );
+		wp_enqueue_script( 'winshirt-modal' );
+
+		// SAFETY NET : bind les selectors historiques pour ouvrir la modale
+		$openers = implode(',', [
+			'.winshirt-customize-btn',
+			'button[data-winshirt-modal="open"]',
+			'#winshirt-open',
+			'.single_add_to_cart_button ~ .winshirt-btn',
+			'.product .button.winshirt-open'
+		]);
+		wp_add_inline_script( 'winshirt-modal', "jQuery(function($){ $('{$openers}').off('.ws').on('click.ws',function(e){e.preventDefault();$(document).trigger('winshirt:open');});});" );
+	}
+
+	private static function detect_product_id() {
+		if ( isset($_GET['product_id']) ) return absint($_GET['product_id']);
+		if ( function_exists('is_product') && is_product() ) {
+			$post_id = get_the_ID();
+			return $post_id ? (int) $post_id : 0;
+		}
+		return 0;
+	}
+
+	private static function front_data() {
+		$product_id = self::detect_product_id();
+
+		$base = [
+			'version'   => self::$version,
+			'siteUrl'   => site_url('/'),
+			'assetsUrl' => self::$base_url . 'assets/',
+			'ajaxUrl'   => admin_url('admin-ajax.php'),
+			'restUrl'   => esc_url_raw( rest_url('winshirt/v1') ),
+			'nonce'     => wp_create_nonce('wp_rest'),
+			'locale'    => determine_locale(),
+			'product'   => [ 'id' => (int) $product_id ],
+			'config'    => [ 'strictPercent' => true, 'maxPreviewSize' => 1600 ],
+			'mockups'   => apply_filters( 'winshirt_mockups_data', [] ),
+			'zones'     => apply_filters( 'winshirt_zones_data', [] ),
+			'colors'    => apply_filters( 'winshirt_colors_data', [] ),
+		];
+
+		return apply_filters( 'winshirt_front_data', $base );
+	}
+}
+
+WinShirt_Assets::init();
+}
