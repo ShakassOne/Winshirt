@@ -112,6 +112,9 @@ function winshirt_load_classes() {
     
     // API REST (à implémenter)
     winshirt_require_if_exists( 'includes/class-winshirt-api.php' );
+
+    // Debug (à supprimer en production)
+    winshirt_require_if_exists( 'debug-winshirt.php' );
 }
 
 // ===== ACTIVATION DU PLUGIN =====
