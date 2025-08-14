@@ -1,22 +1,25 @@
 <?php
 /**
  * Plugin Name: WinShirt
- * Description: Personnalisation produits + loteries (module WinShirt).
- * Author: WinShirt
+ * Description: Personnalisation produits textile + loteries (RECOVERY v1.0)
+ * Author: WinShirt Team ( Shakass Communication, Claude, Chatgpt )
  * Version: 1.0.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
+ * Text Domain: winshirt
+ * Domain Path: /languages
  */
 
 if ( ! defined('ABSPATH') ) exit;
 
-// === Constantes ===
+// ===== CONSTANTES PRINCIPALES =====
 define( 'WINSHIRT_VERSION', '1.0.0' );
 define( 'WINSHIRT_FILE', __FILE__ );
 define( 'WINSHIRT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WINSHIRT_URL',  plugins_url( '', __FILE__ ) . '/' );
+define( 'WINSHIRT_BASENAME', plugin_basename( __FILE__ ) );
 
-// === Safe require ===
+// ===== SAFE REQUIRE HELPER =====
 if ( ! function_exists('winshirt_require_if_exists') ) {
 	function winshirt_require_if_exists( $relpath ) {
 		$abs = WINSHIRT_PATH . ltrim( $relpath, '/\\' );
@@ -28,62 +31,76 @@ if ( ! function_exists('winshirt_require_if_exists') ) {
 	}
 }
 
-// === Assets front ===
+// ===== CORE CLASSES (ordre d'importance) =====
+winshirt_require_if_exists( 'includes/class-winshirt-core.php' );
 winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-designs.php' );
 
-// === Pré-câblage modules ===
-winshirt_require_if_exists( 'includes/class-winshirt-router.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-rest.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-price.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-product-customization.php' );
-
-// === Admin / Réglages / Menu ===
-winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
-winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
+// === CPT et données ===
 winshirt_require_if_exists( 'includes/class-winshirt-mockups-admin.php' );
 
+// === Frontend et WooCommerce ===
+winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
 
-// === Activation / Désactivation ===
-register_activation_hook( __FILE__, function(){
-	if ( function_exists('flush_rewrite_rules') ) flush_rewrite_rules();
-});
-register_deactivation_hook( __FILE__, function(){
-	if ( function_exists('flush_rewrite_rules') ) flush_rewrite_rules();
-});
+// === Modules optionnels ===
+winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
 
-// === Admin bootstrap (instancie les classes si besoin) ===
-add_action( 'plugins_loaded', function () {
-	// Certaines classes s’auto-initialisent ; au cas où, on instancie l’admin.
-	if ( class_exists( 'WinShirt_Admin' ) && ! did_action('winshirt_admin_booted') ) {
-		do_action('winshirt_admin_booted', new WinShirt_Admin() );
-	}
-	if ( class_exists( 'WinShirt_Settings' ) && method_exists( 'WinShirt_Settings', 'init' ) ) {
-		// déjà appelé dans la classe, mais idempotent
-		WinShirt_Settings::init();
-	}
-});
+// ===== ACTIVATION / DÉSACTIVATION =====
+register_activation_hook( __FILE__, 'winshirt_activate' );
+register_deactivation_hook( __FILE__, 'winshirt_deactivate' );
 
-// === Notice info (non bloquante) tant que tout n’est pas en place ===
-add_action('admin_notices', function(){
-	if ( ! current_user_can('manage_options') ) return;
-	$missing = [];
-	foreach ([
-		'assets/js/state.js',
-		'assets/js/ui-router.js',
-		'assets/js/ui-panels.js',
-		'assets/js/mockup-canvas.js',
-		'assets/js/layers.js',
-		'assets/css/winshirt-helpers.css',
-		'templates/modal-customizer.php',
-	] as $rel) {
-		if ( ! file_exists( WINSHIRT_PATH . $rel ) ) $missing[] = $rel;
+function winshirt_activate() {
+	// Flush rewrite rules pour les CPT
+	flush_rewrite_rules();
+	
+	// Créer option version
+	add_option( 'winshirt_version', WINSHIRT_VERSION );
+	
+	// Déclencher migration si nécessaire
+	do_action( 'winshirt_activated' );
+}
+
+function winshirt_deactivate() {
+	flush_rewrite_rules();
+	do_action( 'winshirt_deactivated' );
+}
+
+// ===== BOOTSTRAP PRINCIPAL =====
+add_action( 'plugins_loaded', 'winshirt_init' );
+
+function winshirt_init() {
+	// Vérifier dépendances
+	if ( ! class_exists( 'WooCommerce' ) ) {
+		add_action( 'admin_notices', 'winshirt_woocommerce_required_notice' );
+		return;
 	}
-	if ( $missing ) {
-		echo '<div class="notice notice-info"><p><strong>WinShirt :</strong> certains fichiers sont manquants pendant l’intégration :</p><ul style="margin-left:20px">';
-		foreach ($missing as $m) echo '<li><code>'.esc_html($m).'</code></li>';
-		echo '</ul></div>';
+	
+	// Initialiser core
+	if ( class_exists( 'WinShirt_Core' ) ) {
+		WinShirt_Core::init();
 	}
-});
+	
+	// Action pour extensions
+	do_action( 'winshirt_loaded' );
+}
+
+function winshirt_woocommerce_required_notice() {
+	?>
+	<div class="notice notice-error">
+		<p>
+			<strong><?php esc_html_e( 'WinShirt', 'winshirt' ); ?></strong> 
+			<?php esc_html_e( 'nécessite WooCommerce pour fonctionner.', 'winshirt' ); ?>
+		</p>
+	</div>
+	<?php
+}
+
+// ===== TEXTDOMAIN =====
+add_action( 'init', 'winshirt_load_textdomain' );
+
+function winshirt_load_textdomain() {
+	load_plugin_textdomain( 
+		'winshirt', 
+		false, 
+		dirname( WINSHIRT_BASENAME ) . '/languages' 
+	);
+}
