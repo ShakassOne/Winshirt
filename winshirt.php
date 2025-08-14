@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WinShirt
  * Description: Personnalisation produits textile + loteries (RECOVERY v1.0)
- * Author: WinShirt Team ( Shakass Communication, Claude, Chatgpt )
+ * Author: WinShirt Team (Shakass Communication, Claude, ChatGPT)
  * Version: 1.0.0
  * Requires at least: 6.0
  * Requires PHP: 7.4
@@ -27,21 +27,25 @@ if ( ! function_exists('winshirt_require_if_exists') ) {
 			require_once $abs;
 			return true;
 		}
+		error_log( "WinShirt: Fichier manquant - " . $abs );
 		return false;
 	}
 }
 
-// ===== CORE CLASSES (ordre d'importance) =====
+// ===== CORE CLASSES (ordre critique) =====
+// 1. Core principal
 winshirt_require_if_exists( 'includes/class-winshirt-core.php' );
+
+// 2. Assets et frontend
 winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
 
-// === CPT et données ===
-winshirt_require_if_exists( 'includes/class-winshirt-mockups-admin.php' );
+// 3. ADMIN (CRITIQUE - c'était manquant !)
+winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
 
-// === Frontend et WooCommerce ===
+// 4. Settings et WooCommerce
 winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
 
-// === Modules optionnels ===
+// 5. Modules avancés
 winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
 
 // ===== ACTIVATION / DÉSACTIVATION =====
@@ -57,11 +61,15 @@ function winshirt_activate() {
 	
 	// Déclencher migration si nécessaire
 	do_action( 'winshirt_activated' );
+	
+	// Log d'activation
+	error_log( 'WinShirt: Plugin activé - version ' . WINSHIRT_VERSION );
 }
 
 function winshirt_deactivate() {
 	flush_rewrite_rules();
 	do_action( 'winshirt_deactivated' );
+	error_log( 'WinShirt: Plugin désactivé' );
 }
 
 // ===== BOOTSTRAP PRINCIPAL =====
@@ -77,6 +85,11 @@ function winshirt_init() {
 	// Initialiser core
 	if ( class_exists( 'WinShirt_Core' ) ) {
 		WinShirt_Core::init();
+	}
+	
+	// Log de debug
+	if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+		error_log( 'WinShirt: Initialisé avec succès' );
 	}
 	
 	// Action pour extensions
@@ -103,4 +116,13 @@ function winshirt_load_textdomain() {
 		false, 
 		dirname( WINSHIRT_BASENAME ) . '/languages' 
 	);
+}
+
+// ===== DEBUG INFO (en mode développement) =====
+if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+	add_action( 'admin_footer', function() {
+		if ( current_user_can( 'manage_options' ) ) {
+			echo '<!-- WinShirt Debug: Version ' . WINSHIRT_VERSION . ' -->';
+		}
+	});
 }
