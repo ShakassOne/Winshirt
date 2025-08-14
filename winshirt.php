@@ -82,7 +82,7 @@ function winshirt_load_classes() {
     // winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-admin-menu-fixed.php' );
-    // winshirt_require_if_exists( 'includes/class-winshirt-mockup-admin.php' );
+    winshirt_require_if_exists( 'includes/class-winshirt-mockup-admin.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
