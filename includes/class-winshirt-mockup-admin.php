@@ -11,36 +11,10 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 class WinShirt_Mockup_Admin {
     
     public function __construct() {
-        add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
         add_action( 'wp_ajax_winshirt_save_mockup', array( $this, 'ajax_save_mockup' ) );
         add_action( 'wp_ajax_winshirt_delete_mockup', array( $this, 'ajax_delete_mockup' ) );
         add_action( 'wp_ajax_winshirt_get_mockup', array( $this, 'ajax_get_mockup' ) );
-    }
-    
-    /**
-     * Ajouter les pages admin
-     */
-    public function add_admin_pages() {
-        // Page principale des mockups
-        add_submenu_page(
-            'winshirt',
-            'Gestion des Mockups',
-            'Mockups',
-            'manage_options',
-            'winshirt-mockups',
-            array( $this, 'render_mockups_list' )
-        );
-        
-        // Page éditeur de mockup
-        add_submenu_page(
-            null, // Masqué du menu
-            'Éditeur de Mockup',
-            'Éditer Mockup',
-            'manage_options',
-            'winshirt-edit-mockup',
-            array( $this, 'render_mockup_editor' )
-        );
     }
     
     /**
@@ -178,7 +152,7 @@ class WinShirt_Mockup_Admin {
                 $default_color = get_post_meta( $mockup_id, '_default_color', true );
                 $title = $mockup->post_title;
             } else {
-                $mockup_id = 0; // Invalid ID
+                $mockup_id = 0;
             }
         }
         
