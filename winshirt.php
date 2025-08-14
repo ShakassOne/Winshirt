@@ -82,7 +82,7 @@ function winshirt_load_classes() {
     winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
     
     // 3. Redirection et désactivation Gutenberg - TRÈS IMPORTANT
-    winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' );
+    winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' ); // ← DÉCOMMENTÉ
     
     // 4. Menu admin unifié
     winshirt_require_if_exists( 'includes/class-winshirt-admin-menu-fixed.php' );
