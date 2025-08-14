@@ -1,78 +1,86 @@
-/* ===== WinShirt – Rendu du mockup + zones ===== */
 (function($){
   'use strict';
 
-  const C = {
+  const Canvas = {
+    el: null,
+    imgFront: null,
+    imgBack: null,
     side: 'front',
-    $area: null, $canvas: null,
-    data(){ return window.WinShirtData || {}; },
+    zones: { front: [], back: [] },
 
-    mount(){
-      this.$area   = $('#winshirt-mockup-area');
-      this.$canvas = $('#winshirt-canvas');
-      if(!this.$area.length || !this.$canvas.length) return;
+    boot(){
+      this.el = $('#winshirt-canvas');
+      if(!this.el.length || !window.WinShirtData) return;
 
-      // boutons Recto / Verso
-      $(document).on('click', '.js-ws-side', (e)=>{
-        this.side = $(e.currentTarget).data('side') === 'back' ? 'back' : 'front';
-        $('.js-ws-side').removeClass('is-active');
-        $(e.currentTarget).addClass('is-active');
-        $(document).trigger('winshirt:sideChanged', [this.side]);
-        this.render();
-      });
+      this.imgFront = this.el.find('.winshirt-mockup-img[data-side="front"]');
+      this.imgBack  = this.el.find('.winshirt-mockup-img[data-side="back"]');
 
-      this.render();
+      const mock = WinShirtData.mockups || {};
+      if(mock.front) this.imgFront.attr('src', mock.front);
+      if(mock.back)  this.imgBack.attr('src',  mock.back);
+
+      const z = WinShirtData.zones || {};
+      this.zones.front = Array.isArray(z.front) ? z.front : [];
+      this.zones.back  = Array.isArray(z.back)  ? z.back  : [];
+
+      this.setSide('front');
+      this.bind();
     },
 
-    render(){
-      const d = this.data();
-      const front = (d.mockups && d.mockups.front) || '';
-      const back  = (d.mockups && d.mockups.back)  || '';
+    bind(){
+      $(document).on('winshirt:side', (e, side)=> this.setSide(side));
+      // réagir au resize pour recalculer positions en px
+      $(window).on('resize.ws', ()=> this.renderZones() );
+    },
 
-      // image mockup
-      let $imgFront = this.$canvas.find('img[data-side="front"]');
-      let $imgBack  = this.$canvas.find('img[data-side="back"]');
-      if(!$imgFront.length){
-        $imgFront = $('<img class="winshirt-mockup-img" data-side="front" alt="Mockup Recto">').appendTo(this.$canvas);
-        $imgBack  = $('<img class="winshirt-mockup-img" data-side="back"  alt="Mockup Verso">').appendTo(this.$canvas);
-      }
-      $imgFront.attr('src', front || d.assetsUrl+'img/mockup-front.png');
-      $imgBack.attr('src',  back  || d.assetsUrl+'img/mockup-back.png');
-      $imgFront.toggleClass('is-visible', this.side==='front');
-      $imgBack.toggleClass('is-visible',  this.side==='back');
+    setSide(side){
+      this.side = (side==='back') ? 'back' : 'front';
+      this.imgFront.toggle(this.side==='front');
+      this.imgBack.toggle(this.side==='back');
+      this.renderZones();
+      $(document).trigger('winshirt:canvas:side', [this.side]);
+    },
 
-      // zones : reset
-      this.$canvas.find('.ws-print-zone').remove();
+    canvasRect(){
+      return this.el[0].getBoundingClientRect();
+    },
 
-      const zones = (d.zones && d.zones[this.side]) || [];
-      const w = this.$canvas.width();
-      const h = this.$canvas.height();
+    pctToPx(p){ // {left,top,width,height} → px rect
+      const r = this.canvasRect();
+      return {
+        x: p.left/100 * r.width,
+        y: p.top/100  * r.height,
+        w: p.width/100* r.width,
+        h: p.height/100* r.height
+      };
+    },
 
-      if(!zones.length){
-        $('.ws-zone-empty').remove();
-        $('<div class="ws-zone-empty" style="text-align:center;opacity:.6;margin-top:8px">Aucune zone définie pour ce côté.</div>')
-          .appendTo(this.$area);
-        return;
-      } else {
-        $('.ws-zone-empty').remove();
-      }
-
-      zones.forEach((z, i)=>{
-        const $z = $('<div class="ws-print-zone">').attr('data-idx', i);
-        // z left/top/width/height sont en %
-        const left = (z.left||0)/100 * w;
-        const top  = (z.top||0)/100 * h;
-        const zw   = (z.width||0)/100 * w;
-        const zh   = (z.height||0)/100 * h;
-
-        $z.css({ left, top, width: zw, height: zh });
-        if(i===0) $z.addClass('is-active');
-        this.$canvas.append($z);
+    renderZones(){
+      this.el.find('.ws-print-zone').remove();
+      const list = this.zones[this.side] || [];
+      list.forEach((z,i)=>{
+        const R = this.pctToPx(z);
+        const $z = $('<div class="ws-print-zone" />')
+          .attr('data-index', i)
+          .attr('data-side', this.side)
+          .css({ left:R.x, top:R.y, width:R.w, height:R.h });
+        this.el.append($z);
       });
+
+      const has = list.length>0;
+      $('.ws-zone-hint').text( has ? '' : 'Aucune zone définie pour ce côté.' );
+      $(document).trigger('winshirt:zones:rendered', [this.side, list]);
+    },
+
+    // util pour layer-manager
+    activeZoneRect(){
+      // prend la 1ère zone pour MVP (ou celle “sélectionnée” si on ajoute la sélection)
+      const z = (this.zones[this.side]||[])[0];
+      if(!z) return null;
+      return this.pctToPx(z);
     }
   };
 
-  $(function(){ C.mount(); });
-  window.WinShirtCanvas = C;
+  $(function(){ Canvas.boot(); window.WinShirtCanvas = Canvas; });
 
 })(jQuery);
