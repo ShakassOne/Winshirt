@@ -1,246 +1,478 @@
 <?php
 /**
- * WinShirt – BO Mockups (metaboxes + éditeur zones + couleurs)
- *
- * CPT ciblé : ws-mockup
- * Metas :
- *   _winshirt_mockup_front   (URL)
- *   _winshirt_mockup_back    (URL)
- *   _winshirt_mockup_colors  (JSON array of {label,hex,front,back})
- *   _winshirt_zones          (JSON {"front":[{left,top,width,height,name,price}], "back":[...]})
+ * Éditeur de Mockup - Interface Admin Complète
+ * 
+ * @package WinShirt
+ * @since 1.0.0
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! class_exists( 'WinShirt_Mockups_Admin' ) ) {
-
-class WinShirt_Mockups_Admin {
-
-	public static function init() {
-		add_action( 'add_meta_boxes',        [ __CLASS__, 'add_boxes' ] );
-		add_action( 'save_post_ws-mockup',   [ __CLASS__, 'save' ], 10, 2 );
-		add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue' ] );
-	}
-
-	/** Ajoute les metaboxes */
-	public static function add_boxes() {
-		add_meta_box(
-			'winshirt_mockup_images',
-			__( 'Images mockup', 'winshirt' ),
-			[ __CLASS__, 'box_images' ],
-			'ws-mockup', 'normal', 'high'
-		);
-
-		add_meta_box(
-			'winshirt_mockup_colors',
-			__( 'Couleurs & variations (recto/verso)', 'winshirt' ),
-			[ __CLASS__, 'box_colors' ],
-			'ws-mockup', 'normal', 'default'
-		);
-
-		add_meta_box(
-			'winshirt_mockup_zones',
-			__( 'Zones d’impression', 'winshirt' ),
-			[ __CLASS__, 'box_zones' ],
-			'ws-mockup', 'normal', 'high'
-		);
-	}
-
-	/** Metabox images */
-	public static function box_images( $post ) {
-		wp_nonce_field( 'winshirt_mockup_save', '_winshirt_mockup_nonce' );
-
-		$front = get_post_meta( $post->ID, '_winshirt_mockup_front', true );
-		if ( ! $front ) $front = get_post_meta( $post->ID, 'ws_mockup_front', true );
-
-		$back  = get_post_meta( $post->ID, '_winshirt_mockup_back', true );
-		if ( ! $back ) $back = get_post_meta( $post->ID, 'ws_mockup_back', true );
-		?>
-		<p><label for="ws_mockup_front"><strong><?php esc_html_e( 'Image avant (recto)', 'winshirt' ); ?></strong></label></p>
-		<input type="text" class="widefat" id="ws_mockup_front" name="ws_mockup_front" value="<?php echo esc_attr( $front ); ?>" placeholder="https://.../recto.png" />
-		<p><em><?php esc_html_e( 'Collez l’URL complète du visuel recto (PNG/JPG transparent recommandé).', 'winshirt' ); ?></em></p>
-
-		<p style="margin-top:1em"><label for="ws_mockup_back"><strong><?php esc_html_e( 'Image arrière (verso)', 'winshirt' ); ?></strong></label></p>
-		<input type="text" class="widefat" id="ws_mockup_back" name="ws_mockup_back" value="<?php echo esc_attr( $back ); ?>" placeholder="https://.../verso.png" />
-		<p><em><?php esc_html_e( 'Optionnel si vous n’utilisez que le recto.', 'winshirt' ); ?></em></p>
-		<?php
-	}
-
-	/** Metabox couleurs + visuels par couleur (recto/verso) */
-	public static function box_colors( $post ) {
-		$stored = get_post_meta( $post->ID, '_winshirt_mockup_colors', true );
-
-		// Back-compat : si ancienne valeur CSV, on l’interprète en lignes simples
-		if ( empty( $stored ) ) {
-			$csv = get_post_meta( $post->ID, 'ws_mockup_colors', true );
-			if ( is_string( $csv ) && trim( $csv ) !== '' ) {
-				$parts  = array_filter( array_map( 'trim', explode( ',', $csv ) ) );
-				$stored = [];
-				foreach ( $parts as $p ) {
-					$stored[] = [ 'label' => $p, 'hex' => $p, 'front' => '', 'back' => '' ];
-				}
-			}
-		}
-
-		$rows = ( is_array( $stored ) ? $stored : [] );
-		?>
-		<p><em><?php esc_html_e( 'Ajoutez des couleurs disponibles et, si besoin, des visuels spécifiques par couleur (recto/verso).', 'winshirt' ); ?></em></p>
-
-		<table class="widefat striped ws-colors-table">
-			<thead>
-				<tr>
-					<th style="width:16%"><?php esc_html_e( 'Label', 'winshirt' ); ?></th>
-					<th style="width:12%"><?php esc_html_e( 'Hex/nom', 'winshirt' ); ?></th>
-					<th><?php esc_html_e( 'URL Recto', 'winshirt' ); ?></th>
-					<th><?php esc_html_e( 'URL Verso', 'winshirt' ); ?></th>
-					<th style="width:60px"></th>
-				</tr>
-			</thead>
-			<tbody id="ws-colors-rows">
-				<?php if ( empty( $rows ) ) : ?>
-					<tr class="ws-color-row">
-						<td><input type="text" class="widefat" name="ws_color_label[]" placeholder="Blanc" value=""></td>
-						<td><input type="text" class="widefat" name="ws_color_hex[]"   placeholder="#FFFFFF" value=""></td>
-						<td><input type="text" class="widefat" name="ws_color_front[]" placeholder="https://.../recto.png" value=""></td>
-						<td><input type="text" class="widefat" name="ws_color_back[]"  placeholder="https://.../verso.png" value=""></td>
-						<td><button type="button" class="button ws-colors-del">–</button></td>
-					</tr>
-				<?php else : foreach ( $rows as $r ) : ?>
-					<tr class="ws-color-row">
-						<td><input type="text" class="widefat" name="ws_color_label[]" value="<?php echo esc_attr( $r['label'] ?? '' ); ?>"></td>
-						<td><input type="text" class="widefat" name="ws_color_hex[]"   value="<?php echo esc_attr( $r['hex']   ?? '' ); ?>"></td>
-						<td><input type="text" class="widefat" name="ws_color_front[]" value="<?php echo esc_attr( $r['front'] ?? '' ); ?>"></td>
-						<td><input type="text" class="widefat" name="ws_color_back[]"  value="<?php echo esc_attr( $r['back']  ?? '' ); ?>"></td>
-						<td><button type="button" class="button ws-colors-del">–</button></td>
-					</tr>
-				<?php endforeach; endif; ?>
-			</tbody>
-		</table>
-		<p style="margin-top:8px">
-			<button type="button" class="button button-secondary ws-colors-add"><?php esc_html_e( 'Ajouter une couleur', 'winshirt' ); ?></button>
-		</p>
-		<?php
-	}
-
-	/** Metabox zones – éditeur visuel + panneau noms/prix */
-	public static function box_zones( $post ) {
-		$front = get_post_meta( $post->ID, '_winshirt_mockup_front', true );
-		if ( ! $front ) $front = get_post_meta( $post->ID, 'ws_mockup_front', true );
-
-		$back  = get_post_meta( $post->ID, '_winshirt_mockup_back', true );
-		if ( ! $back ) $back = get_post_meta( $post->ID, 'ws_mockup_back', true );
-
-		$zones_json = get_post_meta( $post->ID, '_winshirt_zones', true );
-		if ( ! $zones_json ) $zones_json = get_post_meta( $post->ID, 'ws_mockup_zones', true );
-		if ( ! is_string( $zones_json ) || $zones_json === '' ) {
-			$zones_json = '{"front":[],"back":[]}';
-		}
-		?>
-		<div class="ws-zone-editor ws-has-sidebar" data-front="<?php echo esc_attr( $front ); ?>" data-back="<?php echo esc_attr( $back ); ?>">
-			<div class="ws-ze-topbar">
-				<div class="ws-ze-left">
-					<button type="button" class="button ws-ze-side" data-side="front"><?php esc_html_e( 'Recto', 'winshirt' ); ?></button>
-					<button type="button" class="button ws-ze-side" data-side="back"><?php esc_html_e( 'Verso', 'winshirt' ); ?></button>
-					<button type="button" class="button button-primary ws-ze-add"><?php esc_html_e( 'Ajouter une zone', 'winshirt' ); ?></button>
-					<button type="button" class="button ws-ze-clear"><?php esc_html_e( 'Tout supprimer (côté courant)', 'winshirt' ); ?></button>
-				</div>
-				<div class="ws-ze-right"><em><?php esc_html_e( 'Glissez/redimensionnez les zones. Éditez nom et prix ci-contre.', 'winshirt' ); ?></em></div>
-			</div>
-
-			<div class="ws-ze-layout">
-				<div class="ws-ze-canvas-wrap">
-					<div id="ws-ze-canvas">
-						<img id="ws-ze-img" src="<?php echo esc_url( $front ); ?>" alt="Mockup">
-						<!-- rectangles injectés en JS -->
-					</div>
-				</div>
-
-				<aside class="ws-ze-sidebar">
-					<h4 style="margin:.3rem 0 0.8rem"><?php esc_html_e( 'Zones (côté en cours)', 'winshirt' ); ?></h4>
-					<div id="ws-ze-list"><!-- lignes JS --></div>
-				</aside>
-			</div>
-
-			<input type="hidden" id="ws-ze-data" name="ws_mockup_zones" value="<?php echo esc_attr( $zones_json ); ?>" />
-		</div>
-		<?php
-	}
-
-	/** Sauvegarde */
-	public static function save( $post_id, $post ) {
-		if ( ! isset( $_POST['_winshirt_mockup_nonce'] ) || ! wp_verify_nonce( $_POST['_winshirt_mockup_nonce'], 'winshirt_mockup_save' ) ) {
-			return;
-		}
-		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
-		if ( ! current_user_can( 'edit_post', $post_id ) ) return;
-
-		$front  = isset( $_POST['ws_mockup_front'] )  ? esc_url_raw( trim( wp_unslash( $_POST['ws_mockup_front'] ) ) )  : '';
-		$back   = isset( $_POST['ws_mockup_back'] )   ? esc_url_raw( trim( wp_unslash( $_POST['ws_mockup_back'] ) ) )   : '';
-
-		update_post_meta( $post_id, '_winshirt_mockup_front',  $front );
-		update_post_meta( $post_id, '_winshirt_mockup_back',   $back );
-
-		// Couleurs (repeater)
-		$labels = isset( $_POST['ws_color_label'] ) ? (array) $_POST['ws_color_label'] : [];
-		$hexes  = isset( $_POST['ws_color_hex'] )   ? (array) $_POST['ws_color_hex']   : [];
-		$fronts = isset( $_POST['ws_color_front'] ) ? (array) $_POST['ws_color_front'] : [];
-		$backs  = isset( $_POST['ws_color_back'] )  ? (array) $_POST['ws_color_back']  : [];
-
-		$rows = [];
-		$max  = max( count( $labels ), count( $hexes ), count( $fronts ), count( $backs ) );
-		for ( $i = 0; $i < $max; $i++ ) {
-			$label = isset( $labels[$i] ) ? sanitize_text_field( wp_unslash( $labels[$i] ) ) : '';
-			$hex   = isset( $hexes[$i] )  ? sanitize_text_field( wp_unslash( $hexes[$i] ) )   : '';
-			$furl  = isset( $fronts[$i] ) ? esc_url_raw( trim( wp_unslash( $fronts[$i] ) ) )   : '';
-			$burl  = isset( $backs[$i] )  ? esc_url_raw( trim( wp_unslash( $backs[$i] ) ) )    : '';
-			if ( $label === '' && $hex === '' && $furl === '' && $burl === '' ) continue;
-
-			$rows[] = [
-				'label' => $label,
-				'hex'   => $hex,
-				'front' => $furl,
-				'back'  => $burl,
-			];
-		}
-		if ( ! empty( $rows ) ) {
-			update_post_meta( $post_id, '_winshirt_mockup_colors', wp_json_encode( $rows ) );
-		} else {
-			delete_post_meta( $post_id, '_winshirt_mockup_colors' );
-		}
-
-		// Zones JSON (avec name/price)
-		if ( isset( $_POST['ws_mockup_zones'] ) ) {
-			$raw = wp_unslash( $_POST['ws_mockup_zones'] );
-			$try = json_decode( $raw, true );
-			if ( is_array( $try ) ) {
-				// sanitation minimale des champs name/price
-				foreach ( ['front','back'] as $sd ) {
-					if ( ! empty( $try[$sd] ) && is_array( $try[$sd] ) ) {
-						foreach ( $try[$sd] as &$z ) {
-							$z['name']  = isset( $z['name'] )  ? sanitize_text_field( $z['name'] ) : '';
-							$z['price'] = isset( $z['price'] ) ? floatval( $z['price'] ) : 0.0;
-						}
-						unset($z);
-					}
-				}
-				update_post_meta( $post_id, '_winshirt_zones', wp_json_encode( $try ) );
-			}
-		}
-	}
-
-	/** Scripts/CSS admin */
-	public static function enqueue( $hook ) {
-		global $post;
-		if ( ! isset( $post->post_type ) || 'ws-mockup' !== $post->post_type ) return;
-
-		$plugin_main = dirname( __DIR__ ) . '/winshirt.php';
-		$base = plugins_url( '', $plugin_main ) . '/';
-
-		wp_enqueue_style( 'winshirt-admin-zones', $base . 'assets/css/admin-zones.css', [], '1.1.0' );
-		wp_enqueue_script( 'winshirt-admin-zones', $base . 'assets/js/admin-zones.js', [], '1.1.0', true );
-	}
+class WinShirt_Mockup_Admin {
+    
+    public function __construct() {
+        add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+        add_action( 'wp_ajax_winshirt_save_mockup', array( $this, 'ajax_save_mockup' ) );
+        add_action( 'wp_ajax_winshirt_delete_mockup', array( $this, 'ajax_delete_mockup' ) );
+        add_action( 'wp_ajax_winshirt_get_mockup', array( $this, 'ajax_get_mockup' ) );
+    }
+    
+    /**
+     * Ajouter les pages admin
+     */
+    public function add_admin_pages() {
+        // Page principale des mockups
+        add_submenu_page(
+            'winshirt',
+            'Gestion des Mockups',
+            'Mockups',
+            'manage_options',
+            'winshirt-mockups',
+            array( $this, 'render_mockups_list' )
+        );
+        
+        // Page éditeur de mockup
+        add_submenu_page(
+            null, // Masqué du menu
+            'Éditeur de Mockup',
+            'Éditer Mockup',
+            'manage_options',
+            'winshirt-edit-mockup',
+            array( $this, 'render_mockup_editor' )
+        );
+    }
+    
+    /**
+     * Charger les assets
+     */
+    public function enqueue_assets( $hook ) {
+        if ( strpos( $hook, 'winshirt' ) === false ) return;
+        
+        wp_enqueue_media();
+        wp_enqueue_script( 'jquery-ui-draggable' );
+        wp_enqueue_script( 'jquery-ui-resizable' );
+        
+        wp_enqueue_style( 
+            'winshirt-mockup-admin', 
+            WINSHIRT_PLUGIN_URL . 'assets/css/mockup-admin.css',
+            array(),
+            WINSHIRT_VERSION
+        );
+        
+        wp_enqueue_script( 
+            'winshirt-mockup-admin', 
+            WINSHIRT_PLUGIN_URL . 'assets/js/mockup-admin.js',
+            array( 'jquery', 'jquery-ui-draggable', 'jquery-ui-resizable' ),
+            WINSHIRT_VERSION,
+            true
+        );
+        
+        wp_localize_script( 'winshirt-mockup-admin', 'winshirtAdmin', array(
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+            'nonce' => wp_create_nonce( 'winshirt_admin_nonce' ),
+            'strings' => array(
+                'save_success' => 'Mockup sauvegardé !',
+                'save_error' => 'Erreur lors de la sauvegarde',
+                'delete_confirm' => 'Êtes-vous sûr de vouloir supprimer ce mockup ?',
+            )
+        ));
+    }
+    
+    /**
+     * Page liste des mockups
+     */
+    public function render_mockups_list() {
+        $mockups = get_posts(array(
+            'post_type' => 'winshirt_mockup',
+            'post_status' => 'any',
+            'numberposts' => -1,
+            'orderby' => 'date',
+            'order' => 'DESC'
+        ));
+        
+        ?>
+        <div class="wrap winshirt-admin">
+            <h1>
+                Gestion des Mockups
+                <a href="<?php echo admin_url('admin.php?page=winshirt-edit-mockup'); ?>" class="page-title-action">
+                    Ajouter un Mockup
+                </a>
+            </h1>
+            
+            <div class="winshirt-mockups-grid">
+                <?php if ( empty( $mockups ) ): ?>
+                    <div class="winshirt-empty-state">
+                        <h3>Aucun mockup créé</h3>
+                        <p>Commencez par créer votre premier mockup</p>
+                        <a href="<?php echo admin_url('admin.php?page=winshirt-edit-mockup'); ?>" class="button-primary">
+                            Créer un Mockup
+                        </a>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ( $mockups as $mockup ): 
+                        $colors = get_post_meta( $mockup->ID, '_mockup_colors', true ) ?: array();
+                        $zones = get_post_meta( $mockup->ID, '_zones', true ) ?: array();
+                        $default_color = get_post_meta( $mockup->ID, '_default_color', true );
+                        $preview_image = '';
+                        
+                        // Image de prévisualisation
+                        if ( !empty( $colors ) && $default_color && isset( $colors[$default_color] ) ) {
+                            $preview_image = $colors[$default_color]['front'] ?: '';
+                        }
+                    ?>
+                        <div class="winshirt-mockup-card">
+                            <div class="mockup-preview">
+                                <?php if ( $preview_image ): ?>
+                                    <img src="<?php echo esc_url( $preview_image ); ?>" alt="<?php echo esc_attr( $mockup->post_title ); ?>">
+                                <?php else: ?>
+                                    <div class="mockup-placeholder">
+                                        <span>Aucune image</span>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                            
+                            <div class="mockup-info">
+                                <h3><?php echo esc_html( $mockup->post_title ?: 'Sans titre' ); ?></h3>
+                                <div class="mockup-stats">
+                                    <span><?php echo count( $colors ); ?> couleur(s)</span>
+                                    <span><?php echo count( $zones ); ?> zone(s)</span>
+                                </div>
+                                
+                                <div class="mockup-actions">
+                                    <a href="<?php echo admin_url('admin.php?page=winshirt-edit-mockup&id=' . $mockup->ID); ?>" 
+                                       class="button button-primary">
+                                        Éditer
+                                    </a>
+                                    <button type="button" 
+                                            class="button button-secondary winshirt-delete-mockup" 
+                                            data-id="<?php echo $mockup->ID; ?>">
+                                        Supprimer
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Page éditeur de mockup
+     */
+    public function render_mockup_editor() {
+        $mockup_id = isset( $_GET['id'] ) ? intval( $_GET['id'] ) : 0;
+        $mockup = null;
+        $colors = array();
+        $zones = array();
+        $default_color = '';
+        $title = '';
+        
+        if ( $mockup_id ) {
+            $mockup = get_post( $mockup_id );
+            if ( $mockup && $mockup->post_type === 'winshirt_mockup' ) {
+                $colors = get_post_meta( $mockup_id, '_mockup_colors', true ) ?: array();
+                $zones = get_post_meta( $mockup_id, '_zones', true ) ?: array();
+                $default_color = get_post_meta( $mockup_id, '_default_color', true );
+                $title = $mockup->post_title;
+            } else {
+                $mockup_id = 0; // Invalid ID
+            }
+        }
+        
+        ?>
+        <div class="wrap winshirt-admin">
+            <h1>
+                <?php echo $mockup_id ? 'Éditer le Mockup' : 'Nouveau Mockup'; ?>
+                <button type="button" id="winshirt-save-mockup" class="page-title-action">
+                    Sauvegarder
+                </button>
+            </h1>
+            
+            <form id="winshirt-mockup-form" data-mockup-id="<?php echo $mockup_id; ?>">
+                
+                <!-- Informations générales -->
+                <div class="winshirt-editor-section">
+                    <h2>Informations Générales</h2>
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="mockup-title">Nom du Mockup</label></th>
+                            <td>
+                                <input type="text" 
+                                       id="mockup-title" 
+                                       name="title" 
+                                       value="<?php echo esc_attr( $title ); ?>" 
+                                       class="regular-text" 
+                                       placeholder="Ex: T-shirt Premium Homme">
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <!-- Gestion des couleurs -->
+                <div class="winshirt-editor-section">
+                    <h2>
+                        Couleurs et Images
+                        <button type="button" id="add-color" class="button button-secondary">
+                            Ajouter une Couleur
+                        </button>
+                    </h2>
+                    
+                    <div id="colors-container">
+                        <?php if ( !empty( $colors ) ): ?>
+                            <?php foreach ( $colors as $color_id => $color_data ): ?>
+                                <div class="color-item" data-color-id="<?php echo esc_attr( $color_id ); ?>">
+                                    <div class="color-header">
+                                        <div class="color-preview" style="background-color: <?php echo esc_attr( $color_data['hex'] ); ?>"></div>
+                                        <input type="text" 
+                                               class="color-name" 
+                                               value="<?php echo esc_attr( $color_data['name'] ); ?>" 
+                                               placeholder="Nom de la couleur">
+                                        <input type="color" 
+                                               class="color-hex" 
+                                               value="<?php echo esc_attr( $color_data['hex'] ); ?>">
+                                        <label>
+                                            <input type="radio" 
+                                                   name="default_color" 
+                                                   value="<?php echo esc_attr( $color_id ); ?>"
+                                                   <?php checked( $default_color, $color_id ); ?>>
+                                            Par défaut
+                                        </label>
+                                        <button type="button" class="remove-color">×</button>
+                                    </div>
+                                    
+                                    <div class="color-images">
+                                        <div class="image-upload">
+                                            <label>Image Recto:</label>
+                                            <div class="image-preview">
+                                                <?php if ( !empty( $color_data['front'] ) ): ?>
+                                                    <img src="<?php echo esc_url( $color_data['front'] ); ?>" alt="Recto">
+                                                <?php endif; ?>
+                                            </div>
+                                            <button type="button" class="upload-image button" data-side="front">
+                                                Choisir l'image Recto
+                                            </button>
+                                            <input type="hidden" class="image-url" data-side="front" value="<?php echo esc_url( $color_data['front'] ?? '' ); ?>">
+                                        </div>
+                                        
+                                        <div class="image-upload">
+                                            <label>Image Verso:</label>
+                                            <div class="image-preview">
+                                                <?php if ( !empty( $color_data['back'] ) ): ?>
+                                                    <img src="<?php echo esc_url( $color_data['back'] ); ?>" alt="Verso">
+                                                <?php endif; ?>
+                                            </div>
+                                            <button type="button" class="upload-image button" data-side="back">
+                                                Choisir l'image Verso
+                                            </button>
+                                            <input type="hidden" class="image-url" data-side="back" value="<?php echo esc_url( $color_data['back'] ?? '' ); ?>">
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <!-- Éditeur de zones -->
+                <div class="winshirt-editor-section">
+                    <h2>
+                        Zones d'Impression
+                        <button type="button" id="add-zone" class="button button-secondary">
+                            Ajouter une Zone
+                        </button>
+                        <div class="side-switcher">
+                            <button type="button" class="side-btn active" data-side="front">Recto</button>
+                            <button type="button" class="side-btn" data-side="back">Verso</button>
+                        </div>
+                    </h2>
+                    
+                    <div class="zones-editor">
+                        <div class="canvas-container">
+                            <canvas id="zones-canvas" width="400" height="500"></canvas>
+                            <div id="zones-overlay"></div>
+                        </div>
+                        
+                        <div class="zones-list">
+                            <h3>Zones Actives</h3>
+                            <div id="zones-container">
+                                <?php if ( !empty( $zones ) ): ?>
+                                    <?php foreach ( $zones as $zone_id => $zone_data ): ?>
+                                        <div class="zone-item" data-zone-id="<?php echo esc_attr( $zone_id ); ?>">
+                                            <input type="text" 
+                                                   class="zone-name" 
+                                                   value="<?php echo esc_attr( $zone_data['name'] ); ?>" 
+                                                   placeholder="Nom de la zone">
+                                            <input type="number" 
+                                                   class="zone-price" 
+                                                   value="<?php echo esc_attr( $zone_data['price'] ); ?>" 
+                                                   step="0.01" 
+                                                   placeholder="Prix">
+                                            <select class="zone-side">
+                                                <option value="front" <?php selected( $zone_data['side'], 'front' ); ?>>Recto</option>
+                                                <option value="back" <?php selected( $zone_data['side'], 'back' ); ?>>Verso</option>
+                                            </select>
+                                            <button type="button" class="remove-zone">Supprimer</button>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </form>
+            
+            <div id="winshirt-save-status"></div>
+        </div>
+        
+        <script type="text/template" id="color-template">
+            <div class="color-item" data-color-id="{{COLOR_ID}}">
+                <div class="color-header">
+                    <div class="color-preview" style="background-color: #000000"></div>
+                    <input type="text" class="color-name" placeholder="Nom de la couleur">
+                    <input type="color" class="color-hex" value="#000000">
+                    <label>
+                        <input type="radio" name="default_color" value="{{COLOR_ID}}">
+                        Par défaut
+                    </label>
+                    <button type="button" class="remove-color">×</button>
+                </div>
+                <div class="color-images">
+                    <div class="image-upload">
+                        <label>Image Recto:</label>
+                        <div class="image-preview"></div>
+                        <button type="button" class="upload-image button" data-side="front">
+                            Choisir l'image Recto
+                        </button>
+                        <input type="hidden" class="image-url" data-side="front">
+                    </div>
+                    <div class="image-upload">
+                        <label>Image Verso:</label>
+                        <div class="image-preview"></div>
+                        <button type="button" class="upload-image button" data-side="back">
+                            Choisir l'image Verso
+                        </button>
+                        <input type="hidden" class="image-url" data-side="back">
+                    </div>
+                </div>
+            </div>
+        </script>
+        
+        <script type="text/template" id="zone-template">
+            <div class="zone-item" data-zone-id="{{ZONE_ID}}">
+                <input type="text" class="zone-name" placeholder="Nom de la zone">
+                <input type="number" class="zone-price" step="0.01" placeholder="Prix">
+                <select class="zone-side">
+                    <option value="front">Recto</option>
+                    <option value="back">Verso</option>
+                </select>
+                <button type="button" class="remove-zone">Supprimer</button>
+            </div>
+        </script>
+        <?php
+    }
+    
+    /**
+     * AJAX - Sauvegarder le mockup
+     */
+    public function ajax_save_mockup() {
+        check_ajax_referer( 'winshirt_admin_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Permissions insuffisantes' );
+        }
+        
+        $mockup_id = intval( $_POST['mockup_id'] ?? 0 );
+        $title = sanitize_text_field( $_POST['title'] ?? '' );
+        $colors = $_POST['colors'] ?? array();
+        $zones = $_POST['zones'] ?? array();
+        $default_color = sanitize_text_field( $_POST['default_color'] ?? '' );
+        
+        // Créer ou mettre à jour le post
+        $post_data = array(
+            'post_title' => $title,
+            'post_type' => 'winshirt_mockup',
+            'post_status' => 'publish'
+        );
+        
+        if ( $mockup_id ) {
+            $post_data['ID'] = $mockup_id;
+            $result = wp_update_post( $post_data );
+        } else {
+            $result = wp_insert_post( $post_data );
+            $mockup_id = $result;
+        }
+        
+        if ( is_wp_error( $result ) ) {
+            wp_send_json_error( 'Erreur lors de la sauvegarde' );
+        }
+        
+        // Sauvegarder les meta données
+        update_post_meta( $mockup_id, '_mockup_colors', $colors );
+        update_post_meta( $mockup_id, '_zones', $zones );
+        update_post_meta( $mockup_id, '_default_color', $default_color );
+        
+        wp_send_json_success( array(
+            'message' => 'Mockup sauvegardé avec succès',
+            'mockup_id' => $mockup_id
+        ));
+    }
+    
+    /**
+     * AJAX - Supprimer le mockup
+     */
+    public function ajax_delete_mockup() {
+        check_ajax_referer( 'winshirt_admin_nonce', 'nonce' );
+        
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Permissions insuffisantes' );
+        }
+        
+        $mockup_id = intval( $_POST['mockup_id'] ?? 0 );
+        
+        if ( ! $mockup_id ) {
+            wp_send_json_error( 'ID invalide' );
+        }
+        
+        $result = wp_delete_post( $mockup_id, true );
+        
+        if ( $result ) {
+            wp_send_json_success( 'Mockup supprimé' );
+        } else {
+            wp_send_json_error( 'Erreur lors de la suppression' );
+        }
+    }
+    
+    /**
+     * AJAX - Récupérer les données du mockup
+     */
+    public function ajax_get_mockup() {
+        check_ajax_referer( 'winshirt_admin_nonce', 'nonce' );
+        
+        $mockup_id = intval( $_GET['mockup_id'] ?? 0 );
+        
+        if ( ! $mockup_id ) {
+            wp_send_json_error( 'ID invalide' );
+        }
+        
+        $mockup = get_post( $mockup_id );
+        if ( ! $mockup || $mockup->post_type !== 'winshirt_mockup' ) {
+            wp_send_json_error( 'Mockup non trouvé' );
+        }
+        
+        $data = array(
+            'title' => $mockup->post_title,
+            'colors' => get_post_meta( $mockup_id, '_mockup_colors', true ) ?: array(),
+            'zones' => get_post_meta( $mockup_id, '_zones', true ) ?: array(),
+            'default_color' => get_post_meta( $mockup_id, '_default_color', true )
+        );
+        
+        wp_send_json_success( $data );
+    }
 }
 
-WinShirt_Mockups_Admin::init();
-
-}
+// Initialiser la classe
+new WinShirt_Mockup_Admin();
