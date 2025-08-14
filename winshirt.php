@@ -78,41 +78,19 @@ function winshirt_load_classes() {
     // 1. Core principal - Base du système
     winshirt_require_if_exists( 'includes/class-winshirt-core.php' );
     
-    // 2. CPT et structures de données - AVANT tout le reste
-    winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
+    // COMMENTÉ POUR TEST - DÉCOMMENTER UN PAR UN
+    // winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-admin-menu-fixed.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-mockup-admin.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-customizer.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-lottery.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-api.php' );
     
-    // 3. Redirection et désactivation Gutenberg - TRÈS IMPORTANT
-    winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' ); // ← DÉCOMMENTÉ
-    
-    // 4. Menu admin unifié
-    winshirt_require_if_exists( 'includes/class-winshirt-admin-menu-fixed.php' );
-    
-    // 5. Interface admin mockups
-    winshirt_require_if_exists( 'includes/class-winshirt-mockup-admin.php' );
-    
-    // 6. Assets et frontend
-    winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
-    
-    // 7. Roadmap et tracking
-    winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
-    
-    // 8. Settings et WooCommerce
-    winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
-    
-    // 9. Gestion des commandes
-    winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
-    
-    // ===== CLASSES OPTIONNELLES =====
-    
-    // Customizer front-end (à implémenter)
-    winshirt_require_if_exists( 'includes/class-winshirt-customizer.php' );
-    
-    // Système de loteries (à implémenter)
-    winshirt_require_if_exists( 'includes/class-winshirt-lottery.php' );
-    
-    // API REST (à implémenter)
-    winshirt_require_if_exists( 'includes/class-winshirt-api.php' );
-
     // Debug (à supprimer en production)
     winshirt_require_if_exists( 'debug-winshirt.php' );
 }
