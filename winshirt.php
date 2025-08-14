@@ -45,6 +45,10 @@ winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
 // 3.5. Éditeur de mockup avancé ⭐ NOUVEAU
 winshirt_require_if_exists( 'includes/class-winshirt-mockup-editor.php' );
 
+// 3.7. Menu admin corrigé + redirections ⭐ NOUVEAU
+winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' );
+winshirt_require_if_exists( 'includes/class-winshirt-admin-menu-fixed.php' );
+
 // 4. Admin interface
 winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
 
