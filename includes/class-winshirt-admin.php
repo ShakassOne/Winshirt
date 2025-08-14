@@ -1,63 +1,43 @@
 <?php
+/**
+ * WinShirt Admin - Menu et pages d'administration (Recovery v1.0)
+ */
+
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+if ( ! class_exists( 'WinShirt_Admin' ) ) {
 
 class WinShirt_Admin {
 
-	/** Les étapes de la roadmap */
-	private $roadmap_steps = array();
-
-	public function __construct() {
-		$this->roadmap_steps = $this->load_roadmap_steps();
-		add_action( 'admin_menu', array( $this, 'add_menu' ) );
-		add_action( 'admin_menu', array( $this, 'cleanup_menu' ), 99 );
+	public static function init() {
+		add_action( 'admin_menu', [ __CLASS__, 'add_menu' ] );
+		add_action( 'admin_menu', [ __CLASS__, 'cleanup_menu' ], 99 );
+		add_action( 'admin_notices', [ __CLASS__, 'admin_notices' ] );
 	}
 
 	/**
-	 * Charge toutes les étapes depuis le fichier roadmap.txt.
+	 * Ajouter menu principal WinShirt
 	 */
-	private function load_roadmap_steps() {
-		$file = WINSHIRT_PATH . 'roadmap.txt';
-		if ( ! file_exists( $file ) ) return array();
-
-		$lines   = file( $file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES );
-		$steps   = array();
-		$section = '';
-		$started = false;
-
-		foreach ( $lines as $line ) {
-			$line = trim( $line );
-			if ( ! $started ) {
-				if ( stripos( $line, 'Roadmap détaillée' ) !== false ) $started = true;
-				continue;
-			}
-			if ( preg_match( '/^\d+\.\s*(.+)$/', $line, $m ) ) { $section = $m[1]; continue; }
-			if ( '' === $line ) continue;
-
-			$label = $section ? $section . ' — ' . $line : $line;
-			$key   = 'step_' . md5( $label );
-			$steps[ $key ] = $label;
-		}
-		return $steps;
-	}
-
-	public function add_menu() {
+	public static function add_menu() {
 		add_menu_page(
 			__( 'WinShirt', 'winshirt' ),
 			__( 'WinShirt', 'winshirt' ),
 			'manage_options',
 			'winshirt',
-			array( $this, 'progress_page' ),
-			'dashicons-tshirt', 56
+			[ __CLASS__, 'dashboard_page' ],
+			'dashicons-tshirt',
+			56
 		);
 
-		// Sous-menus Mockups (CPT : ws-mockup)
+		// Sous-menu Mockups
 		add_submenu_page(
 			'winshirt',
-			__( 'Tous les mockups', 'winshirt' ),
-			__( 'Tous les mockups', 'winshirt' ),
+			__( 'Mockups', 'winshirt' ),
+			__( 'Mockups', 'winshirt' ),
 			'edit_posts',
 			'edit.php?post_type=ws-mockup'
 		);
+
 		add_submenu_page(
 			'winshirt',
 			__( 'Ajouter un mockup', 'winshirt' ),
@@ -66,77 +46,223 @@ class WinShirt_Admin {
 			'post-new.php?post_type=ws-mockup'
 		);
 
-		// Sous-menus Visuels (CPT : ws-design)
-		add_submenu_page(
-			'winshirt',
-			__( 'Tous les visuels', 'winshirt' ),
-			__( 'Tous les visuels', 'winshirt' ),
-			'edit_posts',
-			'edit.php?post_type=ws-design'
-		);
-		add_submenu_page(
-			'winshirt',
-			__( 'Ajouter un visuel', 'winshirt' ),
-			__( 'Ajouter un visuel', 'winshirt' ),
-			'edit_posts',
-			'post-new.php?post_type=ws-design'
-		);
-
-		// Sous-menu Paramètres (si la classe existe)
-		if ( class_exists( 'WinShirt_Settings' ) && method_exists( 'WinShirt_Settings', 'render_settings_page' ) ) {
+		// Sous-menu Designs/Visuels (si le CPT existe)
+		if ( post_type_exists( 'ws-design' ) ) {
 			add_submenu_page(
 				'winshirt',
-				__( 'Paramètres', 'winshirt' ),
-				__( 'Paramètres', 'winshirt' ),
-				'manage_options',
-				'winshirt-settings',
-				array( 'WinShirt_Settings', 'render_settings_page' )
+				__( 'Visuels', 'winshirt' ),
+				__( 'Visuels', 'winshirt' ),
+				'edit_posts',
+				'edit.php?post_type=ws-design'
 			);
 		}
+
+		// Page de statut
+		add_submenu_page(
+			'winshirt',
+			__( 'Statut', 'winshirt' ),
+			__( 'Statut', 'winshirt' ),
+			'manage_options',
+			'winshirt-status',
+			[ __CLASS__, 'status_page' ]
+		);
 	}
 
-	public function cleanup_menu() {
+	/**
+	 * Nettoyer menu (supprimer doublons)
+	 */
+	public static function cleanup_menu() {
+		// Supprimer sous-menus générés automatiquement par les CPT
 		remove_submenu_page( 'winshirt', 'edit-tags.php?taxonomy=ws-design-category&post_type=ws-design' );
 	}
 
-	/** Page d’avancement (optionnelle) */
-	public function progress_page() {
-		$completed = get_option( 'winshirt_roadmap_progress', array() );
-		if ( isset( $_POST['winshirt_roadmap'] ) ) {
-			check_admin_referer( 'winshirt_progress_save', 'winshirt_progress_nonce' );
-			$completed = array_map( 'sanitize_text_field', (array) $_POST['winshirt_roadmap'] );
-			update_option( 'winshirt_roadmap_progress', $completed );
-		}
-		$total   = count( $this->roadmap_steps );
-		$done    = count( $completed );
-		$percent = $total > 0 ? round( $done / $total * 100 ) : 0;
-
-		echo '<div class="wrap"><h1>'.esc_html__( 'Avancement du développement', 'winshirt' ).'</h1>';
-		echo '<p>'.esc_html__( 'Progression :', 'winshirt' ).' <strong id="winshirt-progress">'.$percent.'%</strong></p>';
-		echo '<form method="post">'; wp_nonce_field( 'winshirt_progress_save', 'winshirt_progress_nonce' ); echo '<ul>';
-		foreach ( $this->roadmap_steps as $key => $label ) {
-			$checked = in_array( $key, $completed, true ) ? 'checked' : '';
-			printf(
-				'<li><label><input type="checkbox" class="winshirt-roadmap-checkbox" name="winshirt_roadmap[]" value="%1$s" %2$s> %3$s</label></li>',
-				esc_attr( $key ), $checked, esc_html( $label )
-			);
-		}
-		echo '</ul>'; submit_button(); echo '</form>';
-
+	/**
+	 * Page dashboard principale
+	 */
+	public static function dashboard_page() {
 		?>
-		<script>
-		document.addEventListener("DOMContentLoaded", function() {
-			const boxes=[...document.querySelectorAll(".winshirt-roadmap-checkbox")];
-			const span=document.getElementById("winshirt-progress");
-			const total=boxes.length;
-			function upd(){let c=0;boxes.forEach(b=>{if(b.checked)c++});span.textContent=Math.round(c/Math.max(1,total)*100)+"%";}
-			boxes.forEach(b=>b.addEventListener("change",upd));
-		});
-		</script>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'WinShirt - Personnalisation Textile', 'winshirt' ); ?></h1>
+			
+			<div class="card">
+				<h2><?php esc_html_e( 'Démarrage rapide', 'winshirt' ); ?></h2>
+				<ol>
+					<li>
+						<strong><?php esc_html_e( 'Créer un mockup', 'winshirt' ); ?></strong> - 
+						<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=ws-mockup' ) ); ?>">
+							<?php esc_html_e( 'Ajouter un mockup', 'winshirt' ); ?>
+						</a>
+					</li>
+					<li>
+						<strong><?php esc_html_e( 'Configurer un produit', 'winshirt' ); ?></strong> - 
+						Aller dans Produits → Modifier → Cocher "Activer la personnalisation"
+					</li>
+					<li>
+						<strong><?php esc_html_e( 'Tester', 'winshirt' ); ?></strong> - 
+						Aller sur la page produit → Cliquer "Personnaliser"
+					</li>
+				</ol>
+			</div>
+
+			<div class="card">
+				<h2><?php esc_html_e( 'Statistiques', 'winshirt' ); ?></h2>
+				<?php self::render_stats(); ?>
+			</div>
+
+			<div class="card">
+				<h2><?php esc_html_e( 'Phase de récupération', 'winshirt' ); ?></h2>
+				<p>✅ <strong>Phase 0 terminée</strong> - Plugin stabilisé</p>
+				<p>🚀 Prêt pour Phase 1 - Nettoyage architecture</p>
+			</div>
+
+		</div>
 		<?php
-		echo '</div>';
+	}
+
+	/**
+	 * Page de statut
+	 */
+	public static function status_page() {
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Statut WinShirt', 'winshirt' ); ?></h1>
+
+			<table class="widefat">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Composant', 'winshirt' ); ?></th>
+						<th><?php esc_html_e( 'Statut', 'winshirt' ); ?></th>
+						<th><?php esc_html_e( 'Détails', 'winshirt' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php self::render_status_rows(); ?>
+				</tbody>
+			</table>
+
+			<h2><?php esc_html_e( 'Fichiers critiques', 'winshirt' ); ?></h2>
+			<?php self::check_critical_files(); ?>
+
+		</div>
+		<?php
+	}
+
+	/**
+	 * Render statistiques
+	 */
+	private static function render_stats() {
+		$mockups_count = wp_count_posts( 'ws-mockup' )->publish ?? 0;
+		$products_count = self::count_customizable_products();
+		
+		echo '<p>';
+		printf( 
+			esc_html__( 'Mockups créés : %d | Produits personnalisables : %d', 'winshirt' ),
+			$mockups_count,
+			$products_count
+		);
+		echo '</p>';
+	}
+
+	/**
+	 * Render lignes de statut
+	 */
+	private static function render_status_rows() {
+		$checks = [
+			'WooCommerce' => class_exists( 'WooCommerce' ),
+			'Core WinShirt' => class_exists( 'WinShirt_Core' ),
+			'Assets' => class_exists( 'WinShirt_Assets' ),
+			'Settings' => class_exists( 'WinShirt_Settings' ),
+			'CPT Mockups' => post_type_exists( 'ws-mockup' ),
+		];
+
+		foreach ( $checks as $component => $status ) {
+			$status_text = $status ? '✅ OK' : '❌ Manquant';
+			$status_class = $status ? 'notice-success' : 'notice-error';
+			
+			echo '<tr>';
+			echo '<td>' . esc_html( $component ) . '</td>';
+			echo '<td><span class="' . esc_attr( $status_class ) . '">' . $status_text . '</span></td>';
+			echo '<td>' . ( $status ? 'Chargé' : 'Non trouvé' ) . '</td>';
+			echo '</tr>';
+		}
+	}
+
+	/**
+	 * Vérifier fichiers critiques
+	 */
+	private static function check_critical_files() {
+		$critical_files = [
+			'assets/css/frontend.css',
+			'assets/js/customizer.js',
+			'templates/modal-customizer.php',
+			'includes/class-winshirt-core.php',
+			'includes/class-winshirt-assets.php'
+		];
+
+		echo '<ul>';
+		foreach ( $critical_files as $file ) {
+			$exists = file_exists( WINSHIRT_PATH . $file );
+			$status = $exists ? '✅' : '❌';
+			echo '<li>' . $status . ' <code>' . esc_html( $file ) . '</code></li>';
+		}
+		echo '</ul>';
+	}
+
+	/**
+	 * Compter produits personnalisables
+	 */
+	private static function count_customizable_products() {
+		global $wpdb;
+		
+		$count = $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM {$wpdb->postmeta} pm 
+			 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id 
+			 WHERE pm.meta_key = %s 
+			 AND pm.meta_value = %s 
+			 AND p.post_type = %s 
+			 AND p.post_status = %s",
+			'_winshirt_enable',
+			'yes',
+			'product',
+			'publish'
+		) );
+
+		return (int) $count;
+	}
+
+	/**
+	 * Notices admin
+	 */
+	public static function admin_notices() {
+		// Notice si aucun mockup
+		if ( ! self::has_mockups() ) {
+			?>
+			<div class="notice notice-warning">
+				<p>
+					<strong><?php esc_html_e( 'WinShirt', 'winshirt' ); ?></strong> - 
+					<?php esc_html_e( 'Aucun mockup créé.', 'winshirt' ); ?>
+					<a href="<?php echo esc_url( admin_url( 'post-new.php?post_type=ws-mockup' ) ); ?>">
+						<?php esc_html_e( 'Créer le premier mockup', 'winshirt' ); ?>
+					</a>
+				</p>
+			</div>
+			<?php
+		}
+	}
+
+	/**
+	 * Vérifier si des mockups existent
+	 */
+	private static function has_mockups() {
+		$mockups = get_posts( [
+			'post_type' => 'ws-mockup',
+			'numberposts' => 1,
+			'post_status' => 'publish'
+		] );
+		
+		return ! empty( $mockups );
 	}
 }
 
-// signal pour bootstrap
-do_action('winshirt_admin_booted', new WinShirt_Admin() );
+WinShirt_Admin::init();
+}
