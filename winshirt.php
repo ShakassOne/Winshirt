@@ -78,18 +78,26 @@ function winshirt_load_classes() {
     // 1. Core principal - Base du système
     winshirt_require_if_exists( 'includes/class-winshirt-core.php' );
     
-    // COMMENTÉ POUR TEST - DÉCOMMENTER UN PAR UN
+    // 2. Classes fonctionnelles validées
     winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
     winshirt_require_if_exists( 'includes/class-winshirt-admin-redirect.php' );
     winshirt_require_if_exists( 'includes/class-winshirt-admin-menu-fixed.php' );
     winshirt_require_if_exists( 'includes/class-winshirt-mockup-admin.php' );
-    winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
     winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
-    winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
-    winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
-    winshirt_require_if_exists( 'includes/class-winshirt-customizer.php' );
-    winshirt_require_if_exists( 'includes/class-winshirt-lottery.php' );
-    winshirt_require_if_exists( 'includes/class-winshirt-api.php' );
+    
+    // 3. NOUVEAU : Intégration WooCommerce pour les produits
+    winshirt_require_if_exists( 'includes/class-winshirt-product-integration.php' );
+    
+    // 4. Classes problématiques - COMMENTÉES pour stabilité
+    // À décommenter et corriger une par une après tests
+    // winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );     // Crash front-end
+    // winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );  // Crash front-end
+    // winshirt_require_if_exists( 'includes/class-winshirt-lottery.php' );   // Crash admin produits
+    
+    // 5. Classes à implémenter
+    // winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-customizer.php' );
+    // winshirt_require_if_exists( 'includes/class-winshirt-api.php' );
     
     // Debug (à supprimer en production)
     winshirt_require_if_exists( 'debug-winshirt.php' );
