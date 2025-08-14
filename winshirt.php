@@ -87,7 +87,7 @@ function winshirt_load_classes() {
     winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
     winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
-    // winshirt_require_if_exists( 'includes/class-winshirt-customizer.php' );
+    winshirt_require_if_exists( 'includes/class-winshirt-customizer.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-lottery.php' );
     // winshirt_require_if_exists( 'includes/class-winshirt-api.php' );
     
