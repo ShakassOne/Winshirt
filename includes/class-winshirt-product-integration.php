@@ -36,8 +36,8 @@ class WinShirt_Product_Integration {
         // Sauvegarde des données produit
         add_action('woocommerce_process_product_meta', array($this, 'save_product_meta'));
         
-        // Affichage front-end (optionnel pour plus tard)
-        // add_action('woocommerce_single_product_summary', array($this, 'display_customizer'), 25);
+        // Affichage front-end
+        add_action('woocommerce_single_product_summary', array($this, 'display_customizer_button'), 25);
     }
 
     /**
@@ -241,6 +241,119 @@ class WinShirt_Product_Integration {
     public static function get_product_mockup($product_id) {
         $mockup_id = get_post_meta($product_id, '_winshirt_mockup_id', true);
         return $mockup_id ? intval($mockup_id) : null;
+    }
+
+    /**
+     * Afficher le bouton de personnalisation sur la page produit
+     */
+    public function display_customizer_button() {
+        global $product;
+        
+        if (!$product) {
+            return;
+        }
+        
+        $product_id = $product->get_id();
+        
+        // Vérifier si le produit est personnalisable
+        if (!self::is_product_customizable($product_id)) {
+            return;
+        }
+        
+        $mockup_id = self::get_product_mockup($product_id);
+        if (!$mockup_id) {
+            return;
+        }
+        
+        // Récupérer les infos du mockup
+        $mockup = get_post($mockup_id);
+        if (!$mockup) {
+            return;
+        }
+        
+        ?>
+        <div class="winshirt-customizer-section" style="margin: 20px 0;">
+            <style>
+                .winshirt-customize-btn {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 15px 30px;
+                    border: none;
+                    border-radius: 8px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    text-decoration: none;
+                    display: inline-block;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                }
+                .winshirt-customize-btn:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+                    color: white;
+                    text-decoration: none;
+                }
+                .winshirt-mockup-info {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 8px;
+                    margin-top: 15px;
+                    border-left: 4px solid #667eea;
+                }
+                .winshirt-mockup-info h4 {
+                    margin: 0 0 10px 0;
+                    color: #333;
+                }
+                .winshirt-mockup-features {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                .winshirt-mockup-features li {
+                    padding: 5px 0;
+                    color: #666;
+                }
+                .winshirt-mockup-features li:before {
+                    content: "✓ ";
+                    color: #28a745;
+                    font-weight: bold;
+                    margin-right: 5px;
+                }
+            </style>
+            
+            <a href="#" class="winshirt-customize-btn" onclick="openWinShirtCustomizer(<?php echo $product_id; ?>, <?php echo $mockup_id; ?>); return false;">
+                🎨 Personnaliser ce produit
+            </a>
+            
+            <div class="winshirt-mockup-info">
+                <h4>Personnalisation disponible</h4>
+                <ul class="winshirt-mockup-features">
+                    <?php
+                    // Récupérer les infos du mockup
+                    $zones = get_post_meta($mockup_id, '_zones', true);
+                    $colors = get_post_meta($mockup_id, '_mockup_colors', true);
+                    $zones_count = is_array($zones) ? count($zones) : 0;
+                    $colors_count = is_array($colors) ? count($colors) : 0;
+                    ?>
+                    <li><?php echo $zones_count; ?> zone(s) de personnalisation</li>
+                    <li><?php echo $colors_count; ?> couleur(s) disponible(s)</li>
+                    <li>Aperçu temps réel</li>
+                    <li>Sauvegarde de vos créations</li>
+                </ul>
+            </div>
+            
+            <script>
+            function openWinShirtCustomizer(productId, mockupId) {
+                // Pour l'instant, afficher une alerte - à remplacer par l'ouverture du customizer
+                alert('Ouverture du customizer pour le produit ' + productId + ' avec le mockup ' + mockupId + '\n\nCustomizer en cours de développement...');
+                
+                // TODO: Ici on ouvrira le customizer dans une modale ou une nouvelle page
+                // window.open('/winshirt-customizer/?product=' + productId + '&mockup=' + mockupId, '_blank');
+            }
+            </script>
+        </div>
+        <?php
     }
 
     /**
