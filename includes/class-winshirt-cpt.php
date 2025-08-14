@@ -123,7 +123,12 @@ class WinShirt_CPT {
 	 */
 	public static function add_meta_boxes() {
 		
-		// Meta box Zones d'impression
+		// Supprimer les meta boxes de base si l'éditeur avancé est disponible
+		if ( class_exists( 'WinShirt_Mockup_Editor' ) ) {
+			return; // L'éditeur avancé gère ses propres meta boxes
+		}
+		
+		// Meta box Zones d'impression (version simple)
 		add_meta_box(
 			'ws-mockup-zones',
 			__( 'Zones d\'impression', 'winshirt' ),
@@ -133,7 +138,7 @@ class WinShirt_CPT {
 			'high'
 		);
 
-		// Meta box Images mockup
+		// Meta box Images mockup (version simple)
 		add_meta_box(
 			'ws-mockup-images',
 			__( 'Images mockup', 'winshirt' ),
