@@ -42,6 +42,9 @@ winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
 // 3. CPT et données ⭐ NOUVEAU
 winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
 
+// 3.5. Éditeur de mockup avancé ⭐ NOUVEAU
+winshirt_require_if_exists( 'includes/class-winshirt-mockup-editor.php' );
+
 // 4. Admin interface
 winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
 
