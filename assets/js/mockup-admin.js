@@ -1,551 +1,432 @@
 /**
- * WinShirt - Admin Mockup Editor JavaScript
+ * WinShirt Mockup Admin JavaScript
+ * Gestion de l'interface d'édition des mockups avec zones redimensionnables
  */
 
-jQuery(document).ready(function($) {
+(function($) {
     'use strict';
 
-    // Variables globales
-    let mockupData = {
-        colors: {},
-        zones: {},
-        defaultColor: '',
-        currentSide: 'front'
-    };
-    
-    let canvas, ctx, currentImage = null;
-    let nextColorId = 1;
-    let nextZoneId = 1;
-    let selectedZone = null;
-    let isDragging = false;
+    let currentSide = 'front';
+    let zones = {};
+    let draggedZone = null;
     let isResizing = false;
-    let dragOffset = { x: 0, y: 0 };
+    let resizeHandle = null;
+    let canvas = null;
+    let canvasRect = null;
+    let zoneCounter = 0;
 
-    // ==========================================================================
-    // Initialisation
-    // ==========================================================================
+    $(document).ready(function() {
+        initMockupEditor();
+    });
 
-    function init() {
-        setupCanvas();
-        setupEventListeners();
-        loadExistingData();
-        updateCanvas();
-    }
-
-    function setupCanvas() {
-        canvas = document.getElementById('zones-canvas');
+    function initMockupEditor() {
+        canvas = $('#zone-canvas')[0];
         if (!canvas) return;
-        
-        ctx = canvas.getContext('2d');
-        canvas.style.cursor = 'crosshair';
-    }
 
-    function setupEventListeners() {
-        // Couleurs
-        $(document).on('click', '#add-color', addColor);
-        $(document).on('click', '.remove-color', removeColor);
-        $(document).on('change', '.color-hex', updateColorPreview);
-        $(document).on('change', '.color-name', updateColorData);
-        $(document).on('change', 'input[name="default_color"]', updateDefaultColor);
-        $(document).on('click', '.upload-image', uploadImage);
-
-        // Zones
-        $(document).on('click', '#add-zone', addZone);
-        $(document).on('click', '.remove-zone', removeZone);
-        $(document).on('change', '.zone-name, .zone-price, .zone-side', updateZoneData);
-        $(document).on('click', '.side-btn', switchSide);
-
-        // Canvas
-        $(canvas).on('mousedown', onCanvasMouseDown);
-        $(canvas).on('mousemove', onCanvasMouseMove);
-        $(canvas).on('mouseup', onCanvasMouseUp);
-        $(canvas).on('dblclick', onCanvasDoubleClick);
-
-        // Sauvegarde
-        $('#winshirt-save-mockup').on('click', saveMockup);
-        
-        // Suppression mockup
-        $('.winshirt-delete-mockup').on('click', deleteMockup);
-    }
-
-    function loadExistingData() {
-        // Charger les données existantes du DOM
-        $('#colors-container .color-item').each(function() {
-            const colorId = $(this).data('color-id');
-            const colorData = {
-                name: $(this).find('.color-name').val(),
-                hex: $(this).find('.color-hex').val(),
-                front: $(this).find('.image-url[data-side="front"]').val(),
-                back: $(this).find('.image-url[data-side="back"]').val()
-            };
-            mockupData.colors[colorId] = colorData;
-            
-            if (colorId > nextColorId) nextColorId = colorId + 1;
-        });
-
-        $('#zones-container .zone-item').each(function() {
-            const zoneId = $(this).data('zone-id');
-            const zoneData = {
-                name: $(this).find('.zone-name').val(),
-                price: parseFloat($(this).find('.zone-price').val()) || 0,
-                side: $(this).find('.zone-side').val(),
-                x: 10, y: 10, width: 100, height: 100 // Valeurs par défaut
-            };
-            mockupData.zones[zoneId] = zoneData;
-            
-            if (zoneId > nextZoneId) nextZoneId = zoneId + 1;
-        });
-
-        mockupData.defaultColor = $('input[name="default_color"]:checked').val() || '';
+        loadExistingZones();
+        bindEvents();
         updateCanvas();
     }
 
-    // ==========================================================================
-    // Gestion des Couleurs
-    // ==========================================================================
-
-    function addColor() {
-        const colorId = nextColorId++;
-        const template = $('#color-template').html()
-            .replace(/{{COLOR_ID}}/g, colorId);
-
-        $('#colors-container').append(template);
-        
-        mockupData.colors[colorId] = {
-            name: '',
-            hex: '#000000',
-            front: '',
-            back: ''
-        };
-
-        // Si c'est la première couleur, la définir par défaut
-        if (Object.keys(mockupData.colors).length === 1) {
-            $(`input[name="default_color"][value="${colorId}"]`).prop('checked', true);
-            mockupData.defaultColor = colorId;
+    function bindEvents() {
+        // Switch recto/verso
+        $('.side-switch .btn').on('click', function() {
+            $('.side-switch .btn').removeClass('active');
+            $(this).addClass('active');
+            currentSide = $(this).data('side');
             updateCanvas();
-        }
+        });
+
+        // Double-clic pour créer une zone
+        $('#zone-canvas').on('dblclick', function(e) {
+            if (isResizing) return;
+            
+            const rect = this.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            
+            createZone(x, y);
+        });
+
+        // Gestion couleurs
+        $('#add-color').on('click', function() {
+            addNewColor();
+        });
+
+        $(document).on('click', '.remove-color', function() {
+            removeColor($(this).data('color-id'));
+        });
+
+        $(document).on('change', '.color-picker', function() {
+            updateColorHex($(this).data('color-id'), $(this).val());
+        });
+
+        // Sauvegarde automatique
+        setInterval(autoSave, 5000);
     }
 
-    function removeColor() {
-        const $colorItem = $(this).closest('.color-item');
-        const colorId = $colorItem.data('color-id');
+    function createZone(x, y, existingData = null) {
+        zoneCounter++;
+        const zoneId = existingData ? existingData.id : 'zone_' + zoneCounter + '_' + Date.now();
         
-        if (confirm('Supprimer cette couleur ?')) {
-            delete mockupData.colors[colorId];
-            $colorItem.remove();
+        const zoneData = existingData || {
+            id: zoneId,
+            name: 'Zone ' + zoneCounter,
+            side: currentSide,
+            x: Math.max(0, Math.min(80, x)),
+            y: Math.max(0, Math.min(80, y)),
+            width: 15,
+            height: 10,
+            price: 0
+        };
+
+        zones[zoneId] = zoneData;
+        
+        createZoneElement(zoneData);
+        addZoneToList(zoneData);
+        saveZones();
+    }
+
+    function createZoneElement(zoneData) {
+        if (zoneData.side !== currentSide) return;
+
+        const zoneEl = $(`
+            <div class="zone-element" data-zone-id="${zoneData.id}" 
+                 style="left: ${zoneData.x}%; top: ${zoneData.y}%; width: ${zoneData.width}%; height: ${zoneData.height}%;">
+                <div class="zone-label">${zoneData.name}</div>
+                <div class="zone-handle resize-handle-se"></div>
+                <div class="zone-handle resize-handle-ne"></div>
+                <div class="zone-handle resize-handle-sw"></div>
+                <div class="zone-handle resize-handle-nw"></div>
+                <div class="zone-handle resize-handle-n"></div>
+                <div class="zone-handle resize-handle-s"></div>
+                <div class="zone-handle resize-handle-e"></div>
+                <div class="zone-handle resize-handle-w"></div>
+            </div>
+        `);
+
+        $('#zone-canvas').append(zoneEl);
+        makeZoneDraggable(zoneEl);
+        makeZoneResizable(zoneEl);
+    }
+
+    function makeZoneDraggable(zoneEl) {
+        zoneEl.on('mousedown', function(e) {
+            if ($(e.target).hasClass('zone-handle') || isResizing) return;
             
-            // Si c'était la couleur par défaut, choisir une autre
-            if (mockupData.defaultColor == colorId) {
-                const firstColor = Object.keys(mockupData.colors)[0];
-                if (firstColor) {
-                    $(`input[name="default_color"][value="${firstColor}"]`).prop('checked', true);
-                    mockupData.defaultColor = firstColor;
-                } else {
-                    mockupData.defaultColor = '';
+            e.preventDefault();
+            draggedZone = $(this);
+            canvasRect = canvas.getBoundingClientRect();
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startLeft = parseFloat(draggedZone.css('left'));
+            const startTop = parseFloat(draggedZone.css('top'));
+
+            $(document).on('mousemove.drag', function(e) {
+                const deltaX = ((e.clientX - startX) / canvasRect.width) * 100;
+                const deltaY = ((e.clientY - startY) / canvasRect.height) * 100;
+                
+                const newLeft = Math.max(0, Math.min(100 - parseFloat(draggedZone.css('width')), startLeft + deltaX));
+                const newTop = Math.max(0, Math.min(100 - parseFloat(draggedZone.css('height')), startTop + deltaY));
+                
+                draggedZone.css({
+                    left: newLeft + '%',
+                    top: newTop + '%'
+                });
+                
+                updateZoneData(draggedZone.data('zone-id'), {
+                    x: newLeft,
+                    y: newTop
+                });
+            });
+
+            $(document).on('mouseup.drag', function() {
+                $(document).off('.drag');
+                draggedZone = null;
+                saveZones();
+            });
+        });
+    }
+
+    function makeZoneResizable(zoneEl) {
+        zoneEl.find('.zone-handle').on('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            isResizing = true;
+            resizeHandle = $(this);
+            const zoneId = zoneEl.data('zone-id');
+            canvasRect = canvas.getBoundingClientRect();
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startLeft = parseFloat(zoneEl.css('left'));
+            const startTop = parseFloat(zoneEl.css('top'));
+            const startWidth = parseFloat(zoneEl.css('width'));
+            const startHeight = parseFloat(zoneEl.css('height'));
+            
+            const handleClass = resizeHandle.attr('class');
+
+            $(document).on('mousemove.resize', function(e) {
+                const deltaX = ((e.clientX - startX) / canvasRect.width) * 100;
+                const deltaY = ((e.clientY - startY) / canvasRect.height) * 100;
+                
+                let newLeft = startLeft;
+                let newTop = startTop;
+                let newWidth = startWidth;
+                let newHeight = startHeight;
+
+                // Gestion des différentes poignées de redimensionnement
+                if (handleClass.includes('resize-handle-se')) {
+                    // Sud-Est : augmente largeur et hauteur
+                    newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
+                    newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
+                } else if (handleClass.includes('resize-handle-sw')) {
+                    // Sud-Ouest : diminue largeur à gauche, augmente hauteur
+                    newWidth = Math.max(5, startWidth - deltaX);
+                    newLeft = Math.max(0, startLeft + deltaX);
+                    newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
+                } else if (handleClass.includes('resize-handle-ne')) {
+                    // Nord-Est : augmente largeur, diminue hauteur en haut
+                    newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
+                    newHeight = Math.max(5, startHeight - deltaY);
+                    newTop = Math.max(0, startTop + deltaY);
+                } else if (handleClass.includes('resize-handle-nw')) {
+                    // Nord-Ouest : diminue largeur et hauteur en haut-gauche
+                    newWidth = Math.max(5, startWidth - deltaX);
+                    newLeft = Math.max(0, startLeft + deltaX);
+                    newHeight = Math.max(5, startHeight - deltaY);
+                    newTop = Math.max(0, startTop + deltaY);
+                } else if (handleClass.includes('resize-handle-n')) {
+                    // Nord : diminue hauteur en haut
+                    newHeight = Math.max(5, startHeight - deltaY);
+                    newTop = Math.max(0, startTop + deltaY);
+                } else if (handleClass.includes('resize-handle-s')) {
+                    // Sud : augmente hauteur
+                    newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
+                } else if (handleClass.includes('resize-handle-e')) {
+                    // Est : augmente largeur
+                    newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
+                } else if (handleClass.includes('resize-handle-w')) {
+                    // Ouest : diminue largeur à gauche
+                    newWidth = Math.max(5, startWidth - deltaX);
+                    newLeft = Math.max(0, startLeft + deltaX);
                 }
-                updateCanvas();
-            }
-        }
-    }
 
-    function updateColorPreview() {
-        const $item = $(this).closest('.color-item');
-        const hex = $(this).val();
-        
-        $item.find('.color-preview').css('background-color', hex);
-        updateColorData.call(this);
-    }
+                // Contraintes pour éviter de sortir du canvas
+                if (newLeft + newWidth > 100) {
+                    newWidth = 100 - newLeft;
+                }
+                if (newTop + newHeight > 100) {
+                    newHeight = 100 - newTop;
+                }
 
-    function updateColorData() {
-        const $item = $(this).closest('.color-item');
-        const colorId = $item.data('color-id');
-        
-        if (!mockupData.colors[colorId]) {
-            mockupData.colors[colorId] = {};
-        }
-        
-        mockupData.colors[colorId].name = $item.find('.color-name').val();
-        mockupData.colors[colorId].hex = $item.find('.color-hex').val();
-        mockupData.colors[colorId].front = $item.find('.image-url[data-side="front"]').val();
-        mockupData.colors[colorId].back = $item.find('.image-url[data-side="back"]').val();
-    }
+                zoneEl.css({
+                    left: newLeft + '%',
+                    top: newTop + '%',
+                    width: newWidth + '%',
+                    height: newHeight + '%'
+                });
+                
+                updateZoneData(zoneId, {
+                    x: newLeft,
+                    y: newTop,
+                    width: newWidth,
+                    height: newHeight
+                });
+            });
 
-    function updateDefaultColor() {
-        mockupData.defaultColor = $(this).val();
-        updateCanvas();
-    }
-
-    function uploadImage() {
-        const $button = $(this);
-        const $item = $button.closest('.color-item');
-        const side = $button.data('side');
-        
-        const mediaUploader = wp.media({
-            title: 'Choisir une image',
-            button: { text: 'Utiliser cette image' },
-            multiple: false,
-            library: { type: 'image' }
+            $(document).on('mouseup.resize', function() {
+                $(document).off('.resize');
+                isResizing = false;
+                resizeHandle = null;
+                saveZones();
+            });
         });
-
-        mediaUploader.on('select', function() {
-            const attachment = mediaUploader.state().get('selection').first().toJSON();
-            const imageUrl = attachment.url;
-            
-            // Mettre à jour l'aperçu
-            $item.find(`.image-preview`).html(`<img src="${imageUrl}" alt="${side}">`);
-            $item.find(`.image-url[data-side="${side}"]`).val(imageUrl);
-            
-            // Mettre à jour les données
-            updateColorData.call($item.find('.color-name')[0]);
-            
-            // Redessiner le canvas si c'est la couleur active
-            updateCanvas();
-        });
-
-        mediaUploader.open();
     }
 
-    // ==========================================================================
-    // Gestion des Zones
-    // ==========================================================================
-
-    function addZone() {
-        const zoneId = nextZoneId++;
-        const template = $('#zone-template').html()
-            .replace(/{{ZONE_ID}}/g, zoneId);
-
-        $('#zones-container').append(template);
-        
-        // Ajouter la zone aux données
-        mockupData.zones[zoneId] = {
-            name: `Zone ${zoneId}`,
-            price: 0,
-            side: mockupData.currentSide,
-            x: 20, // Pourcentage
-            y: 20, // Pourcentage
-            width: 25, // Pourcentage
-            height: 25 // Pourcentage
-        };
-
-        // Mettre à jour les champs
-        const $zoneItem = $(`.zone-item[data-zone-id="${zoneId}"]`);
-        $zoneItem.find('.zone-name').val(`Zone ${zoneId}`);
-        $zoneItem.find('.zone-price').val(0);
-        $zoneItem.find('.zone-side').val(mockupData.currentSide);
-
-        updateCanvas();
-    }
-
-    function removeZone() {
-        const $zoneItem = $(this).closest('.zone-item');
-        const zoneId = $zoneItem.data('zone-id');
-        
-        if (confirm('Supprimer cette zone ?')) {
-            delete mockupData.zones[zoneId];
-            $zoneItem.remove();
-            updateCanvas();
+    function updateZoneData(zoneId, newData) {
+        if (zones[zoneId]) {
+            Object.assign(zones[zoneId], newData);
+            updateZoneInList(zoneId);
         }
     }
 
-    function updateZoneData() {
-        const $item = $(this).closest('.zone-item');
-        const zoneId = $item.data('zone-id');
+    function addZoneToList(zoneData) {
+        const listItem = $(`
+            <div class="zone-item" data-zone-id="${zoneData.id}">
+                <div class="zone-info">
+                    <input type="text" class="zone-name" value="${zoneData.name}" />
+                    <span class="zone-side">${zoneData.side === 'front' ? 'Recto' : 'Verso'}</span>
+                </div>
+                <div class="zone-controls">
+                    <input type="number" class="zone-price" value="${zoneData.price}" step="0.01" min="0" placeholder="Prix" />
+                    <button class="remove-zone btn btn-sm btn-danger">×</button>
+                </div>
+            </div>
+        `);
+
+        $('#zones-list').append(listItem);
         
-        if (!mockupData.zones[zoneId]) return;
+        // Events pour la liste
+        listItem.find('.zone-name').on('change', function() {
+            updateZoneData(zoneData.id, { name: $(this).val() });
+            updateZoneLabel(zoneData.id, $(this).val());
+            saveZones();
+        });
         
-        mockupData.zones[zoneId].name = $item.find('.zone-name').val();
-        mockupData.zones[zoneId].price = parseFloat($item.find('.zone-price').val()) || 0;
-        mockupData.zones[zoneId].side = $item.find('.zone-side').val();
+        listItem.find('.zone-price').on('change', function() {
+            updateZoneData(zoneData.id, { price: parseFloat($(this).val()) || 0 });
+            saveZones();
+        });
         
-        updateCanvas();
+        listItem.find('.remove-zone').on('click', function() {
+            removeZone(zoneData.id);
+        });
     }
 
-    function switchSide() {
-        $('.side-btn').removeClass('active');
-        $(this).addClass('active');
-        
-        mockupData.currentSide = $(this).data('side');
-        updateCanvas();
+    function updateZoneInList(zoneId) {
+        const zoneData = zones[zoneId];
+        const listItem = $(`.zone-item[data-zone-id="${zoneId}"]`);
+        if (listItem.length && zoneData) {
+            listItem.find('.zone-side').text(zoneData.side === 'front' ? 'Recto' : 'Verso');
+        }
     }
 
-    // ==========================================================================
-    // Gestion du Canvas
-    // ==========================================================================
+    function updateZoneLabel(zoneId, newName) {
+        $(`.zone-element[data-zone-id="${zoneId}"] .zone-label`).text(newName);
+    }
+
+    function removeZone(zoneId) {
+        delete zones[zoneId];
+        $(`.zone-element[data-zone-id="${zoneId}"]`).remove();
+        $(`.zone-item[data-zone-id="${zoneId}"]`).remove();
+        saveZones();
+    }
 
     function updateCanvas() {
-        if (!canvas || !ctx) return;
+        $('.zone-element').remove();
         
-        // Effacer le canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Charger la bonne image de fond
+        loadBackgroundImage();
         
-        // Charger l'image de fond
-        const defaultColor = mockupData.defaultColor;
-        if (defaultColor && mockupData.colors[defaultColor]) {
-            const imageUrl = mockupData.colors[defaultColor][mockupData.currentSide];
-            if (imageUrl) {
-                loadBackgroundImage(imageUrl);
-            }
-        }
-        
-        // Dessiner les zones pour le côté actuel
-        drawZones();
-    }
-
-    function loadBackgroundImage(imageUrl) {
-        const img = new Image();
-        img.onload = function() {
-            // Calculer les dimensions pour conserver le ratio
-            const canvasRatio = canvas.width / canvas.height;
-            const imageRatio = img.width / img.height;
-            
-            let drawWidth, drawHeight, drawX, drawY;
-            
-            if (imageRatio > canvasRatio) {
-                // Image plus large que le canvas
-                drawWidth = canvas.width;
-                drawHeight = canvas.width / imageRatio;
-                drawX = 0;
-                drawY = (canvas.height - drawHeight) / 2;
-            } else {
-                // Image plus haute que le canvas
-                drawHeight = canvas.height;
-                drawWidth = canvas.height * imageRatio;
-                drawX = (canvas.width - drawWidth) / 2;
-                drawY = 0;
-            }
-            
-            ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-            drawZones(); // Redessiner les zones par-dessus
-            currentImage = { img, drawX, drawY, drawWidth, drawHeight };
-        };
-        img.src = imageUrl;
-    }
-
-    function drawZones() {
-        Object.entries(mockupData.zones).forEach(([zoneId, zone]) => {
-            if (zone.side !== mockupData.currentSide) return;
-            
-            // Convertir les pourcentages en pixels
-            const x = (zone.x / 100) * canvas.width;
-            const y = (zone.y / 100) * canvas.height;
-            const width = (zone.width / 100) * canvas.width;
-            const height = (zone.height / 100) * canvas.height;
-            
-            // Dessiner la zone
-            ctx.strokeStyle = selectedZone == zoneId ? '#dc3545' : '#0073aa';
-            ctx.fillStyle = selectedZone == zoneId ? 'rgba(220, 53, 69, 0.1)' : 'rgba(0, 115, 170, 0.1)';
-            ctx.lineWidth = 2;
-            
-            ctx.fillRect(x, y, width, height);
-            ctx.strokeRect(x, y, width, height);
-            
-            // Dessiner le nom de la zone
-            ctx.fillStyle = '#0073aa';
-            ctx.font = '12px Arial';
-            ctx.fillText(zone.name || `Zone ${zoneId}`, x, y - 5);
-            
-            // Dessiner les poignées de redimensionnement si sélectionnée
-            if (selectedZone == zoneId) {
-                drawResizeHandles(x, y, width, height);
+        // Afficher les zones du côté actuel
+        Object.values(zones).forEach(function(zoneData) {
+            if (zoneData.side === currentSide) {
+                createZoneElement(zoneData);
             }
         });
     }
 
-    function drawResizeHandles(x, y, width, height) {
-        const handleSize = 6;
-        ctx.fillStyle = '#0073aa';
-        
-        // Coins
-        ctx.fillRect(x - handleSize/2, y - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(x + width - handleSize/2, y - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(x - handleSize/2, y + height - handleSize/2, handleSize, handleSize);
-        ctx.fillRect(x + width - handleSize/2, y + height - handleSize/2, handleSize, handleSize);
-    }
+    function loadBackgroundImage() {
+        const defaultColor = $('input[name="_default_color"]:checked').val();
+        if (!defaultColor) return;
 
-    // ==========================================================================
-    // Événements Canvas
-    // ==========================================================================
+        const colorRow = $(`.color-row[data-color-id="${defaultColor}"]`);
+        const imageUrl = currentSide === 'front' 
+            ? colorRow.find('.front-image-url').val()
+            : colorRow.find('.back-image-url').val();
 
-    function onCanvasMouseDown(e) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        // Vérifier si on clique sur une zone existante
-        const clickedZone = getZoneAtPosition(x, y);
-        
-        if (clickedZone) {
-            selectedZone = clickedZone;
-            isDragging = true;
-            
-            const zone = mockupData.zones[clickedZone];
-            const zoneX = (zone.x / 100) * canvas.width;
-            const zoneY = (zone.y / 100) * canvas.height;
-            
-            dragOffset = {
-                x: x - zoneX,
-                y: y - zoneY
-            };
-        } else {
-            selectedZone = null;
-        }
-        
-        updateCanvas();
-    }
-
-    function onCanvasMouseMove(e) {
-        if (!isDragging || !selectedZone) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        // Calculer la nouvelle position en pourcentages
-        const newX = Math.max(0, Math.min(100, ((x - dragOffset.x) / canvas.width) * 100));
-        const newY = Math.max(0, Math.min(100, ((y - dragOffset.y) / canvas.height) * 100));
-        
-        // Mettre à jour la zone
-        mockupData.zones[selectedZone].x = newX;
-        mockupData.zones[selectedZone].y = newY;
-        
-        updateCanvas();
-    }
-
-    function onCanvasMouseUp(e) {
-        isDragging = false;
-        isResizing = false;
-    }
-
-    function onCanvasDoubleClick(e) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        
-        // Créer une nouvelle zone à la position du double-clic
-        if (!getZoneAtPosition(x, y)) {
-            const zoneId = nextZoneId++;
-            
-            mockupData.zones[zoneId] = {
-                name: `Zone ${zoneId}`,
-                price: 0,
-                side: mockupData.currentSide,
-                x: (x / canvas.width) * 100,
-                y: (y / canvas.height) * 100,
-                width: 20,
-                height: 20
-            };
-            
-            // Ajouter à l'interface
-            const template = $('#zone-template').html()
-                .replace(/{{ZONE_ID}}/g, zoneId);
-            $('#zones-container').append(template);
-            
-            const $zoneItem = $(`.zone-item[data-zone-id="${zoneId}"]`);
-            $zoneItem.find('.zone-name').val(`Zone ${zoneId}`);
-            $zoneItem.find('.zone-price').val(0);
-            $zoneItem.find('.zone-side').val(mockupData.currentSide);
-            
-            selectedZone = zoneId;
-            updateCanvas();
+        if (imageUrl) {
+            $('#zone-canvas').css({
+                'background-image': `url(${imageUrl})`,
+                'background-size': 'contain',
+                'background-repeat': 'no-repeat',
+                'background-position': 'center'
+            });
         }
     }
 
-    function getZoneAtPosition(x, y) {
-        for (const [zoneId, zone] of Object.entries(mockupData.zones)) {
-            if (zone.side !== mockupData.currentSide) continue;
-            
-            const zoneX = (zone.x / 100) * canvas.width;
-            const zoneY = (zone.y / 100) * canvas.height;
-            const zoneWidth = (zone.width / 100) * canvas.width;
-            const zoneHeight = (zone.height / 100) * canvas.height;
-            
-            if (x >= zoneX && x <= zoneX + zoneWidth &&
-                y >= zoneY && y <= zoneY + zoneHeight) {
-                return zoneId;
+    function loadExistingZones() {
+        const zonesData = $('#zones-data').val();
+        if (zonesData) {
+            try {
+                const parsedZones = JSON.parse(zonesData);
+                Object.values(parsedZones).forEach(function(zoneData) {
+                    zones[zoneData.id] = zoneData;
+                    addZoneToList(zoneData);
+                    zoneCounter = Math.max(zoneCounter, parseInt(zoneData.id.split('_')[1]) || 0);
+                });
+            } catch (e) {
+                console.error('Erreur lors du chargement des zones:', e);
             }
         }
-        return null;
     }
 
-    // ==========================================================================
-    // Sauvegarde
-    // ==========================================================================
-
-    function saveMockup() {
-        const $button = $('#winshirt-save-mockup');
-        const mockupId = $('#winshirt-mockup-form').data('mockup-id');
+    function saveZones() {
+        $('#zones-data').val(JSON.stringify(zones));
         
-        $button.prop('disabled', true).text('Sauvegarde...');
-        
+        // Sauvegarder via AJAX
         const data = {
-            action: 'winshirt_save_mockup',
-            nonce: winshirtAdmin.nonce,
-            mockup_id: mockupId,
-            title: $('#mockup-title').val(),
-            colors: mockupData.colors,
-            zones: mockupData.zones,
-            default_color: mockupData.defaultColor
+            action: 'save_mockup_zones',
+            post_id: $('#post_ID').val(),
+            zones: zones,
+            nonce: winshirtAjax.nonce
         };
-        
-        $.post(winshirtAdmin.ajax_url, data)
-            .done(function(response) {
-                if (response.success) {
-                    showNotice('success', winshirtAdmin.strings.save_success);
-                    
-                    // Mettre à jour l'URL si nouveau mockup
-                    if (!mockupId && response.data.mockup_id) {
-                        const newUrl = window.location.href + '&id=' + response.data.mockup_id;
-                        window.history.replaceState({}, '', newUrl);
-                        $('#winshirt-mockup-form').data('mockup-id', response.data.mockup_id);
-                    }
-                } else {
-                    showNotice('error', response.data || winshirtAdmin.strings.save_error);
-                }
-            })
-            .fail(function() {
-                showNotice('error', winshirtAdmin.strings.save_error);
-            })
-            .always(function() {
-                $button.prop('disabled', false).text('Sauvegarder');
-            });
+
+        $.post(winshirtAjax.ajaxurl, data, function(response) {
+            if (response.success) {
+                showNotification('Zones sauvegardées', 'success');
+            }
+        });
     }
 
-    function deleteMockup() {
-        const mockupId = $(this).data('id');
-        
-        if (!confirm(winshirtAdmin.strings.delete_confirm)) return;
-        
-        const data = {
-            action: 'winshirt_delete_mockup',
-            nonce: winshirtAdmin.nonce,
-            mockup_id: mockupId
-        };
-        
-        $.post(winshirtAdmin.ajax_url, data)
-            .done(function(response) {
-                if (response.success) {
-                    location.reload();
-                } else {
-                    showNotice('error', response.data || 'Erreur lors de la suppression');
-                }
-            });
+    function autoSave() {
+        if (Object.keys(zones).length > 0) {
+            saveZones();
+        }
     }
 
-    // ==========================================================================
-    // Utilitaires
-    // ==========================================================================
-
-    function showNotice(type, message) {
-        const $notice = $(`<div class="winshirt-notice ${type}">${message}</div>`);
-        $('#winshirt-save-status').append($notice);
+    function addNewColor() {
+        const colorCount = $('.color-row').length + 1;
+        const colorId = 'color_' + Date.now();
         
-        setTimeout(function() {
-            $notice.fadeOut(function() {
-                $(this).remove();
-            });
-        }, 3000);
+        const colorHtml = `
+            <div class="color-row" data-color-id="${colorId}">
+                <div class="color-basic">
+                    <input type="color" class="color-picker" data-color-id="${colorId}" value="#FFFFFF" />
+                    <input type="text" class="color-hex" value="#FFFFFF" readonly />
+                    <input type="radio" name="_default_color" value="${colorId}" />
+                    <span>Par défaut</span>
+                    <button type="button" class="remove-color btn btn-sm btn-danger" data-color-id="${colorId}">Supprimer</button>
+                </div>
+                <div class="color-images">
+                    <div class="image-upload">
+                        <label>Image Recto:</label>
+                        <button type="button" class="upload-image btn btn-secondary" data-target="front-${colorId}">Choisir Image</button>
+                        <input type="hidden" class="front-image-url" name="colors[${colorId}][front]" value="" />
+                    </div>
+                    <div class="image-upload">
+                        <label>Image Verso:</label>
+                        <button type="button" class="upload-image btn btn-secondary" data-target="back-${colorId}">Choisir Image</button>
+                        <input type="hidden" class="back-image-url" name="colors[${colorId}][back]" value="" />
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        $('#colors-container').append(colorHtml);
     }
 
-    // Initialiser l'application
-    init();
-});
+    function removeColor(colorId) {
+        $(`.color-row[data-color-id="${colorId}"]`).remove();
+    }
+
+    function updateColorHex(colorId, hexValue) {
+        $(`.color-row[data-color-id="${colorId}"] .color-hex`).val(hexValue);
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = $(`<div class="notice notice-${type} is-dismissible"><p>${message}</p></div>`);
+        $('.wrap h1').after(notification);
+        setTimeout(() => notification.fadeOut(), 3000);
+    }
+
+    // Export pour utilisation globale
+    window.WinShirtMockupEditor = {
+        updateCanvas: updateCanvas,
+        saveZones: saveZones
+    };
+
+})(jQuery);
