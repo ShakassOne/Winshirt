@@ -1,7 +1,7 @@
 <?php
 /**
  * WinShirt - Assets Management Unifié (SANS CONFLITS)
- * Version de récupération - 2025-01-14
+ * Version de récupération - 2025-09-14
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
