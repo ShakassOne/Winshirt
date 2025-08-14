@@ -39,13 +39,19 @@ winshirt_require_if_exists( 'includes/class-winshirt-core.php' );
 // 2. Assets et frontend
 winshirt_require_if_exists( 'includes/class-winshirt-assets.php' );
 
-// 3. ADMIN (CRITIQUE - c'était manquant !)
+// 3. CPT et données ⭐ NOUVEAU
+winshirt_require_if_exists( 'includes/class-winshirt-cpt.php' );
+
+// 4. Admin interface
 winshirt_require_if_exists( 'includes/class-winshirt-admin.php' );
 
-// 4. Settings et WooCommerce
+// 5. Roadmap et tracking ⭐ NOUVEAU
+winshirt_require_if_exists( 'includes/class-winshirt-roadmap.php' );
+
+// 6. Settings et WooCommerce
 winshirt_require_if_exists( 'includes/class-winshirt-settings.php' );
 
-// 5. Modules avancés
+// 7. Modules avancés
 winshirt_require_if_exists( 'includes/class-winshirt-order.php' );
 
 // ===== ACTIVATION / DÉSACTIVATION =====
@@ -58,6 +64,11 @@ function winshirt_activate() {
 	
 	// Créer option version
 	add_option( 'winshirt_version', WINSHIRT_VERSION );
+	
+	// Initialiser progression roadmap si elle n'existe pas
+	if ( ! get_option( 'winshirt_completed_tasks' ) ) {
+		add_option( 'winshirt_completed_tasks', [] );
+	}
 	
 	// Déclencher migration si nécessaire
 	do_action( 'winshirt_activated' );
@@ -87,9 +98,17 @@ function winshirt_init() {
 		WinShirt_Core::init();
 	}
 	
-	// Log de debug
+	// Log de debug avec statut des modules
 	if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-		error_log( 'WinShirt: Initialisé avec succès' );
+		$modules_status = [
+			'Core' => class_exists( 'WinShirt_Core' ) ? 'OK' : 'MANQUANT',
+			'Assets' => class_exists( 'WinShirt_Assets' ) ? 'OK' : 'MANQUANT',
+			'CPT' => class_exists( 'WinShirt_CPT' ) ? 'OK' : 'MANQUANT',
+			'Admin' => class_exists( 'WinShirt_Admin' ) ? 'OK' : 'MANQUANT',
+			'Roadmap' => class_exists( 'WinShirt_Roadmap' ) ? 'OK' : 'MANQUANT',
+			'Settings' => class_exists( 'WinShirt_Settings' ) ? 'OK' : 'MANQUANT',
+		];
+		error_log( 'WinShirt: Modules chargés - ' . json_encode( $modules_status ) );
 	}
 	
 	// Action pour extensions
@@ -123,6 +142,41 @@ if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 	add_action( 'admin_footer', function() {
 		if ( current_user_can( 'manage_options' ) ) {
 			echo '<!-- WinShirt Debug: Version ' . WINSHIRT_VERSION . ' -->';
+			echo '<!-- CPT Status: ws-mockup=' . ( post_type_exists( 'ws-mockup' ) ? 'OK' : 'NO' ) . ' -->';
 		}
 	});
 }
+
+// ===== HOOK DE RÉCUPÉRATION (temporaire) =====
+// Afficher les erreurs de chargement en admin
+add_action( 'admin_notices', function() {
+	if ( current_user_can( 'manage_options' ) && isset( $_GET['page'] ) && strpos( $_GET['page'], 'winshirt' ) === 0 ) {
+		$missing_files = [];
+		
+		$critical_files = [
+			'includes/class-winshirt-core.php',
+			'includes/class-winshirt-cpt.php',
+			'includes/class-winshirt-admin.php',
+			'includes/class-winshirt-roadmap.php'
+		];
+		
+		foreach ( $critical_files as $file ) {
+			if ( ! file_exists( WINSHIRT_PATH . $file ) ) {
+				$missing_files[] = $file;
+			}
+		}
+		
+		if ( ! empty( $missing_files ) ) {
+			?>
+			<div class="notice notice-error">
+				<p><strong>WinShirt:</strong> Fichiers manquants détectés :</p>
+				<ul>
+					<?php foreach ( $missing_files as $file ) : ?>
+						<li><code><?php echo esc_html( $file ); ?></code></li>
+					<?php endforeach; ?>
+				</ul>
+			</div>
+			<?php
+		}
+	}
+});
