@@ -36,11 +36,10 @@ class WinShirt_Product_Integration {
         // Sauvegarde des données produit
         add_action('woocommerce_process_product_meta', array($this, 'save_product_meta'));
         
-        // Affichage front-end
+        // Affichage front-end - FORCER L'AFFICHAGE
         add_action('woocommerce_single_product_summary', array($this, 'display_customizer_button'), 25);
-        
-        // Debug - forcer l'affichage
-        add_action('wp_footer', array($this, 'debug_display'));
+        add_action('woocommerce_after_single_product_summary', array($this, 'display_customizer_button'), 5);
+        add_action('wp_footer', array($this, 'force_display_button'));
     }
 
     /**
@@ -360,18 +359,61 @@ class WinShirt_Product_Integration {
     }
 
     /**
-     * Debug - Vérifier l'intégration
+     * FORCER l'affichage du bouton - SOLUTION RAPIDE
      */
-    public function debug_display() {
-        if (is_product() && defined('WP_DEBUG') && WP_DEBUG) {
-            global $product;
-            if ($product) {
-                $product_id = $product->get_id();
-                $is_customizable = self::is_product_customizable($product_id);
-                $mockup_id = self::get_product_mockup($product_id);
-                
-                echo '<script>console.log("WinShirt Debug - Product ID: ' . $product_id . ', Customizable: ' . ($is_customizable ? 'Oui' : 'Non') . ', Mockup ID: ' . ($mockup_id ?: 'Aucun') . '");</script>';
-            }
+    public function force_display_button() {
+        if (!is_product()) return;
+        
+        global $product;
+        if (!$product) return;
+        
+        $product_id = $product->get_id();
+        $is_customizable = get_post_meta($product_id, '_winshirt_customizable', true);
+        $mockup_id = get_post_meta($product_id, '_winshirt_mockup_id', true);
+        
+        if ($is_customizable === '1' && $mockup_id) {
+            ?>
+            <script>
+            jQuery(document).ready(function($) {
+                // Si le bouton n'existe pas déjà, l'ajouter
+                if ($('.winshirt-customize-btn').length === 0) {
+                    var button = `
+                        <div class="winshirt-customizer-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px solid #0073aa;">
+                            <h3 style="margin: 0 0 15px 0; color: #0073aa;">🎨 Personnalisation Disponible</h3>
+                            <button class="winshirt-customize-btn" style="
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                padding: 15px 30px;
+                                border: none;
+                                border-radius: 8px;
+                                font-size: 16px;
+                                font-weight: bold;
+                                cursor: pointer;
+                                width: 100%;
+                                margin-bottom: 10px;
+                            ">
+                                Personnaliser ce produit
+                            </button>
+                            <p style="margin: 0; color: #666; font-size: 14px;">
+                                ✓ Zones de personnalisation disponibles<br>
+                                ✓ Plusieurs couleurs au choix<br>
+                                ✓ Aperçu en temps réel
+                            </p>
+                        </div>
+                    `;
+                    
+                    // L'ajouter après le bouton d'ajout au panier
+                    $('.single_add_to_cart_button').closest('form').after(button);
+                    
+                    // Event du bouton
+                    $('.winshirt-customize-btn').on('click', function(e) {
+                        e.preventDefault();
+                        alert('Customizer en développement pour le produit <?php echo $product_id; ?> avec le mockup <?php echo $mockup_id; ?>');
+                    });
+                }
+            });
+            </script>
+            <?php
         }
     }
 
