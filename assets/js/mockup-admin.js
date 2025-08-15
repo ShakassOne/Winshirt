@@ -1,44 +1,50 @@
 /**
  * WinShirt Mockup Admin JavaScript
- * Gestion de l'interface d'édition des mockups avec zones redimensionnables
+ * Interface d'édition des mockups - Version corrigée
  */
 
-(function($) {
-    'use strict';
-
+jQuery(document).ready(function($) {
     let currentSide = 'front';
     let zones = {};
+    let isCreatingZone = false;
     let draggedZone = null;
     let isResizing = false;
-    let resizeHandle = null;
-    let canvas = null;
-    let canvasRect = null;
-    let zoneCounter = 0;
+    let startX, startY, startLeft, startTop, startWidth, startHeight;
 
-    $(document).ready(function() {
-        initMockupEditor();
-    });
+    // Initialisation
+    initializeMockupEditor();
 
-    function initMockupEditor() {
-        canvas = $('#zone-canvas')[0];
-        if (!canvas) return;
-
+    function initializeMockupEditor() {
+        console.log('Initialisation de l\'éditeur de mockup');
+        
+        // Charger les zones existantes
         loadExistingZones();
-        bindEvents();
+        
+        // Mettre à jour le canvas
         updateCanvas();
+        
+        // Bind des événements
+        bindEvents();
     }
 
     function bindEvents() {
         // Switch recto/verso
-        $('.side-switch .btn').on('click', function() {
+        $('.side-switch .btn').off('click').on('click', function(e) {
+            e.preventDefault();
             $('.side-switch .btn').removeClass('active');
             $(this).addClass('active');
             currentSide = $(this).data('side');
             updateCanvas();
         });
 
+        // Bouton ajouter une zone
+        $('#add-zone-btn').off('click').on('click', function(e) {
+            e.preventDefault();
+            addZoneAtCenter();
+        });
+
         // Double-clic pour créer une zone
-        $('#zone-canvas').on('dblclick', function(e) {
+        $('#zone-canvas').off('dblclick').on('dblclick', function(e) {
             if (isResizing) return;
             
             const rect = this.getBoundingClientRect();
@@ -48,30 +54,39 @@
             createZone(x, y);
         });
 
-        // Gestion couleurs
-        $('#add-color').on('click', function() {
+        // Gestion des couleurs
+        $('#add-color').off('click').on('click', function(e) {
+            e.preventDefault();
             addNewColor();
         });
 
-        $(document).on('click', '.remove-color', function() {
+        $(document).off('click', '.remove-color').on('click', '.remove-color', function(e) {
+            e.preventDefault();
             removeColor($(this).data('color-id'));
         });
 
-        $(document).on('change', '.color-picker', function() {
-            updateColorHex($(this).data('color-id'), $(this).val());
+        // Upload d'images
+        $(document).off('click', '.upload-image').on('click', '.upload-image', function(e) {
+            e.preventDefault();
+            openMediaUploader($(this));
         });
 
-        // Sauvegarde automatique
-        setInterval(autoSave, 5000);
+        // Changement de couleur par défaut
+        $(document).off('change', 'input[name="_default_color"]').on('change', 'input[name="_default_color"]', function() {
+            updateCanvas();
+        });
+    }
+
+    function addZoneAtCenter() {
+        createZone(40, 40); // Position par défaut au centre-ish
     }
 
     function createZone(x, y, existingData = null) {
-        zoneCounter++;
-        const zoneId = existingData ? existingData.id : 'zone_' + zoneCounter + '_' + Date.now();
+        const zoneId = existingData ? existingData.id : 'zone_' + Date.now();
         
         const zoneData = existingData || {
             id: zoneId,
-            name: 'Zone ' + zoneCounter,
+            name: 'Zone ' + (Object.keys(zones).length + 1),
             side: currentSide,
             x: Math.max(0, Math.min(80, x)),
             y: Math.max(0, Math.min(80, y)),
@@ -82,26 +97,29 @@
 
         zones[zoneId] = zoneData;
         
-        createZoneElement(zoneData);
+        if (zoneData.side === currentSide) {
+            createZoneElement(zoneData);
+        }
+        
         addZoneToList(zoneData);
         saveZones();
     }
 
     function createZoneElement(zoneData) {
-        if (zoneData.side !== currentSide) return;
-
         const zoneEl = $(`
             <div class="zone-element" data-zone-id="${zoneData.id}" 
                  style="left: ${zoneData.x}%; top: ${zoneData.y}%; width: ${zoneData.width}%; height: ${zoneData.height}%;">
                 <div class="zone-label">${zoneData.name}</div>
-                <div class="zone-handle resize-handle-se"></div>
-                <div class="zone-handle resize-handle-ne"></div>
-                <div class="zone-handle resize-handle-sw"></div>
-                <div class="zone-handle resize-handle-nw"></div>
-                <div class="zone-handle resize-handle-n"></div>
-                <div class="zone-handle resize-handle-s"></div>
-                <div class="zone-handle resize-handle-e"></div>
-                <div class="zone-handle resize-handle-w"></div>
+                
+                <!-- Poignées de redimensionnement -->
+                <div class="resize-handle nw-resize" data-direction="nw"></div>
+                <div class="resize-handle n-resize" data-direction="n"></div>
+                <div class="resize-handle ne-resize" data-direction="ne"></div>
+                <div class="resize-handle w-resize" data-direction="w"></div>
+                <div class="resize-handle e-resize" data-direction="e"></div>
+                <div class="resize-handle sw-resize" data-direction="sw"></div>
+                <div class="resize-handle s-resize" data-direction="s"></div>
+                <div class="resize-handle se-resize" data-direction="se"></div>
             </div>
         `);
 
@@ -111,17 +129,17 @@
     }
 
     function makeZoneDraggable(zoneEl) {
-        zoneEl.on('mousedown', function(e) {
-            if ($(e.target).hasClass('zone-handle') || isResizing) return;
+        zoneEl.off('mousedown').on('mousedown', function(e) {
+            if ($(e.target).hasClass('resize-handle') || isResizing) return;
             
             e.preventDefault();
             draggedZone = $(this);
-            canvasRect = canvas.getBoundingClientRect();
             
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const startLeft = parseFloat(draggedZone.css('left'));
-            const startTop = parseFloat(draggedZone.css('top'));
+            const canvasRect = $('#zone-canvas')[0].getBoundingClientRect();
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseFloat(draggedZone.css('left'));
+            startTop = parseFloat(draggedZone.css('top'));
 
             $(document).on('mousemove.drag', function(e) {
                 const deltaX = ((e.clientX - startX) / canvasRect.width) * 100;
@@ -150,23 +168,21 @@
     }
 
     function makeZoneResizable(zoneEl) {
-        zoneEl.find('.zone-handle').on('mousedown', function(e) {
+        zoneEl.find('.resize-handle').off('mousedown').on('mousedown', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
             isResizing = true;
-            resizeHandle = $(this);
+            const direction = $(this).data('direction');
             const zoneId = zoneEl.data('zone-id');
-            canvasRect = canvas.getBoundingClientRect();
+            const canvasRect = $('#zone-canvas')[0].getBoundingClientRect();
             
-            const startX = e.clientX;
-            const startY = e.clientY;
-            const startLeft = parseFloat(zoneEl.css('left'));
-            const startTop = parseFloat(zoneEl.css('top'));
-            const startWidth = parseFloat(zoneEl.css('width'));
-            const startHeight = parseFloat(zoneEl.css('height'));
-            
-            const handleClass = resizeHandle.attr('class');
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseFloat(zoneEl.css('left'));
+            startTop = parseFloat(zoneEl.css('top'));
+            startWidth = parseFloat(zoneEl.css('width'));
+            startHeight = parseFloat(zoneEl.css('height'));
 
             $(document).on('mousemove.resize', function(e) {
                 const deltaX = ((e.clientX - startX) / canvasRect.width) * 100;
@@ -177,44 +193,44 @@
                 let newWidth = startWidth;
                 let newHeight = startHeight;
 
-                // Gestion des différentes poignées de redimensionnement
-                if (handleClass.includes('resize-handle-se')) {
-                    // Sud-Est : augmente largeur et hauteur
-                    newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
-                    newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
-                } else if (handleClass.includes('resize-handle-sw')) {
-                    // Sud-Ouest : diminue largeur à gauche, augmente hauteur
-                    newWidth = Math.max(5, startWidth - deltaX);
-                    newLeft = Math.max(0, startLeft + deltaX);
-                    newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
-                } else if (handleClass.includes('resize-handle-ne')) {
-                    // Nord-Est : augmente largeur, diminue hauteur en haut
-                    newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
-                    newHeight = Math.max(5, startHeight - deltaY);
-                    newTop = Math.max(0, startTop + deltaY);
-                } else if (handleClass.includes('resize-handle-nw')) {
-                    // Nord-Ouest : diminue largeur et hauteur en haut-gauche
-                    newWidth = Math.max(5, startWidth - deltaX);
-                    newLeft = Math.max(0, startLeft + deltaX);
-                    newHeight = Math.max(5, startHeight - deltaY);
-                    newTop = Math.max(0, startTop + deltaY);
-                } else if (handleClass.includes('resize-handle-n')) {
-                    // Nord : diminue hauteur en haut
-                    newHeight = Math.max(5, startHeight - deltaY);
-                    newTop = Math.max(0, startTop + deltaY);
-                } else if (handleClass.includes('resize-handle-s')) {
-                    // Sud : augmente hauteur
-                    newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
-                } else if (handleClass.includes('resize-handle-e')) {
-                    // Est : augmente largeur
-                    newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
-                } else if (handleClass.includes('resize-handle-w')) {
-                    // Ouest : diminue largeur à gauche
-                    newWidth = Math.max(5, startWidth - deltaX);
-                    newLeft = Math.max(0, startLeft + deltaX);
+                switch(direction) {
+                    case 'se':
+                        newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
+                        newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
+                        break;
+                    case 'sw':
+                        newWidth = Math.max(5, startWidth - deltaX);
+                        newLeft = Math.max(0, startLeft + deltaX);
+                        newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
+                        break;
+                    case 'ne':
+                        newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
+                        newHeight = Math.max(5, startHeight - deltaY);
+                        newTop = Math.max(0, startTop + deltaY);
+                        break;
+                    case 'nw':
+                        newWidth = Math.max(5, startWidth - deltaX);
+                        newLeft = Math.max(0, startLeft + deltaX);
+                        newHeight = Math.max(5, startHeight - deltaY);
+                        newTop = Math.max(0, startTop + deltaY);
+                        break;
+                    case 'n':
+                        newHeight = Math.max(5, startHeight - deltaY);
+                        newTop = Math.max(0, startTop + deltaY);
+                        break;
+                    case 's':
+                        newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
+                        break;
+                    case 'e':
+                        newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
+                        break;
+                    case 'w':
+                        newWidth = Math.max(5, startWidth - deltaX);
+                        newLeft = Math.max(0, startLeft + deltaX);
+                        break;
                 }
 
-                // Contraintes pour éviter de sortir du canvas
+                // Contraintes
                 if (newLeft + newWidth > 100) {
                     newWidth = 100 - newLeft;
                 }
@@ -240,7 +256,6 @@
             $(document).on('mouseup.resize', function() {
                 $(document).off('.resize');
                 isResizing = false;
-                resizeHandle = null;
                 saveZones();
             });
         });
@@ -249,21 +264,19 @@
     function updateZoneData(zoneId, newData) {
         if (zones[zoneId]) {
             Object.assign(zones[zoneId], newData);
-            updateZoneInList(zoneId);
         }
     }
 
     function addZoneToList(zoneData) {
         const listItem = $(`
             <div class="zone-item" data-zone-id="${zoneData.id}">
-                <div class="zone-info">
-                    <input type="text" class="zone-name" value="${zoneData.name}" />
-                    <span class="zone-side">${zoneData.side === 'front' ? 'Recto' : 'Verso'}</span>
-                </div>
-                <div class="zone-controls">
-                    <input type="number" class="zone-price" value="${zoneData.price}" step="0.01" min="0" placeholder="Prix" />
-                    <button class="remove-zone btn btn-sm btn-danger">×</button>
-                </div>
+                <input type="text" class="zone-name" value="${zoneData.name}" placeholder="Nom de la zone" />
+                <select class="zone-side">
+                    <option value="front" ${zoneData.side === 'front' ? 'selected' : ''}>Recto</option>
+                    <option value="back" ${zoneData.side === 'back' ? 'selected' : ''}>Verso</option>
+                </select>
+                <input type="number" class="zone-price" value="${zoneData.price}" step="0.01" min="0" placeholder="Prix €" />
+                <button type="button" class="remove-zone">Supprimer</button>
             </div>
         `);
 
@@ -276,6 +289,12 @@
             saveZones();
         });
         
+        listItem.find('.zone-side').on('change', function() {
+            updateZoneData(zoneData.id, { side: $(this).val() });
+            updateCanvas();
+            saveZones();
+        });
+        
         listItem.find('.zone-price').on('change', function() {
             updateZoneData(zoneData.id, { price: parseFloat($(this).val()) || 0 });
             saveZones();
@@ -284,14 +303,6 @@
         listItem.find('.remove-zone').on('click', function() {
             removeZone(zoneData.id);
         });
-    }
-
-    function updateZoneInList(zoneId) {
-        const zoneData = zones[zoneId];
-        const listItem = $(`.zone-item[data-zone-id="${zoneId}"]`);
-        if (listItem.length && zoneData) {
-            listItem.find('.zone-side').text(zoneData.side === 'front' ? 'Recto' : 'Verso');
-        }
     }
 
     function updateZoneLabel(zoneId, newName) {
@@ -325,8 +336,8 @@
 
         const colorRow = $(`.color-row[data-color-id="${defaultColor}"]`);
         const imageUrl = currentSide === 'front' 
-            ? colorRow.find('.front-image-url').val()
-            : colorRow.find('.back-image-url').val();
+            ? colorRow.find('input[name*="[front]"]').val()
+            : colorRow.find('input[name*="[back]"]').val();
 
         if (imageUrl) {
             $('#zone-canvas').css({
@@ -339,14 +350,14 @@
     }
 
     function loadExistingZones() {
-        const zonesData = $('#zones-data').val();
-        if (zonesData) {
+        const zonesInput = $('input[name="_zones"]');
+        if (zonesInput.length && zonesInput.val()) {
             try {
-                const parsedZones = JSON.parse(zonesData);
-                Object.values(parsedZones).forEach(function(zoneData) {
-                    zones[zoneData.id] = zoneData;
+                const existingZones = JSON.parse(zonesInput.val());
+                zones = existingZones;
+                
+                Object.values(zones).forEach(function(zoneData) {
                     addZoneToList(zoneData);
-                    zoneCounter = Math.max(zoneCounter, parseInt(zoneData.id.split('_')[1]) || 0);
                 });
             } catch (e) {
                 console.error('Erreur lors du chargement des zones:', e);
@@ -355,78 +366,111 @@
     }
 
     function saveZones() {
-        $('#zones-data').val(JSON.stringify(zones));
+        $('input[name="_zones"]').val(JSON.stringify(zones));
         
-        // Sauvegarder via AJAX
-        const data = {
-            action: 'save_mockup_zones',
-            post_id: $('#post_ID').val(),
-            zones: zones,
-            nonce: winshirtAjax.nonce
-        };
+        // Sauvegarder via AJAX si disponible
+        if (typeof winshirtAjax !== 'undefined') {
+            const data = {
+                action: 'save_mockup_zones',
+                post_id: $('#post_ID').val(),
+                zones: zones,
+                nonce: winshirtAjax.nonce
+            };
 
-        $.post(winshirtAjax.ajaxurl, data, function(response) {
-            if (response.success) {
-                showNotification('Zones sauvegardées', 'success');
-            }
-        });
-    }
-
-    function autoSave() {
-        if (Object.keys(zones).length > 0) {
-            saveZones();
+            $.post(winshirtAjax.ajaxurl, data, function(response) {
+                if (response.success) {
+                    console.log('Zones sauvegardées');
+                }
+            });
         }
     }
 
     function addNewColor() {
-        const colorCount = $('.color-row').length + 1;
+        const colorCount = $('.color-row').length;
         const colorId = 'color_' + Date.now();
         
         const colorHtml = `
             <div class="color-row" data-color-id="${colorId}">
-                <div class="color-basic">
-                    <input type="color" class="color-picker" data-color-id="${colorId}" value="#FFFFFF" />
-                    <input type="text" class="color-hex" value="#FFFFFF" readonly />
-                    <input type="radio" name="_default_color" value="${colorId}" />
-                    <span>Par défaut</span>
-                    <button type="button" class="remove-color btn btn-sm btn-danger" data-color-id="${colorId}">Supprimer</button>
+                <div class="color-controls">
+                    <label>Couleur:</label>
+                    <input type="color" class="color-picker" value="#FFFFFF" />
+                    <input type="text" class="color-name" placeholder="Nom couleur" value="Couleur ${colorCount + 1}" />
+                    <label>
+                        <input type="radio" name="_default_color" value="${colorId}" ${colorCount === 0 ? 'checked' : ''} />
+                        Par défaut
+                    </label>
+                    <button type="button" class="remove-color" data-color-id="${colorId}">Supprimer</button>
                 </div>
                 <div class="color-images">
-                    <div class="image-upload">
+                    <div class="image-section">
                         <label>Image Recto:</label>
-                        <button type="button" class="upload-image btn btn-secondary" data-target="front-${colorId}">Choisir Image</button>
-                        <input type="hidden" class="front-image-url" name="colors[${colorId}][front]" value="" />
+                        <button type="button" class="upload-image" data-side="front" data-color="${colorId}">Choisir Image Recto</button>
+                        <input type="hidden" name="colors[${colorId}][front]" />
+                        <div class="image-preview"></div>
                     </div>
-                    <div class="image-upload">
+                    <div class="image-section">
                         <label>Image Verso:</label>
-                        <button type="button" class="upload-image btn btn-secondary" data-target="back-${colorId}">Choisir Image</button>
-                        <input type="hidden" class="back-image-url" name="colors[${colorId}][back]" value="" />
+                        <button type="button" class="upload-image" data-side="back" data-color="${colorId}">Choisir Image Verso</button>
+                        <input type="hidden" name="colors[${colorId}][back]" />
+                        <div class="image-preview"></div>
                     </div>
                 </div>
             </div>
         `;
         
         $('#colors-container').append(colorHtml);
+        
+        // Si c'est la première couleur, la marquer comme par défaut
+        if (colorCount === 0) {
+            updateCanvas();
+        }
     }
 
     function removeColor(colorId) {
         $(`.color-row[data-color-id="${colorId}"]`).remove();
+        
+        // Si on supprime la couleur par défaut, marquer la première restante
+        if (!$('input[name="_default_color"]:checked').length) {
+            $('input[name="_default_color"]').first().prop('checked', true);
+            updateCanvas();
+        }
     }
 
-    function updateColorHex(colorId, hexValue) {
-        $(`.color-row[data-color-id="${colorId}"] .color-hex`).val(hexValue);
+    function openMediaUploader(button) {
+        const colorId = button.data('color');
+        const side = button.data('side');
+        
+        // WordPress Media Uploader
+        const mediaUploader = wp.media({
+            title: 'Choisir une image',
+            button: {
+                text: 'Utiliser cette image'
+            },
+            multiple: false
+        });
+
+        mediaUploader.on('select', function() {
+            const attachment = mediaUploader.state().get('selection').first().toJSON();
+            const input = button.siblings(`input[name="colors[${colorId}][${side}]"]`);
+            const preview = button.siblings('.image-preview');
+            
+            input.val(attachment.url);
+            preview.html(`<img src="${attachment.url}" style="max-width: 100px; height: auto;" />`);
+            
+            // Mettre à jour le canvas si c'est la couleur par défaut
+            const isDefault = $(`.color-row[data-color-id="${colorId}"] input[name="_default_color"]`).is(':checked');
+            if (isDefault) {
+                updateCanvas();
+            }
+        });
+
+        mediaUploader.open();
     }
 
-    function showNotification(message, type = 'info') {
-        const notification = $(`<div class="notice notice-${type} is-dismissible"><p>${message}</p></div>`);
-        $('.wrap h1').after(notification);
-        setTimeout(() => notification.fadeOut(), 3000);
-    }
-
-    // Export pour utilisation globale
-    window.WinShirtMockupEditor = {
+    // Rendre les fonctions disponibles globalement pour debug
+    window.WinShirtDebug = {
+        zones: zones,
         updateCanvas: updateCanvas,
         saveZones: saveZones
     };
-
-})(jQuery);
+});
