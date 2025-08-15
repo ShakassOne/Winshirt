@@ -38,6 +38,9 @@ class WinShirt_Product_Integration {
         
         // Affichage front-end
         add_action('woocommerce_single_product_summary', array($this, 'display_customizer_button'), 25);
+        
+        // Debug - forcer l'affichage
+        add_action('wp_footer', array($this, 'debug_display'));
     }
 
     /**
@@ -354,6 +357,22 @@ class WinShirt_Product_Integration {
             </script>
         </div>
         <?php
+    }
+
+    /**
+     * Debug - Vérifier l'intégration
+     */
+    public function debug_display() {
+        if (is_product() && defined('WP_DEBUG') && WP_DEBUG) {
+            global $product;
+            if ($product) {
+                $product_id = $product->get_id();
+                $is_customizable = self::is_product_customizable($product_id);
+                $mockup_id = self::get_product_mockup($product_id);
+                
+                echo '<script>console.log("WinShirt Debug - Product ID: ' . $product_id . ', Customizable: ' . ($is_customizable ? 'Oui' : 'Non') . ', Mockup ID: ' . ($mockup_id ?: 'Aucun') . '");</script>';
+            }
+        }
     }
 
     /**
