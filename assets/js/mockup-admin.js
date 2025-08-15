@@ -1,475 +1,383 @@
 /**
- * WinShirt Mockup Admin JavaScript
- * Interface d'édition des mockups - Version corrigée
+ * WinShirt Mockup Admin - Version Simple et Fonctionnelle
  */
 
 jQuery(document).ready(function($) {
+    console.log('WinShirt Mockup Admin chargé');
+    
     let currentSide = 'front';
     let zones = {};
-    let isCreatingZone = false;
-    let draggedZone = null;
-    let isResizing = false;
-    let startX, startY, startLeft, startTop, startWidth, startHeight;
-
+    
     // Initialisation
-    initializeMockupEditor();
-
-    function initializeMockupEditor() {
-        console.log('Initialisation de l\'éditeur de mockup');
-        
-        // Charger les zones existantes
+    init();
+    
+    function init() {
         loadExistingZones();
-        
-        // Mettre à jour le canvas
-        updateCanvas();
-        
-        // Bind des événements
         bindEvents();
+        updateCanvas();
+        console.log('Initialisation terminée');
     }
-
+    
     function bindEvents() {
         // Switch recto/verso
-        $('.side-switch .btn').off('click').on('click', function(e) {
+        $(document).on('click', '.side-switch .btn', function(e) {
             e.preventDefault();
             $('.side-switch .btn').removeClass('active');
             $(this).addClass('active');
             currentSide = $(this).data('side');
             updateCanvas();
+            console.log('Switch vers:', currentSide);
         });
-
-        // Bouton ajouter une zone
-        $('#add-zone-btn').off('click').on('click', function(e) {
+        
+        // Ajouter une zone
+        $(document).on('click', '#add-zone-btn', function(e) {
             e.preventDefault();
-            addZoneAtCenter();
+            addZone();
         });
-
-        // Double-clic pour créer une zone
-        $('#zone-canvas').off('dblclick').on('dblclick', function(e) {
-            if (isResizing) return;
-            
+        
+        // Double-clic sur canvas pour ajouter zone
+        $(document).on('dblclick', '#zone-canvas', function(e) {
             const rect = this.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * 100;
             const y = ((e.clientY - rect.top) / rect.height) * 100;
-            
-            createZone(x, y);
+            addZone(x, y);
         });
-
-        // Gestion des couleurs
-        $('#add-color').off('click').on('click', function(e) {
+        
+        // Ajouter couleur
+        $(document).on('click', '#add-color', function(e) {
             e.preventDefault();
-            addNewColor();
+            addColor();
         });
-
-        $(document).off('click', '.remove-color').on('click', '.remove-color', function(e) {
+        
+        // Supprimer couleur
+        $(document).on('click', '.remove-color', function(e) {
             e.preventDefault();
-            removeColor($(this).data('color-id'));
+            $(this).closest('.color-row').remove();
         });
-
-        // Upload d'images
-        $(document).off('click', '.upload-image').on('click', '.upload-image', function(e) {
+        
+        // Upload image
+        $(document).on('click', '.upload-image', function(e) {
             e.preventDefault();
             openMediaUploader($(this));
         });
-
-        // Changement de couleur par défaut
-        $(document).off('change', 'input[name="_default_color"]').on('change', 'input[name="_default_color"]', function() {
+        
+        // Changement couleur par défaut
+        $(document).on('change', 'input[name="_default_color"]', function() {
             updateCanvas();
         });
-    }
-
-    function addZoneAtCenter() {
-        createZone(40, 40); // Position par défaut au centre-ish
-    }
-
-    function createZone(x, y, existingData = null) {
-        const zoneId = existingData ? existingData.id : 'zone_' + Date.now();
         
-        const zoneData = existingData || {
+        // Supprimer zone
+        $(document).on('click', '.remove-zone', function(e) {
+            e.preventDefault();
+            const zoneId = $(this).closest('.zone-item').data('zone-id');
+            removeZone(zoneId);
+        });
+        
+        // Sauvegarder
+        $(document).on('click', '#publish, #save-post', function() {
+            saveZones();
+        });
+        
+        // Auto-save
+        setInterval(saveZones, 10000);
+    }
+    
+    function addZone(x = 30, y = 30) {
+        const zoneId = 'zone_' + Date.now();
+        const zoneName = 'Zone ' + (Object.keys(zones).length + 1);
+        
+        zones[zoneId] = {
             id: zoneId,
-            name: 'Zone ' + (Object.keys(zones).length + 1),
+            name: zoneName,
             side: currentSide,
-            x: Math.max(0, Math.min(80, x)),
-            y: Math.max(0, Math.min(80, y)),
-            width: 15,
-            height: 10,
+            x: x,
+            y: y,
+            width: 25,
+            height: 20,
             price: 0
         };
-
-        zones[zoneId] = zoneData;
         
-        if (zoneData.side === currentSide) {
-            createZoneElement(zoneData);
-        }
-        
-        addZoneToList(zoneData);
+        addZoneToList(zones[zoneId]);
+        updateCanvas();
         saveZones();
+        
+        console.log('Zone ajoutée:', zoneId);
     }
-
-    function createZoneElement(zoneData) {
-        const zoneEl = $(`
-            <div class="zone-element" data-zone-id="${zoneData.id}" 
-                 style="left: ${zoneData.x}%; top: ${zoneData.y}%; width: ${zoneData.width}%; height: ${zoneData.height}%;">
-                <div class="zone-label">${zoneData.name}</div>
-                
-                <!-- Poignées de redimensionnement -->
-                <div class="resize-handle nw-resize" data-direction="nw"></div>
-                <div class="resize-handle n-resize" data-direction="n"></div>
-                <div class="resize-handle ne-resize" data-direction="ne"></div>
-                <div class="resize-handle w-resize" data-direction="w"></div>
-                <div class="resize-handle e-resize" data-direction="e"></div>
-                <div class="resize-handle sw-resize" data-direction="sw"></div>
-                <div class="resize-handle s-resize" data-direction="s"></div>
-                <div class="resize-handle se-resize" data-direction="se"></div>
+    
+    function addZoneToList(zone) {
+        const html = `
+            <div class="zone-item" data-zone-id="${zone.id}">
+                <div style="margin-bottom: 5px;">
+                    <input type="text" value="${zone.name}" class="zone-name" style="width: 100%;" />
+                </div>
+                <div style="margin-bottom: 5px;">
+                    <select class="zone-side" style="width: 100%;">
+                        <option value="front" ${zone.side === 'front' ? 'selected' : ''}>Recto</option>
+                        <option value="back" ${zone.side === 'back' ? 'selected' : ''}>Verso</option>
+                    </select>
+                </div>
+                <div style="margin-bottom: 5px;">
+                    <input type="number" value="${zone.price}" class="zone-price" placeholder="Prix €" step="0.01" style="width: 100%;" />
+                </div>
+                <button type="button" class="remove-zone" style="width: 100%; background: #dc3545; color: white; border: none; padding: 5px; border-radius: 3px;">
+                    Supprimer
+                </button>
             </div>
-        `);
-
-        $('#zone-canvas').append(zoneEl);
-        makeZoneDraggable(zoneEl);
-        makeZoneResizable(zoneEl);
+        `;
+        
+        $('#zones-list').append(html);
+        
+        // Événements pour cette zone
+        const item = $(`.zone-item[data-zone-id="${zone.id}"]`);
+        
+        item.find('.zone-name').on('change', function() {
+            zones[zone.id].name = $(this).val();
+            updateCanvas();
+            saveZones();
+        });
+        
+        item.find('.zone-side').on('change', function() {
+            zones[zone.id].side = $(this).val();
+            updateCanvas();
+            saveZones();
+        });
+        
+        item.find('.zone-price').on('change', function() {
+            zones[zone.id].price = parseFloat($(this).val()) || 0;
+            saveZones();
+        });
     }
-
-    function makeZoneDraggable(zoneEl) {
-        zoneEl.off('mousedown').on('mousedown', function(e) {
-            if ($(e.target).hasClass('resize-handle') || isResizing) return;
+    
+    function removeZone(zoneId) {
+        delete zones[zoneId];
+        $(`.zone-item[data-zone-id="${zoneId}"]`).remove();
+        $(`.zone-element[data-zone-id="${zoneId}"]`).remove();
+        saveZones();
+        console.log('Zone supprimée:', zoneId);
+    }
+    
+    function updateCanvas() {
+        const canvas = $('#zone-canvas');
+        
+        // Vider le canvas
+        canvas.find('.zone-element').remove();
+        
+        // Charger l'image de fond
+        loadBackgroundImage();
+        
+        // Afficher les zones du côté actuel
+        Object.values(zones).forEach(zone => {
+            if (zone.side === currentSide) {
+                createZoneElement(zone);
+            }
+        });
+        
+        console.log('Canvas mis à jour pour:', currentSide);
+    }
+    
+    function createZoneElement(zone) {
+        const html = `
+            <div class="zone-element" data-zone-id="${zone.id}" 
+                 style="position: absolute; left: ${zone.x}%; top: ${zone.y}%; width: ${zone.width}%; height: ${zone.height}%; 
+                        border: 2px solid #0073aa; background: rgba(0,115,170,0.1); cursor: move;">
+                <div style="position: absolute; top: -20px; left: 0; background: #0073aa; color: white; padding: 2px 5px; 
+                           font-size: 10px; border-radius: 2px; white-space: nowrap;">
+                    ${zone.name}
+                </div>
+            </div>
+        `;
+        
+        $('#zone-canvas').append(html);
+        
+        // Rendre la zone déplaçable
+        makeZoneDraggable($(`.zone-element[data-zone-id="${zone.id}"]`));
+    }
+    
+    function makeZoneDraggable(element) {
+        let isDragging = false;
+        let startX, startY, startLeft, startTop;
+        
+        element.on('mousedown', function(e) {
+            isDragging = true;
+            const canvas = $('#zone-canvas');
+            const canvasRect = canvas[0].getBoundingClientRect();
             
-            e.preventDefault();
-            draggedZone = $(this);
-            
-            const canvasRect = $('#zone-canvas')[0].getBoundingClientRect();
             startX = e.clientX;
             startY = e.clientY;
-            startLeft = parseFloat(draggedZone.css('left'));
-            startTop = parseFloat(draggedZone.css('top'));
-
+            startLeft = parseFloat(element.css('left'));
+            startTop = parseFloat(element.css('top'));
+            
             $(document).on('mousemove.drag', function(e) {
+                if (!isDragging) return;
+                
                 const deltaX = ((e.clientX - startX) / canvasRect.width) * 100;
                 const deltaY = ((e.clientY - startY) / canvasRect.height) * 100;
                 
-                const newLeft = Math.max(0, Math.min(100 - parseFloat(draggedZone.css('width')), startLeft + deltaX));
-                const newTop = Math.max(0, Math.min(100 - parseFloat(draggedZone.css('height')), startTop + deltaY));
+                const newLeft = Math.max(0, Math.min(75, startLeft + deltaX));
+                const newTop = Math.max(0, Math.min(75, startTop + deltaY));
                 
-                draggedZone.css({
+                element.css({
                     left: newLeft + '%',
                     top: newTop + '%'
                 });
                 
-                updateZoneData(draggedZone.data('zone-id'), {
-                    x: newLeft,
-                    y: newTop
-                });
+                // Mettre à jour les données
+                const zoneId = element.data('zone-id');
+                if (zones[zoneId]) {
+                    zones[zoneId].x = newLeft;
+                    zones[zoneId].y = newTop;
+                }
             });
-
+            
             $(document).on('mouseup.drag', function() {
+                isDragging = false;
                 $(document).off('.drag');
-                draggedZone = null;
                 saveZones();
             });
         });
     }
-
-    function makeZoneResizable(zoneEl) {
-        zoneEl.find('.resize-handle').off('mousedown').on('mousedown', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            isResizing = true;
-            const direction = $(this).data('direction');
-            const zoneId = zoneEl.data('zone-id');
-            const canvasRect = $('#zone-canvas')[0].getBoundingClientRect();
-            
-            startX = e.clientX;
-            startY = e.clientY;
-            startLeft = parseFloat(zoneEl.css('left'));
-            startTop = parseFloat(zoneEl.css('top'));
-            startWidth = parseFloat(zoneEl.css('width'));
-            startHeight = parseFloat(zoneEl.css('height'));
-
-            $(document).on('mousemove.resize', function(e) {
-                const deltaX = ((e.clientX - startX) / canvasRect.width) * 100;
-                const deltaY = ((e.clientY - startY) / canvasRect.height) * 100;
-                
-                let newLeft = startLeft;
-                let newTop = startTop;
-                let newWidth = startWidth;
-                let newHeight = startHeight;
-
-                switch(direction) {
-                    case 'se':
-                        newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
-                        newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
-                        break;
-                    case 'sw':
-                        newWidth = Math.max(5, startWidth - deltaX);
-                        newLeft = Math.max(0, startLeft + deltaX);
-                        newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
-                        break;
-                    case 'ne':
-                        newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
-                        newHeight = Math.max(5, startHeight - deltaY);
-                        newTop = Math.max(0, startTop + deltaY);
-                        break;
-                    case 'nw':
-                        newWidth = Math.max(5, startWidth - deltaX);
-                        newLeft = Math.max(0, startLeft + deltaX);
-                        newHeight = Math.max(5, startHeight - deltaY);
-                        newTop = Math.max(0, startTop + deltaY);
-                        break;
-                    case 'n':
-                        newHeight = Math.max(5, startHeight - deltaY);
-                        newTop = Math.max(0, startTop + deltaY);
-                        break;
-                    case 's':
-                        newHeight = Math.max(5, Math.min(100 - startTop, startHeight + deltaY));
-                        break;
-                    case 'e':
-                        newWidth = Math.max(5, Math.min(100 - startLeft, startWidth + deltaX));
-                        break;
-                    case 'w':
-                        newWidth = Math.max(5, startWidth - deltaX);
-                        newLeft = Math.max(0, startLeft + deltaX);
-                        break;
-                }
-
-                // Contraintes
-                if (newLeft + newWidth > 100) {
-                    newWidth = 100 - newLeft;
-                }
-                if (newTop + newHeight > 100) {
-                    newHeight = 100 - newTop;
-                }
-
-                zoneEl.css({
-                    left: newLeft + '%',
-                    top: newTop + '%',
-                    width: newWidth + '%',
-                    height: newHeight + '%'
-                });
-                
-                updateZoneData(zoneId, {
-                    x: newLeft,
-                    y: newTop,
-                    width: newWidth,
-                    height: newHeight
-                });
-            });
-
-            $(document).on('mouseup.resize', function() {
-                $(document).off('.resize');
-                isResizing = false;
-                saveZones();
-            });
-        });
-    }
-
-    function updateZoneData(zoneId, newData) {
-        if (zones[zoneId]) {
-            Object.assign(zones[zoneId], newData);
-        }
-    }
-
-    function addZoneToList(zoneData) {
-        const listItem = $(`
-            <div class="zone-item" data-zone-id="${zoneData.id}">
-                <input type="text" class="zone-name" value="${zoneData.name}" placeholder="Nom de la zone" />
-                <select class="zone-side">
-                    <option value="front" ${zoneData.side === 'front' ? 'selected' : ''}>Recto</option>
-                    <option value="back" ${zoneData.side === 'back' ? 'selected' : ''}>Verso</option>
-                </select>
-                <input type="number" class="zone-price" value="${zoneData.price}" step="0.01" min="0" placeholder="Prix €" />
-                <button type="button" class="remove-zone">Supprimer</button>
-            </div>
-        `);
-
-        $('#zones-list').append(listItem);
-        
-        // Events pour la liste
-        listItem.find('.zone-name').on('change', function() {
-            updateZoneData(zoneData.id, { name: $(this).val() });
-            updateZoneLabel(zoneData.id, $(this).val());
-            saveZones();
-        });
-        
-        listItem.find('.zone-side').on('change', function() {
-            updateZoneData(zoneData.id, { side: $(this).val() });
-            updateCanvas();
-            saveZones();
-        });
-        
-        listItem.find('.zone-price').on('change', function() {
-            updateZoneData(zoneData.id, { price: parseFloat($(this).val()) || 0 });
-            saveZones();
-        });
-        
-        listItem.find('.remove-zone').on('click', function() {
-            removeZone(zoneData.id);
-        });
-    }
-
-    function updateZoneLabel(zoneId, newName) {
-        $(`.zone-element[data-zone-id="${zoneId}"] .zone-label`).text(newName);
-    }
-
-    function removeZone(zoneId) {
-        delete zones[zoneId];
-        $(`.zone-element[data-zone-id="${zoneId}"]`).remove();
-        $(`.zone-item[data-zone-id="${zoneId}"]`).remove();
-        saveZones();
-    }
-
-    function updateCanvas() {
-        $('.zone-element').remove();
-        
-        // Charger la bonne image de fond
-        loadBackgroundImage();
-        
-        // Afficher les zones du côté actuel
-        Object.values(zones).forEach(function(zoneData) {
-            if (zoneData.side === currentSide) {
-                createZoneElement(zoneData);
-            }
-        });
-    }
-
+    
     function loadBackgroundImage() {
         const defaultColor = $('input[name="_default_color"]:checked').val();
         if (!defaultColor) return;
-
+        
         const colorRow = $(`.color-row[data-color-id="${defaultColor}"]`);
-        const imageUrl = currentSide === 'front' 
-            ? colorRow.find('input[name*="[front]"]').val()
-            : colorRow.find('input[name*="[back]"]').val();
-
+        let imageUrl = '';
+        
+        if (currentSide === 'front') {
+            imageUrl = colorRow.find('input[name*="[front]"]').val();
+        } else {
+            imageUrl = colorRow.find('input[name*="[back]"]').val();
+        }
+        
         if (imageUrl) {
             $('#zone-canvas').css({
                 'background-image': `url(${imageUrl})`,
                 'background-size': 'contain',
                 'background-repeat': 'no-repeat',
-                'background-position': 'center'
+                'background-position': 'center',
+                'background-color': '#f9f9f9'
             });
         }
     }
-
-    function loadExistingZones() {
-        const zonesInput = $('input[name="_zones"]');
-        if (zonesInput.length && zonesInput.val()) {
-            try {
-                const existingZones = JSON.parse(zonesInput.val());
-                zones = existingZones;
-                
-                Object.values(zones).forEach(function(zoneData) {
-                    addZoneToList(zoneData);
-                });
-            } catch (e) {
-                console.error('Erreur lors du chargement des zones:', e);
-            }
-        }
-    }
-
-    function saveZones() {
-        $('input[name="_zones"]').val(JSON.stringify(zones));
-        
-        // Sauvegarder via AJAX si disponible
-        if (typeof winshirtAjax !== 'undefined') {
-            const data = {
-                action: 'save_mockup_zones',
-                post_id: $('#post_ID').val(),
-                zones: zones,
-                nonce: winshirtAjax.nonce
-            };
-
-            $.post(winshirtAjax.ajaxurl, data, function(response) {
-                if (response.success) {
-                    console.log('Zones sauvegardées');
-                }
-            });
-        }
-    }
-
-    function addNewColor() {
-        const colorCount = $('.color-row').length;
+    
+    function addColor() {
         const colorId = 'color_' + Date.now();
+        const colorCount = $('.color-row').length + 1;
         
-        const colorHtml = `
-            <div class="color-row" data-color-id="${colorId}">
-                <div class="color-controls">
-                    <label>Couleur:</label>
-                    <input type="color" class="color-picker" value="#FFFFFF" />
-                    <input type="text" class="color-name" placeholder="Nom couleur" value="Couleur ${colorCount + 1}" />
-                    <label>
-                        <input type="radio" name="_default_color" value="${colorId}" ${colorCount === 0 ? 'checked' : ''} />
+        const html = `
+            <div class="color-row" data-color-id="${colorId}" style="border-bottom: 1px solid #eee; padding: 10px; background: #fafafa;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <input type="color" value="#FFFFFF" style="width: 40px; height: 30px;" />
+                    <input type="text" placeholder="Nom couleur" value="Couleur ${colorCount}" style="flex: 1; padding: 5px;" />
+                    <label style="display: flex; align-items: center; gap: 5px;">
+                        <input type="radio" name="_default_color" value="${colorId}" ${colorCount === 1 ? 'checked' : ''} />
                         Par défaut
                     </label>
-                    <button type="button" class="remove-color" data-color-id="${colorId}">Supprimer</button>
+                    <button type="button" class="remove-color" data-color-id="${colorId}" 
+                            style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px;">
+                        Supprimer
+                    </button>
                 </div>
-                <div class="color-images">
-                    <div class="image-section">
-                        <label>Image Recto:</label>
-                        <button type="button" class="upload-image" data-side="front" data-color="${colorId}">Choisir Image Recto</button>
+                <div style="display: flex; gap: 15px;">
+                    <div style="text-align: center;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 12px;">Recto:</label>
+                        <button type="button" class="upload-image" data-side="front" data-color="${colorId}"
+                                style="background: #0073aa; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px;">
+                            Choisir Image
+                        </button>
                         <input type="hidden" name="colors[${colorId}][front]" />
-                        <div class="image-preview"></div>
+                        <div class="image-preview" style="margin-top: 5px;"></div>
                     </div>
-                    <div class="image-section">
-                        <label>Image Verso:</label>
-                        <button type="button" class="upload-image" data-side="back" data-color="${colorId}">Choisir Image Verso</button>
+                    <div style="text-align: center;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 12px;">Verso:</label>
+                        <button type="button" class="upload-image" data-side="back" data-color="${colorId}"
+                                style="background: #0073aa; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 11px;">
+                            Choisir Image
+                        </button>
                         <input type="hidden" name="colors[${colorId}][back]" />
-                        <div class="image-preview"></div>
+                        <div class="image-preview" style="margin-top: 5px;"></div>
                     </div>
                 </div>
             </div>
         `;
         
-        $('#colors-container').append(colorHtml);
-        
-        // Si c'est la première couleur, la marquer comme par défaut
-        if (colorCount === 0) {
-            updateCanvas();
-        }
+        $('#colors-container').append(html);
+        console.log('Couleur ajoutée:', colorId);
     }
-
-    function removeColor(colorId) {
-        $(`.color-row[data-color-id="${colorId}"]`).remove();
-        
-        // Si on supprime la couleur par défaut, marquer la première restante
-        if (!$('input[name="_default_color"]:checked').length) {
-            $('input[name="_default_color"]').first().prop('checked', true);
-            updateCanvas();
-        }
-    }
-
+    
     function openMediaUploader(button) {
-        const colorId = button.data('color');
-        const side = button.data('side');
+        if (typeof wp === 'undefined' || !wp.media) {
+            alert('WordPress Media Library non disponible');
+            return;
+        }
         
-        // WordPress Media Uploader
-        const mediaUploader = wp.media({
+        const frame = wp.media({
             title: 'Choisir une image',
-            button: {
-                text: 'Utiliser cette image'
-            },
+            button: { text: 'Utiliser cette image' },
             multiple: false
         });
-
-        mediaUploader.on('select', function() {
-            const attachment = mediaUploader.state().get('selection').first().toJSON();
-            const input = button.siblings(`input[name="colors[${colorId}][${side}]"]`);
-            const preview = button.siblings('.image-preview');
+        
+        frame.on('select', function() {
+            const attachment = frame.state().get('selection').first().toJSON();
+            const colorId = button.data('color');
+            const side = button.data('side');
             
+            // Mettre à jour l'input hidden
+            const input = button.siblings(`input[name="colors[${colorId}][${side}]"]`);
             input.val(attachment.url);
-            preview.html(`<img src="${attachment.url}" style="max-width: 100px; height: auto;" />`);
+            
+            // Afficher l'aperçu
+            const preview = button.siblings('.image-preview');
+            preview.html(`<img src="${attachment.url}" style="max-width: 60px; height: auto; border: 1px solid #ddd; border-radius: 3px;" />`);
             
             // Mettre à jour le canvas si c'est la couleur par défaut
-            const isDefault = $(`.color-row[data-color-id="${colorId}"] input[name="_default_color"]`).is(':checked');
-            if (isDefault) {
-                updateCanvas();
-            }
+            updateCanvas();
+            
+            console.log('Image uploadée:', attachment.url);
         });
-
-        mediaUploader.open();
+        
+        frame.open();
     }
-
-    // Rendre les fonctions disponibles globalement pour debug
+    
+    function loadExistingZones() {
+        const input = $('input[name="_zones"]');
+        if (input.length && input.val()) {
+            try {
+                zones = JSON.parse(input.val());
+                Object.values(zones).forEach(zone => {
+                    addZoneToList(zone);
+                });
+                console.log('Zones existantes chargées:', Object.keys(zones).length);
+            } catch (e) {
+                console.error('Erreur chargement zones:', e);
+                zones = {};
+            }
+        }
+    }
+    
+    function saveZones() {
+        const input = $('input[name="_zones"]');
+        if (input.length) {
+            input.val(JSON.stringify(zones));
+            console.log('Zones sauvegardées:', Object.keys(zones).length);
+        }
+        
+        // Sauvegarder via AJAX si disponible
+        if (typeof ajaxurl !== 'undefined' && $('#post_ID').length) {
+            $.post(ajaxurl, {
+                action: 'save_mockup_zones',
+                post_id: $('#post_ID').val(),
+                zones: zones,
+                nonce: $('input[name="winshirt_nonce"]').val()
+            });
+        }
+    }
+    
+    // Debug global
     window.WinShirtDebug = {
         zones: zones,
+        currentSide: currentSide,
         updateCanvas: updateCanvas,
         saveZones: saveZones
     };
