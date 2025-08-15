@@ -362,59 +362,90 @@ class WinShirt_Product_Integration {
      * FORCER l'affichage du bouton - SOLUTION RAPIDE
      */
     public function force_display_button() {
-        if (!is_product()) return;
-        
-        global $product;
-        if (!$product) return;
-        
-        $product_id = $product->get_id();
-        $is_customizable = get_post_meta($product_id, '_winshirt_customizable', true);
-        $mockup_id = get_post_meta($product_id, '_winshirt_mockup_id', true);
-        
-        if ($is_customizable === '1' && $mockup_id) {
-            ?>
-            <script>
-            jQuery(document).ready(function($) {
-                // Si le bouton n'existe pas déjà, l'ajouter
-                if ($('.winshirt-customize-btn').length === 0) {
-                    var button = `
-                        <div class="winshirt-customizer-section" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; border: 2px solid #0073aa;">
-                            <h3 style="margin: 0 0 15px 0; color: #0073aa;">🎨 Personnalisation Disponible</h3>
-                            <button class="winshirt-customize-btn" style="
-                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                color: white;
-                                padding: 15px 30px;
-                                border: none;
-                                border-radius: 8px;
-                                font-size: 16px;
-                                font-weight: bold;
-                                cursor: pointer;
-                                width: 100%;
-                                margin-bottom: 10px;
-                            ">
-                                Personnaliser ce produit
-                            </button>
-                            <p style="margin: 0; color: #666; font-size: 14px;">
-                                ✓ Zones de personnalisation disponibles<br>
-                                ✓ Plusieurs couleurs au choix<br>
-                                ✓ Aperçu en temps réel
-                            </p>
-                        </div>
-                    `;
-                    
-                    // L'ajouter après le bouton d'ajout au panier
+        ?>
+        <script>
+        jQuery(document).ready(function($) {
+            // FORCER l'affichage sur TOUTES les pages produit
+            if ($('body').hasClass('single-product')) {
+                console.log('Page produit détectée - ajout du bouton');
+                
+                // Supprimer le bouton existant s'il y en a un
+                $('.winshirt-customizer-section').remove();
+                
+                var button = `
+                    <div class="winshirt-customizer-section" style="
+                        margin: 20px 0; 
+                        padding: 20px; 
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                        border-radius: 12px; 
+                        color: white;
+                        text-align: center;
+                        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                    ">
+                        <h3 style="margin: 0 0 15px 0; color: white; font-size: 24px;">🎨 Personnalisation Disponible</h3>
+                        <button class="winshirt-customize-btn" style="
+                            background: rgba(255, 255, 255, 0.2);
+                            color: white;
+                            padding: 15px 40px;
+                            border: 2px solid white;
+                            border-radius: 8px;
+                            font-size: 18px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            width: 100%;
+                            max-width: 400px;
+                            margin-bottom: 15px;
+                            transition: all 0.3s ease;
+                        ">
+                            ✨ PERSONNALISER CE PRODUIT ✨
+                        </button>
+                        <p style="margin: 0; color: rgba(255,255,255,0.9); font-size: 16px;">
+                            ✓ Zones de personnalisation disponibles<br>
+                            ✓ Plusieurs couleurs au choix<br>
+                            ✓ Aperçu en temps réel<br>
+                            ✓ Customizer en développement
+                        </p>
+                    </div>
+                `;
+                
+                // L'ajouter après le formulaire d'ajout au panier
+                if ($('.single_add_to_cart_button').length) {
                     $('.single_add_to_cart_button').closest('form').after(button);
-                    
-                    // Event du bouton
-                    $('.winshirt-customize-btn').on('click', function(e) {
-                        e.preventDefault();
-                        alert('Customizer en développement pour le produit <?php echo $product_id; ?> avec le mockup <?php echo $mockup_id; ?>');
-                    });
+                } else if ($('.product_title').length) {
+                    $('.product_title').after(button);
+                } else {
+                    $('body').append(button);
                 }
-            });
-            </script>
-            <?php
-        }
+                
+                // Effet hover
+                $('.winshirt-customize-btn').hover(
+                    function() {
+                        $(this).css({
+                            'background': 'rgba(255, 255, 255, 0.3)',
+                            'transform': 'translateY(-2px)',
+                            'box-shadow': '0 6px 20px rgba(255, 255, 255, 0.3)'
+                        });
+                    },
+                    function() {
+                        $(this).css({
+                            'background': 'rgba(255, 255, 255, 0.2)',
+                            'transform': 'translateY(0)',
+                            'box-shadow': 'none'
+                        });
+                    }
+                );
+                
+                // Event du bouton
+                $('.winshirt-customize-btn').on('click', function(e) {
+                    e.preventDefault();
+                    alert('🎨 Customizer WinShirt\n\nEn cours de développement...\n\nFonctionnalités prévues:\n• Design en drag & drop\n• Zones de personnalisation\n• Aperçu temps réel\n• Sauvegarde des créations');
+                });
+                
+                console.log('Bouton WinShirt ajouté avec succès!');
+            }
+        });
+        </script>
+        <?php
     }
 
     /**
