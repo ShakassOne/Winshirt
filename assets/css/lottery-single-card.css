@@ -1,0 +1,12 @@
+.lottery-card {
+  border:2px solid #000;
+  padding:1rem;
+  border-radius:12px;
+  background:#fff;
+}
+.ws-lottery-banner {
+  margin:1rem 0;
+  padding:1rem;
+  background:#f8f8f8;
+  border:1px solid #ddd;
+}
