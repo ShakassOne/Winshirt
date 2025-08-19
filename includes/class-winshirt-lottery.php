@@ -277,4 +277,100 @@ class Lottery {
                 ]);
             }
             wp_reset_postdata();
-        } else
+        } else {
+            echo '<p>'.esc_html__('Aucune loterie disponible.','winshirt').'</p>';
+        }
+        echo '</div>';
+        return ob_get_clean();
+    }
+
+    /** Carte unique */
+    public function sc_card($atts=[]): string {
+        $a = shortcode_atts([ 'id'=>'0', 'show_timer'=>'1', 'show_count'=>'1' ], $atts, 'winshirt_lottery_card');
+        $id = (int) $a['id'];
+        if ( ! $id || get_post_type($id)!=='winshirt_lottery' ) return '';
+        return $this->render_card($id, [
+            'show_timer' => $a['show_timer']==='1',
+            'show_count' => $a['show_count']==='1',
+        ]);
+    }
+
+    /** Formulaire d’inscription manuelle (1 ticket) */
+    public function sc_form($atts=[]): string {
+        $a = shortcode_atts([ 'id'=>'0' ], $atts, 'winshirt_lottery_form' );
+        $id = (int) $a['id']; if ( ! $id || get_post_type($id)!=='winshirt_lottery' ) return '';
+        ob_start(); ?>
+        <form class="ws-form" method="post">
+            <input type="hidden" name="ws_lottery_id" value="<?php echo (int)$id; ?>">
+            <?php wp_nonce_field('ws_lottery_enter','ws_lottery_nonce'); ?>
+            <label class="ws-field"><span><?php esc_html_e('Nom','winshirt'); ?> *</span><input type="text" name="ws_name" required></label>
+            <label class="ws-field"><span><?php esc_html_e('Email','winshirt'); ?> *</span><input type="email" name="ws_email" required></label>
+            <label class="ws-field"><span><?php esc_html_e('N° de commande (facultatif)','winshirt'); ?></span><input type="text" name="ws_order"></label>
+            <label class="ws-terms-accept"><input type="checkbox" name="ws_accept" required> <span><?php esc_html_e("J'accepte le règlement et la politique de confidentialité.",'winshirt'); ?></span></label>
+            <button type="submit" name="ws_lottery_enter" value="1" class="ws-btn ws-btn-primary"><?php esc_html_e('Valider (1 ticket)','winshirt'); ?></button>
+        </form>
+        <?php return ob_get_clean();
+    }
+
+    /* ============================== RENDUS ============================= */
+
+    /** Carte compacte (utilisée par liste & shortcode) */
+    private function render_card(int $post_id, array $opts=[]): string {
+        $title   = get_the_title($post_id);
+        $url     = get_permalink($post_id);
+        $thumb   = get_the_post_thumbnail($post_id,'large',['loading'=>'lazy']);
+        $end     = get_post_meta($post_id,'_ws_lottery_end',true);
+        $end_ts  = $end ? strtotime($end) : 0;
+        $tickets = (int) get_post_meta($post_id,'_ws_lottery_count',true); // total tickets
+        $goal    = (int) get_post_meta($post_id,'_ws_lottery_goal',true);
+        $value   = (string) get_post_meta($post_id,'_ws_lottery_value',true);
+        $feat    = get_post_meta($post_id,'_ws_lottery_featured',true)==='yes';
+
+        $show_timer = ! empty($opts['show_timer']);
+        $show_count = ! empty($opts['show_count']);
+
+        ob_start(); ?>
+        <article class="ws-card-mini">
+            <a class="ws-card-mini-media" href="<?php echo esc_url($url); ?>">
+                <?php echo $thumb ?: '<div class="ws-ph"></div>'; ?>
+                <?php if ($feat): ?><span class="ws-mini-badge ws-badge-featured"><?php esc_html_e('En vedette','winshirt'); ?></span><?php endif; ?>
+            </a>
+            <div class="ws-card-mini-body">
+                <h3 class="ws-card-mini-title"><a href="<?php echo esc_url($url); ?>"><?php echo esc_html($title); ?></a></h3>
+                <?php if ($value): ?><div class="ws-mini-value"><?php echo esc_html(sprintf(__('Valeur: %s','winshirt'),$value)); ?></div><?php endif; ?>
+                <?php if ($show_timer && $end_ts): ?>
+                    <div class="ws-mini-timer" data-end="<?php echo (int)$end_ts; ?>"><span data-u="d">--</span>d <span data-u="h">--</span>h <span data-u="m">--</span>m <span data-u="s">--</span>s</div>
+                <?php endif; ?>
+                <?php if ($show_count): ?>
+                    <div class="ws-mini-count"><?php echo esc_html(sprintf(_n('%d ticket','%d tickets',$tickets,'winshirt'),$tickets)); ?><?php if($goal): ?> — <?php echo esc_html(sprintf(__('Objectif: %d','winshirt'),$goal)); ?><?php endif; ?></div>
+                <?php endif; ?>
+                <a class="ws-btn ws-btn-sm" href="<?php echo esc_url($url); ?>"><?php esc_html_e('Participer','winshirt'); ?></a>
+            </div>
+        </article>
+        <?php return ob_get_clean();
+    }
+
+    /* ============================== ADMIN ============================== */
+
+    public function admin_cols(array $cols): array {
+        $cols['ws_end']   = __('Fin','winshirt');
+        $cols['ws_goal']  = __('Objectif (tickets)','winshirt');
+        $cols['ws_count'] = __('Tickets','winshirt');
+        return $cols;
+    }
+    public function admin_col_render(string $col, int $post_id): void {
+        if ($col==='ws_end'){ $v=get_post_meta($post_id,'_ws_lottery_end',true); echo esc_html($v?date_i18n('d/m/Y H:i',strtotime($v)):'—'); }
+        if ($col==='ws_goal'){ echo (int) get_post_meta($post_id,'_ws_lottery_goal',true); }
+        if ($col==='ws_count'){ echo (int) get_post_meta($post_id,'_ws_lottery_count',true); }
+    }
+    public function add_row_action_id(array $actions, \WP_Post $post): array {
+        if ( $post->post_type === 'winshirt_lottery' ) {
+            $actions['ws_id'] = '<span class="row-id" style="opacity:.7">'.esc_html__('ID','winshirt').': '.$post->ID.'</span>';
+        }
+        return $actions;
+    }
+
+    /* ============================== HELPERS ============================ */
+    private function fmt_dt_local($stored): string { if(empty($stored))return''; $ts=strtotime($stored); return $ts?date_i18n('Y-m-d\TH:i',$ts):''; }
+    private function parse_dt_local(string $v): string { if(empty($v))return''; $ts=strtotime($v); return $ts?date_i18n('Y-m-d H:i:s',$ts):''; }
+}
