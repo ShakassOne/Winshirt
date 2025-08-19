@@ -1,0 +1,57 @@
+/* === Styles communs cartes & template === */
+.ws-wrap{max-width:1200px;margin:0 auto;padding:24px 16px}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px}
+.ws-grid-2{display:grid;grid-template-columns:1.15fr .85fr;gap:20px}
+@media(max-width:980px){.ws-grid-2{grid-template-columns:1fr}}
+
+/* Hero */
+.ws-hero{background:#0b0b0c;color:#fff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.08)}
+.ws-hero-media{position:relative;height:360px;background:#111}
+.ws-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:saturate(1.05) contrast(1.05)}
+.ws-hero-media:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(2,6,23,0) 0%,rgba(2,6,23,.55) 55%,rgba(2,6,23,.9) 100%)}
+.ws-hero-badges{position:absolute;top:14px;left:14px;z-index:2;display:flex;gap:8px}
+.ws-badge{padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700;backdrop-filter:blur(6px);border:1px solid rgba(255,255,255,.2)}
+.ws-badge-active{background:rgba(34,197,94,.2);color:#86efac;border-color:rgba(34,197,94,.35)}
+.ws-badge-featured{background:rgba(147,51,234,.2);color:#d8b4fe;border-color:rgba(147,51,234,.35)}
+.ws-badge-ended{background:rgba(239,68,68,.2);color:#fecaca;border-color:rgba(239,68,68,.35)}
+.ws-hero-title{position:absolute;left:16px;right:16px;bottom:16px;z-index:2}
+.ws-hero-title h1{margin:0 0 6px 0;font-size:clamp(22px,3vw,32px)}
+.ws-hero-sub{margin:0;opacity:.9}
+
+.ws-hero-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px;background:#0e0f11}
+.ws-hero-metrics .m{background:#111318;border:1px solid #1f2430;border-radius:12px;text-align:center;padding:10px}
+.ws-hero-metrics .m span{font-size:22px;font-weight:800;display:block}
+.ws-hero-metrics .m label{font-size:11px;color:#9ca3af}
+
+.ws-hero-bottom{padding:14px;background:#0e0f11;border-top:1px solid #1f2430;display:grid;gap:10px}
+.ws-stats{color:#e5e7eb}
+.ws-progress{height:8px;background:#1f2430;border-radius:999px;overflow:hidden}
+.ws-progress-bar{height:100%;background:linear-gradient(90deg,#10b981,#3b82f6)}
+.ws-draw{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ws-btn{display:inline-flex;align-items:center;justify-content:center;padding:10px 14px;border-radius:12px;border:1px solid #e5e7eb;background:#fff;color:#111;font-weight:700;text-decoration:none}
+.ws-btn-disabled{opacity:.6;cursor:not-allowed}
+
+/* Shortcode : grille/listes */
+.ws-lottery-list.ws-grid{display:grid;gap:18px}
+.ws-lottery-list.ws-grid.cols-2{grid-template-columns:repeat(2,1fr)}
+.ws-lottery-list.ws-grid.cols-3{grid-template-columns:repeat(3,1fr)}
+.ws-lottery-list.ws-grid.cols-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:980px){.ws-lottery-list.ws-grid{grid-template-columns:1fr}}
+.ws-card-mini{background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.ws-card-mini-media{position:relative;display:block;height:180px;background:#111}
+.ws-card-mini-media img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ws-mini-badge{position:absolute;top:10px;left:10px}
+.ws-card-mini-body{padding:12px;display:grid;gap:8px}
+.ws-card-mini-title{margin:0;font-size:16px}
+.ws-mini-value{font-size:13px;color:#374151}
+.ws-mini-timer{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:#111}
+.ws-mini-count{font-size:13px;color:#111}
+.ws-btn-sm{padding:8px 12px;border-radius:10px}
+
+/* Formulaire solo & notice produit */
+.ws-form{display:grid;gap:12px}
+.ws-field{display:grid;gap:6px}
+.ws-field input{padding:10px 12px;border:1px solid #d1d5db;border-radius:10px}
+.ws-terms-accept{display:flex;align-items:flex-start;gap:8px}
+.ws-ended{padding:12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px}
+.ws-lottery-product-notice{margin:10px 0;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;background:#f9fafb;font-size:14px}
