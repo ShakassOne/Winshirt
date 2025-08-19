@@ -1,5 +1,4 @@
 <?php
-/** Template single loterie robuste (aucune fonction avancée qui pourrait fataler). */
 if ( ! defined('ABSPATH') ) exit;
 get_header();
 
@@ -11,7 +10,7 @@ $content = apply_filters('the_content', get_post_field('post_content',$id));
 
 $end     = get_post_meta($id,'_ws_lottery_end',true);
 $end_ts  = $end ? strtotime($end) : 0;
-$count   = (int) get_post_meta($id,'_ws_lottery_count',true);
+$tickets = (int) get_post_meta($id,'_ws_lottery_count',true); // total tickets
 $goal    = (int) get_post_meta($id,'_ws_lottery_goal',true);
 $value   = (string) get_post_meta($id,'_ws_lottery_value',true);
 $terms   = (string) get_post_meta($id,'_ws_lottery_terms_url',true);
@@ -41,10 +40,10 @@ $over    = $end_ts && $end_ts < current_time('timestamp');
 
     <div class="ws-hero-bottom">
       <div class="ws-stats">
-        <span><?php echo esc_html(sprintf(_n('%d participant','%d participants',$count,'winshirt'),$count)); ?></span>
+        <span><?php echo esc_html(sprintf(_n('%d ticket','%d tickets',$tickets,'winshirt'),$tickets)); ?></span>
         <?php if ($goal): ?><span>— <?php echo esc_html(sprintf(__('Objectif: %d','winshirt'),$goal)); ?></span><?php endif; ?>
       </div>
-      <?php if ($goal): $progress = max(0,min(100,$count/$goal*100)); ?>
+      <?php if ($goal): $progress = max(0,min(100,$tickets/$goal*100)); ?>
         <div class="ws-progress"><div class="ws-progress-bar" style="width:<?php echo esc_attr(round($progress,1)); ?>%"></div></div>
       <?php endif; ?>
       <div class="ws-draw">
