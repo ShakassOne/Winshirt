@@ -415,17 +415,21 @@ class Lottery {
 
             .wsl-badge{position:absolute;top:12px;left:12px;padding:6px 10px;border-radius:999px;background:#6d28d9;color:#fff;font-size:12px;font-weight:600;z-index:2}
 
+            /* >>> Overlay 100% caché au repos */
             .wsl-overlay{
                 position:absolute; inset:auto 0 0 0; padding:16px; color:#fff;
-                background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 80%);
-                transform: translateY(70%); transition: transform .35s ease;
+                background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 85%);
+                transform: translateY(100%);          /* totalement hors champ */
+                transition: transform .35s ease;
                 display:flex; flex-direction:column; gap:6px; z-index:1;
+                will-change: transform;
             }
+            /* Apparition uniquement au survol/focus */
             .wsl-card:hover .wsl-overlay,
             .wsl-card:focus .wsl-overlay,
             .wsl-card:focus-within .wsl-overlay{ transform: translateY(0%); }
 
-            .wsl-title{margin:0 0 2px; font-size:18px; line-height:1.25; font-weight:700}
+            .wsl-title{margin:0 0 2px; font-size:18px; line-height:1.25; font-weight:700; color:#fff;} /* titre en blanc */
             .wsl-line{margin:0; font-size:14px; color:#E6E6E6}
             .wsl-timer{font-family:ui-monospace,monospace}
             .wsl-btn-ghost{align-self:flex-start; margin-top:4px; border:1px solid rgba(255,255,255,.9); color:#fff; padding:8px 12px; border-radius:8px; font-weight:600; font-size:14px; background:transparent}
