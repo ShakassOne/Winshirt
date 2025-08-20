@@ -4,13 +4,16 @@ if (!defined('ABSPATH')) { exit; }
 
 /**
  * WinShirt – CPT Loteries + Shortcodes + Layouts (grid/masonry/slider/diagonal)
- * VERSION: 1.1.0 (diagonal revamp)
+ * VERSION: 1.2.0 (diagonal spacing + no-shadow + no-loop + overlay++)
  */
 class Lottery {
     private static $instance;
     public static function instance(){ return self::$instance ?: (self::$instance = new self()); }
     public static function register_post_type(){ self::instance()->register_cpt(); }
 
+    /* --------------------------------
+     * Point d’entrée du module
+     * -------------------------------- */
     public function init(){
         add_action('init',               [$this,'register_cpt']);
         add_action('add_meta_boxes',     [$this,'add_meta_boxes']);
@@ -31,8 +34,11 @@ class Lottery {
         add_action('wp_footer',[$this,'inline_js']);
     }
 
-    /* ================= CPT / Metas ================= */
+    /* =====================================================================
+     *                            CPT + METAS
+     * ===================================================================== */
 
+    /** Enregistre le Custom Post Type "winshirt_lottery" */
     public function register_cpt(){
         register_post_type('winshirt_lottery',[
             'labels'=>[
@@ -53,11 +59,13 @@ class Lottery {
         ]);
     }
 
+    /** Déclare les metaboxes */
     public function add_meta_boxes(){
         add_meta_box('ws_lottery_details',__('Détails de la loterie','winshirt'),[$this,'mb_details'],'winshirt_lottery','normal','high');
         add_meta_box('ws_lottery_participants',__('Tickets & entrées','winshirt'),[$this,'mb_participants'],'winshirt_lottery','normal','default');
     }
 
+    /** Metabox : Détails (dates, objectif, valeur, etc.) */
     public function mb_details(\WP_Post $post){
         wp_nonce_field('ws_lottery_save','ws_lottery_nonce');
         $start=get_post_meta($post->ID,'_ws_lottery_start',true);
@@ -95,6 +103,7 @@ class Lottery {
         <?php
     }
 
+    /** Sauvegarde des métadonnées */
     public function save_meta($post_id,\WP_Post $post){
         if(!isset($_POST['ws_lottery_nonce']) || !wp_verify_nonce($_POST['ws_lottery_nonce'],'ws_lottery_save')) return;
         if(defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
@@ -106,7 +115,6 @@ class Lottery {
         $value=sanitize_text_field($_POST['ws_lottery_value'] ?? '');
         $terms=esc_url_raw($_POST['ws_lottery_terms_url'] ?? '');
         $feat =isset($_POST['ws_lottery_featured'])? 'yes':'no';
-        $product=(int)($_POST['ws_lottery_product_id'] ?? 0);
 
         update_post_meta($post_id,'_ws_lottery_start',$this->parse_dt_local($start));
         update_post_meta($post_id,'_ws_lottery_end',$this->parse_dt_local($end));
@@ -114,12 +122,12 @@ class Lottery {
         update_post_meta($post_id,'_ws_lottery_value',$value);
         update_post_meta($post_id,'_ws_lottery_terms_url',$terms);
         update_post_meta($post_id,'_ws_lottery_featured',$feat);
-        update_post_meta($post_id,'_ws_lottery_product_id',$product);
 
         if(get_post_meta($post_id,'_ws_lottery_participants',true)==='') update_post_meta($post_id,'_ws_lottery_participants',[]);
         if(get_post_meta($post_id,'_ws_lottery_count',true)==='')        update_post_meta($post_id,'_ws_lottery_count',0);
     }
 
+    /** Metabox participants (liste + export CSV) */
     public function mb_participants(\WP_Post $post){
         $rows=(array)get_post_meta($post->ID,'_ws_lottery_participants',true);
         $count=(int)get_post_meta($post->ID,'_ws_lottery_count',true); ?>
@@ -157,8 +165,11 @@ class Lottery {
         <?php
     }
 
-    /* ============ POST mini-form (1 ticket) ============ */
+    /* =====================================================================
+     *                        FORMULAIRE 1 ticket
+     * ===================================================================== */
 
+    /** Reçoit l’entry (mini-form) et incrémente les tickets */
     public function handle_entry_post(){
         if(!isset($_POST['ws_lottery_enter'])) return;
         if(!isset($_POST['ws_lottery_nonce']) || !wp_verify_nonce($_POST['ws_lottery_nonce'],'ws_lottery_enter')) return;
@@ -199,6 +210,7 @@ class Lottery {
         wp_safe_redirect(add_query_arg('ws_lottery','ok',get_permalink($post_id))); exit;
     }
 
+    /** Template email de confirmation */
     private function email_tpl($post_id,$name,$tickets,$from,$to){
         $site=wp_specialchars_decode(get_bloginfo('name'),ENT_QUOTES);
         $title=get_the_title($post_id);
@@ -215,8 +227,11 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ================= Shortcodes ================= */
+    /* =====================================================================
+     *                             SHORTCODES
+     * ===================================================================== */
 
+    /** Liste (grid/masonry/slider/diagonal) */
     public function sc_list($atts=[]){
         $a=shortcode_atts([
             'status'=>'active','featured'=>'0','limit'=>'12',
@@ -286,12 +301,14 @@ class Lottery {
         return ob_get_clean();
     }
 
+    /** Affiche une carte seule */
     public function sc_card($atts=[]){
         $a=shortcode_atts(['id'=>'0','show_timer'=>'1','show_count'=>'1'],$atts,'winshirt_lottery_card');
         $id=(int)$a['id']; if(!$id || get_post_type($id)!=='winshirt_lottery') return '';
         return $this->render_card($id,['show_timer'=>$a['show_timer']==='1','show_count'=>$a['show_count']==='1']);
     }
 
+    /** Affiche le mini-formulaire (1 ticket) */
     public function sc_form($atts=[]){
         $a=shortcode_atts(['id'=>'0'],$atts,'winshirt_lottery_form');
         $id=(int)$a['id']; if(!$id || get_post_type($id)!=='winshirt_lottery') return '';
@@ -308,8 +325,11 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ============== Rendu carte ============== */
+    /* =====================================================================
+     *                              RENDU CARTE
+     * ===================================================================== */
 
+    /** Construit la carte HTML d’une loterie */
     private function render_card($post_id,$opts=[]){
         $title=get_the_title($post_id);
         $url=get_permalink($post_id);
@@ -360,7 +380,9 @@ class Lottery {
         return ob_get_clean();
     }
 
-    /* ============== Admin list helpers ============== */
+    /* =====================================================================
+     *                           ADMIN LIST HELPERS
+     * ===================================================================== */
 
     public function admin_cols($c){ $c['ws_end']=__('Fin','winshirt'); $c['ws_goal']=__('Objectif','winshirt'); $c['ws_count']=__('Tickets','winshirt'); return $c; }
     public function admin_col_render($col,$id){
@@ -373,7 +395,9 @@ class Lottery {
         return $actions;
     }
 
-    /* ============== Export CSV ============== */
+    /* =====================================================================
+     *                              EXPORT CSV
+     * ===================================================================== */
 
     public function ajax_export_csv(){
         check_admin_referer('ws_lottery_csv');
@@ -388,12 +412,16 @@ class Lottery {
         fclose($out); exit;
     }
 
-    /* ============== Helpers ============== */
+    /* =====================================================================
+     *                                HELPERS
+     * ===================================================================== */
 
     private function fmt_dt_local($stored){ if(empty($stored)) return ''; $ts=strtotime($stored); return $ts? date_i18n('Y-m-d\TH:i',$ts):''; }
     private function parse_dt_local($v){ if(empty($v)) return ''; $ts=strtotime($v); return $ts? date_i18n('Y-m-d H:i:s',$ts):''; }
 
-    /* ============== CSS inline (inclut diagonal refondu) ============== */
+    /* =====================================================================
+     *                                CSS
+     * ===================================================================== */
 
     public function inline_css(){ ?>
         <style id="winshirt-lottery-cards">
@@ -418,17 +446,18 @@ class Lottery {
             .ws-lottery-list.ws-slider.cols-2>.wsl-card{min-width:calc(100%/2 - 9px)}
             .ws-lottery-list.ws-slider.cols-3>.wsl-card{min-width:calc(100%/3 - 12px)}
             .ws-lottery-list.ws-slider.cols-4>.wsl-card{min-width:calc(100%/4 - 13.5px)}
-            .ws-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:9;border:0;border-radius:999px;width:44px;height:44px;line-height:44px;text-align:center;font-size:22px;font-weight:700;background:#2b2b2b;color:#fff;opacity:.92;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+            .ws-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:9;border:0;border-radius:999px;width:44px;height:44px;line-height:44px;text-align:center;font-size:22px;font-weight:700;background:#2b2b2b;color:#fff;opacity:.92;cursor:pointer}
             .ws-prev{left:24px}.ws-next{right:24px}
             .ws-dots{display:flex;gap:8px;justify-content:center;margin-top:10px}
             .ws-dots button{width:8px;height:8px;border-radius:999px;border:0;background:#d2d2d2}
             .ws-dots button.is-active{background:#111}
+            .ws-nav[disabled]{opacity:.35;cursor:not-allowed}
 
-            /* ===== DIAGONAL CAROUSEL revamp ===== */
+            /* ===== DIAGONAL CAROUSEL (écart ++, sans ombre, pas de rognage) ===== */
             .ws-lottery-list.ws-diagonal{
                 position:relative;
-                height:clamp(320px, 58vh, 560px);
-                overflow:hidden;
+                height:clamp(360px, 62vh, 620px);
+                overflow:visible;             /* évite la coupe en bas */
                 perspective: 1400px;
                 transform-style: preserve-3d;
                 user-select:none;
@@ -438,15 +467,16 @@ class Lottery {
                 left:50%; top:50%;
                 width: clamp(300px, 46vw, 820px);
                 transform-origin:center center;
-                transition: transform .5s cubic-bezier(.2,.7,.2,1), opacity .4s ease, filter .4s ease;
+                transition: transform .55s cubic-bezier(.2,.7,.2,1), opacity .35s ease, filter .35s ease;
                 will-change: transform, opacity, filter;
-                filter: drop-shadow(0 14px 40px rgba(0,0,0,.35));
+                /* AUCUNE OMBRE demandée */
+                filter: none;
                 border-radius:18px; overflow:hidden;
-                pointer-events:none;  /* réactivé pour l’active */
+                pointer-events:none;
             }
             .ws-diagonal .wsl-card.is-active{
                 pointer-events:auto;
-                filter: drop-shadow(0 24px 60px rgba(0,0,0,.45));
+                filter:none;                 /* pas d’ombre sur l’active non plus */
             }
 
             /* Carte / image / overlay */
@@ -457,20 +487,21 @@ class Lottery {
             .wsl-ph{background:linear-gradient(135deg,#111,#1f1f1f)}
             .wsl-badge{position:absolute;top:12px;left:12px;padding:6px 10px;border-radius:999px;background:#6d28d9;color:#fff;font-size:12px;font-weight:700;z-index:3}
 
-            /* Overlay uniquement au survol/focus */
-            .wsl-overlay{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:22px;background:linear-gradient(180deg,rgba(0,0,0,0) 8%,rgba(0,0,0,.94) 82%);opacity:0;transform:translateY(8%);transition:opacity .25s ease, transform .25s ease}
+            /* Overlay ONLY hover/focus – un peu plus grand */
+            .wsl-overlay{
+                position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;
+                padding:28px;                                  /* ++ */
+                background:linear-gradient(180deg,rgba(0,0,0,0) 6%,rgba(0,0,0,.96) 86%); /* ++ */
+                opacity:0;transform:translateY(8%);transition:opacity .25s ease, transform .25s ease
+            }
             .wsl-card:hover .wsl-overlay,
             .wsl-card:focus .wsl-overlay,
             .wsl-card:focus-within .wsl-overlay{opacity:1;transform:translateY(0)}
-            .wsl-ov-inner{color:#fff;text-align:center;max-width:90%}
-            .wsl-title{margin:0 0 6px 0;font-size:clamp(18px,2.2vw,22px);line-height:1.25;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.35)}
-            .wsl-line{margin:0;font-size:clamp(13px,1.8vw,14px);color:#E6E6E6}
+            .wsl-ov-inner{color:#fff;text-align:center;max-width:95%}     /* ++ */
+            .wsl-title{margin:0 0 8px 0;font-size:clamp(19px,2.6vw,24px);line-height:1.25;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.35)} /* ++ */
+            .wsl-line{margin:0;font-size:clamp(13px,1.95vw,15px);color:#E6E6E6} /* ++ */
             .wsl-timer{font-family:ui-monospace,monospace}
-            .wsl-btn-ghost{display:inline-block;margin-top:8px;border:1px solid rgba(255,255,255,.95);color:#fff;padding:8px 12px;border-radius:10px;font-weight:700;font-size:14px;background:transparent}
-
-            /* NAV pour diagonal */
-            .ws-slider-wrap .ws-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:12}
-            .ws-slider-wrap .ws-dots{position:absolute;left:0;right:0;bottom:10px;display:flex;gap:8px;justify-content:center;z-index:11}
+            .wsl-btn-ghost{display:inline-block;margin-top:10px;border:1px solid rgba(255,255,255,.95);color:#fff;padding:9px 13px;border-radius:10px;font-weight:700;font-size:14px;background:transparent}
 
             @media (max-width:1024px){
                 .ws-lottery-list.ws-grid.cols-3{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -483,12 +514,14 @@ class Lottery {
         </style>
     <?php }
 
-    /* ============== JS inline (compteurs + sliders + diagonal) ============== */
+    /* =====================================================================
+     *                                 JS
+     * ===================================================================== */
 
     public function inline_js(){ ?>
         <script>
         (function(){
-            /* ======= Compteurs ======= */
+            /* ------------------ Compteurs ------------------ */
             function tick(){
                 document.querySelectorAll('.wsl-timer').forEach(function(el){
                     var end=parseInt(el.getAttribute('data-end')||'0',10)*1000; if(!end) return;
@@ -502,7 +535,7 @@ class Lottery {
             }
             tick(); setInterval(tick,1000);
 
-            /* ======= Slider simple (scroll-snap) ======= */
+            /* ---------------- Slider simple (scroll-snap) ---------------- */
             document.querySelectorAll('.ws-lottery-list.ws-slider').forEach(function(track){
                 var wrap=track.parentElement, prev=wrap.querySelector('.ws-prev'), next=wrap.querySelector('.ws-next'), dots=wrap.querySelector('.ws-dots');
                 var cols=parseInt(track.getAttribute('data-columns')||'3',10);
@@ -512,25 +545,31 @@ class Lottery {
                 function pages(){ return Math.max(1, Math.ceil(track.scrollWidth/track.clientWidth)); }
                 function buildDots(){ if(!dots) return; dots.innerHTML=''; for(var i=0;i<pages();i++){ var b=document.createElement('button'); if(i===0) b.className='is-active'; dots.appendChild(b);} }
                 function setDot(){ if(!dots) return; var i=Math.round(track.scrollLeft/track.clientWidth); dots.querySelectorAll('button').forEach(function(b,idx){ b.classList.toggle('is-active', idx===i); }); }
-                function scrollByPage(dir){ track.scrollTo({left: track.scrollLeft + dir*track.clientWidth, behavior:'smooth'}); setTimeout(setDot,350); }
+                function setNav(){
+                    if(!prev||!next) return;
+                    var i=Math.round(track.scrollLeft/track.clientWidth);
+                    prev.disabled = (i<=0);
+                    next.disabled = (i>=pages()-1);
+                }
+                function scrollByPage(dir){ track.scrollTo({left: track.scrollLeft + dir*track.clientWidth, behavior:'smooth'}); setTimeout(function(){ setDot(); setNav(); },350); }
 
                 prev && prev.addEventListener('click',function(){ scrollByPage(-1); });
                 next && next.addEventListener('click',function(){ scrollByPage(1);  });
-                track.addEventListener('scroll', function(){ window.requestAnimationFrame(setDot); });
-                buildDots(); setDot();
+                track.addEventListener('scroll', function(){ window.requestAnimationFrame(function(){ setDot(); setNav(); }); });
+                buildDots(); setDot(); setNav();
 
                 var needAuto = track.querySelectorAll('.wsl-card').length > cols;
-                var t=null; function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){ scrollByPage(1); }, interval); }
+                var t=null; function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){ 
+                    var i=Math.round(track.scrollLeft/track.clientWidth);
+                    if(i>=pages()-1){ stop(); return; } /* stop au dernier */
+                    scrollByPage(1);
+                }, interval); }
                 function stop(){ if(t){ clearInterval(t); t=null; } }
                 start(); track.addEventListener('mouseenter',stop); track.addEventListener('mouseleave',start);
-                window.addEventListener('resize',function(){ buildDots(); setDot(); start(); });
+                window.addEventListener('resize',function(){ buildDots(); setDot(); setNav(); start(); });
             });
 
-            /* ======= DIAGONAL CAROUSEL – refonte =======
-             * - Carte active: droite (rotate/skew 0), zIndex haut, pointer-events ON
-             * - Autres: rotation +/- 13°, décalage X/Y, scale, blur léger
-             * - Navigation: molette, drag, flèches, dots, clavier, autoplay
-             */
+            /* ---------------- Diagonal Carousel (écart++, no loop) ---------------- */
             document.querySelectorAll('.ws-lottery-list.ws-diagonal').forEach(function(scene){
                 var cards=[].slice.call(scene.querySelectorAll('.wsl-card'));
                 var wrap=scene.parentElement, prev=wrap.querySelector('.ws-prev'), next=wrap.querySelector('.ws-next'), dots=wrap.querySelector('.ws-dots');
@@ -539,27 +578,25 @@ class Lottery {
                 if(cards.length===0) return;
 
                 var current=0;
+
+                /* Réglages visuels – ÉCARTS ++ façon CodePen */
                 var ROT=13;              // rotation des cartes adjacentes
-                var GAP_X=90;            // décalage horizontal
-                var GAP_Y=42;            // décalage vertical
+                var GAP_X=220;           // écart horizontal (était 90)
+                var GAP_Y=90;            // écart vertical (était 42)
                 var SCALE_STEP=0.10;     // réduction par niveau
                 var FAR_HIDE=6;          // au delà -> fade
 
                 function tf(el,rel){
-                    // rel = index relatif: 0 (active), 1 (juste derrière), -1 (devant)
                     var sign = (rel<0)? -1 : 1;
                     var abs = Math.abs(rel);
-
                     var rot   = (rel===0)? 0 : sign*ROT;
-                    var skew  = 0;
                     var scale = Math.max(0.5, 1 - abs*SCALE_STEP);
                     var tx    = rel*GAP_X;
                     var ty    = abs*GAP_Y;
 
-                    el.style.transform = 'translate3d(calc(-50% + '+tx+'px), calc(-50% + '+ty+'px), 0) rotate('+rot+'deg) skewY('+skew+'deg) scale('+scale+')';
+                    el.style.transform = 'translate3d(calc(-50% + '+tx+'px), calc(-50% + '+ty+'px), 0) rotate('+rot+'deg) scale('+scale+')';
                     el.style.zIndex    = String(100 - abs);
                     el.style.opacity   = (abs>FAR_HIDE)? 0 : 1;
-                    el.style.filter    = (abs===0)? 'drop-shadow(0 24px 60px rgba(0,0,0,.45))' : 'drop-shadow(0 14px 40px rgba(0,0,0,.35)) blur('+(abs>3?1.2:0)+'px)';
                     el.classList.toggle('is-active', rel===0);
                     el.style.pointerEvents = (rel===0)? 'auto':'none';
                     el.style.willChange = 'transform';
@@ -567,7 +604,7 @@ class Lottery {
 
                 function layout(){
                     cards.forEach(function(el,idx){ tf(el, idx-current); });
-                    setDots();
+                    setDots(); setNav();
                 }
 
                 function buildDots(){
@@ -583,8 +620,21 @@ class Lottery {
                     if(!dots) return; var bs=dots.querySelectorAll('button');
                     bs.forEach(function(b,i){ b.classList.toggle('is-active', i===current); });
                 }
+                function setNav(){
+                    if(!prev||!next) return;
+                    prev.disabled = (current<=0);
+                    next.disabled = (current>=cards.length-1);
+                }
 
-                function go(d){ current=(current+d+cards.length)%cards.length; layout(); }
+                /* NO-LOOP: on clamp entre 0 et last */
+                function go(d){
+                    var nextIndex=current + d;
+                    if(nextIndex<0) nextIndex=0;
+                    if(nextIndex>cards.length-1) nextIndex=cards.length-1;
+                    if(nextIndex===current) return; /* déjà en bord */
+                    current=nextIndex; layout();
+                }
+
                 prev && prev.addEventListener('click',function(){ go(-1); });
                 next && next.addEventListener('click',function(){ go(+1); });
 
@@ -595,7 +645,7 @@ class Lottery {
                     if(e.key==='ArrowRight'){ e.preventDefault(); go(+1); }
                 });
 
-                // Molette (throttle)
+                // Molette (throttle) – no loop
                 var wheelLock=false;
                 scene.addEventListener('wheel',function(e){
                     e.preventDefault();
@@ -621,13 +671,16 @@ class Lottery {
                 scene.addEventListener('touchmove',onMove,{passive:true});
                 scene.addEventListener('touchend',onUp);
 
-                // Autoplay
+                // Autoplay: avance jusqu’à la dernière puis s’arrête
                 var needAuto = cards.length > 1;
-                var t=null; function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){ go(+1); }, interval); }
+                var t=null; function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){
+                    if(current>=cards.length-1){ stop(); return; }
+                    go(+1);
+                }, interval); }
                 function stop(){ if(t){ clearInterval(t); t=null; } }
-                start(); wrap.addEventListener('mouseenter',stop); wrap.addEventListener('mouseleave',start);
 
-                buildDots(); layout();
+                buildDots(); layout(); start();
+                wrap.addEventListener('mouseenter',stop); wrap.addEventListener('mouseleave',start);
                 window.addEventListener('resize', layout);
             });
         })();
