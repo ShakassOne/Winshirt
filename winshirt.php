@@ -3,7 +3,7 @@
  * Plugin Name: WinShirt
  * Description: Loteries WinShirt (CPT + tickets en base + cartes + shortcodes) + liaison WooCommerce Produits ↔ Loteries (tickets).
  * Version: 2.0.0
- * Author: WinShirt Recovery
+ * Author: Winshirt by Shakass Communication
  * Text Domain: winshirt
  */
 if ( ! defined('ABSPATH') ) exit;
