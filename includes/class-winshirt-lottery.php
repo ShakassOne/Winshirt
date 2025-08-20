@@ -3,9 +3,9 @@ namespace WinShirt;
 if (!defined('ABSPATH')) { exit; }
 
 /**
- * WinShirt – Loteries (CPT + Shortcodes)
- * Cartes uniformisées : titre fixé en bas, overlay qui slide au survol.
- * Slider natif (scroll-snap) avec flèches, dots et autoplay conditionnel.
+ * WinShirt – Loteries (CPT + Shortcodes + Cartes)
+ * Carte : titre calé en bas (hauteur fixe), overlay qui couvre jusqu’au bas et remonte au survol.
+ * Slider : flèches, points et autoplay (conditionné au nombre d’items).
  */
 class Lottery {
     private static $instance;
@@ -32,7 +32,7 @@ class Lottery {
         add_action('wp_footer',[$this,'inline_js']);
     }
 
-    /* ===== CPT ===== */
+    /* ========= CPT ========= */
     public function register_cpt(){
         register_post_type('winshirt_lottery',[
             'labels'=>[
@@ -154,7 +154,7 @@ class Lottery {
         <?php
     }
 
-    /* ===== Front: POST form ===== */
+    /* ========= Front : POST simple ========= */
     public function handle_entry_post(){
         if(!isset($_POST['ws_lottery_enter'])) return;
         if(!isset($_POST['ws_lottery_nonce']) || !wp_verify_nonce($_POST['ws_lottery_nonce'],'ws_lottery_enter')) return;
@@ -211,7 +211,7 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ===== Shortcodes ===== */
+    /* ========= Shortcodes ========= */
     public function sc_list($atts=[]){
         $a=shortcode_atts([
             'status'=>'active','featured'=>'0','limit'=>'12',
@@ -255,6 +255,7 @@ class Lottery {
                 if($a['featured']==='1' && !$f) $ok=false;
                 if($a['status']==='active')   $ok=$end? (strtotime($end)>= $now):$ok;
                 if($a['status']==='finished') $ok=$end && (strtotime($end)<  $now);
+                if($a['status']==='all')      $ok=true;
                 if(!$ok) continue;
 
                 echo $this->render_card($id,[
@@ -300,11 +301,10 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ===== Rendu carte ===== */
+    /* ========= Rendu carte ========= */
     private function render_card($post_id,$opts=[]){
         $title=get_the_title($post_id);
         $url=get_permalink($post_id);
-
         $thumb=get_the_post_thumbnail($post_id,'large',[
             'loading'=>'lazy','class'=>'wsl-img','decoding'=>'async','alt'=>esc_attr($title),
         ]);
@@ -322,14 +322,11 @@ class Lottery {
         ob_start(); ?>
         <article class="wsl-card" tabindex="0">
             <a class="wsl-link" href="<?php echo esc_url($url); ?>" aria-label="<?php echo esc_attr($title); ?>">
-                <figure class="wsl-figure" style="--wsl-titlebar-h:56px">
+                <figure class="wsl-figure" style="--wsl-titlebar-h:58px">
                     <?php echo $thumb ?: '<div class="wsl-img wsl-ph"></div>'; ?>
                     <?php if($feat): ?><span class="wsl-badge"><?php esc_html_e('En vedette','winshirt'); ?></span><?php endif; ?>
 
-                    <!-- Titre fixé en bas -->
-                    <div class="wsl-titlebar"><h3 class="wsl-title"><?php echo esc_html($title); ?></h3></div>
-
-                    <!-- Overlay qui slide depuis le bas jusqu'au dessus du titre -->
+                    <!-- Overlay couvre jusqu'en bas (derrière le titre) -->
                     <figcaption class="wsl-overlay">
                         <?php if($value): ?><p class="wsl-line"><?php echo esc_html(sprintf(__('Valeur: %s','winshirt'),$value)); ?></p><?php endif; ?>
                         <?php if($show_timer && $end_ts): ?>
@@ -346,6 +343,11 @@ class Lottery {
                         <p class="wsl-line wsl-date"><?php echo $end_ts? esc_html(sprintf(__('Tirage le %s','winshirt'), date_i18n('d/m/Y',$end_ts))) : esc_html__('Date de tirage à venir','winshirt'); ?></p>
                         <span class="wsl-btn-ghost"><?php esc_html_e('Participer','winshirt'); ?></span>
                     </figcaption>
+
+                    <!-- Titre calé en bas (visible en permanence) -->
+                    <div class="wsl-titlebar">
+                        <h3 class="wsl-title"><?php echo esc_html($title); ?></h3>
+                    </div>
                 </figure>
             </a>
         </article>
@@ -353,7 +355,7 @@ class Lottery {
         return ob_get_clean();
     }
 
-    /* ===== Admin liste ===== */
+    /* ========= Admin list ========= */
     public function admin_cols($c){ $c['ws_end']=__('Fin','winshirt'); $c['ws_goal']=__('Objectif','winshirt'); $c['ws_count']=__('Tickets','winshirt'); return $c; }
     public function admin_col_render($col,$id){
         if($col==='ws_end'){ $v=get_post_meta($id,'_ws_lottery_end',true); echo esc_html($v? date_i18n('d/m/Y H:i',strtotime($v)):'—'); }
@@ -365,7 +367,7 @@ class Lottery {
         return $actions;
     }
 
-    /* ===== Export CSV ===== */
+    /* ========= Export CSV ========= */
     public function ajax_export_csv(){
         check_admin_referer('ws_lottery_csv');
         if(!current_user_can('edit_posts')) wp_die('forbidden','',[ 'response'=>403 ]);
@@ -379,11 +381,11 @@ class Lottery {
         fclose($out); exit;
     }
 
-    /* ===== Helpers ===== */
+    /* ========= Helpers ========= */
     private function fmt_dt_local($stored){ if(empty($stored)) return ''; $ts=strtotime($stored); return $ts? date_i18n('Y-m-d\TH:i',$ts):''; }
     private function parse_dt_local($v){ if(empty($v)) return ''; $ts=strtotime($v); return $ts? date_i18n('Y-m-d H:i:s',$ts):''; }
 
-    /* ===== CSS ===== */
+    /* ========= CSS ========= */
     public function inline_css(){ ?>
         <style id="winshirt-lottery-cards">
             .ws-lottery-list{margin:10px auto;gap:18px}
@@ -397,6 +399,7 @@ class Lottery {
             .ws-lottery-list.ws-masonry.cols-4{column-count:4}
             .ws-lottery-list.ws-masonry>.wsl-card{break-inside:avoid;display:inline-block;width:100%;margin:0 0 18px}
 
+            /* Slider */
             .ws-slider-wrap{position:relative}
             .ws-lottery-list.ws-slider{display:flex;overflow:auto;gap:18px;scroll-snap-type:x mandatory;padding:4px 4px 8px 4px;scrollbar-width:none;-ms-overflow-style:none}
             .ws-lottery-list.ws-slider::-webkit-scrollbar{display:none}
@@ -410,6 +413,7 @@ class Lottery {
             .ws-dots button{width:8px;height:8px;border-radius:999px;border:0;background:#cfcfcf}
             .ws-dots button.is-active{background:#111}
 
+            /* Cartes */
             .wsl-card{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.10);background:#000}
             .wsl-link{display:block;color:inherit;text-decoration:none}
             .wsl-figure{position:relative;margin:0;aspect-ratio:16/9;background:#0a0a0a}
@@ -417,13 +421,23 @@ class Lottery {
             .wsl-ph{background:linear-gradient(135deg,#111,#1f1f1f)}
             .wsl-badge{position:absolute;top:12px;left:12px;padding:6px 10px;border-radius:999px;background:#6d28d9;color:#fff;font-size:12px;font-weight:600;z-index:3}
 
-            /* Titre collé en bas */
-            .wsl-titlebar{position:absolute;left:0;right:0;bottom:0;height:var(--wsl-titlebar-h,56px);padding:12px 16px;display:flex;align-items:center;color:#fff;background:rgba(0,0,0,.72);backdrop-filter:saturate(120%) blur(1.5px);z-index:2}
-            .wsl-title{margin:0;font-size:18px;line-height:1.25;font-weight:800;color:#fff}
+            /* Titre collé en bas – hauteur fixe */
+            .wsl-titlebar{position:absolute;left:0;right:0;bottom:0;height:var(--wsl-titlebar-h,58px);padding:12px 16px;display:flex;align-items:center;z-index:2}
+            .wsl-title{margin:0;max-width:100%;font-size:18px;line-height:1.25;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 2px 10px rgba(0,0,0,.35)}
 
-            /* Overlay à la même base partout : bottom = hauteur du titre, translateY(100%) -> 0 */
-            .wsl-overlay{position:absolute;left:0;right:0;bottom:calc(var(--wsl-titlebar-h,56px));padding:16px;color:#fff;background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.92) 85%);transform:translateY(100%);transition:transform .32s ease;display:flex;flex-direction:column;gap:6px;z-index:1;will-change:transform}
-            .wsl-card:hover .wsl-overlay,.wsl-card:focus .wsl-overlay,.wsl-card:focus-within .wsl-overlay{transform:translateY(0%)}
+            /* Overlay couvre jusqu'au bas (derrière le titre) */
+            .wsl-overlay{
+                position:absolute;left:0;right:0;bottom:0;
+                padding:16px 16px calc(var(--wsl-titlebar-h,58px) + 10px);
+                color:#fff;
+                background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.92) 85%);
+                transform:translateY(calc(100% - var(--wsl-titlebar-h,58px)));
+                transition:transform .32s ease;
+                display:flex;flex-direction:column;gap:6px;z-index:1;will-change:transform
+            }
+            .wsl-card:hover .wsl-overlay,
+            .wsl-card:focus .wsl-overlay,
+            .wsl-card:focus-within .wsl-overlay{transform:translateY(0%)}
 
             .wsl-line{margin:0;font-size:14px;color:#E6E6E6}
             .wsl-timer{font-family:ui-monospace,monospace}
@@ -441,11 +455,11 @@ class Lottery {
         </style>
     <?php }
 
-    /* ===== JS ===== */
+    /* ========= JS ========= */
     public function inline_js(){ ?>
         <script>
         (function(){
-            // Timers
+            /* Timers */
             function tick(){
                 document.querySelectorAll('.wsl-timer').forEach(function(el){
                     var end=parseInt(el.getAttribute('data-end')||'0',10)*1000; if(!end) return;
@@ -459,15 +473,15 @@ class Lottery {
             }
             tick(); setInterval(tick,1000);
 
-            // Slider
+            /* Slider */
             document.querySelectorAll('.ws-lottery-list.ws-slider').forEach(function(track){
                 var wrap=track.parentElement, prev=wrap.querySelector('.ws-prev'), next=wrap.querySelector('.ws-next'), dots=wrap.querySelector('.ws-dots');
                 var cols=parseInt(track.getAttribute('data-columns')||'3',10);
                 var autoplay=parseInt(track.getAttribute('data-autoplay')||'1',10)===1;
                 var interval=parseInt(track.getAttribute('data-interval')||'4000',10);
+
                 function pages(){ return Math.max(1, Math.ceil(track.scrollWidth/track.clientWidth)); }
 
-                // dots
                 function buildDots(){
                     if(!dots) return;
                     dots.innerHTML='';
