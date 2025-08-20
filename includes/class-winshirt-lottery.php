@@ -3,23 +3,18 @@ namespace WinShirt;
 if (!defined('ABSPATH')) { exit; }
 
 /**
- * WinShirt – Gestion des loteries (CPT + shortcodes + rendu front)
- * Version "overlay full-screen" :
- *  - Aucun texte visible par défaut
- *  - Un seul overlay couvrant 100% de la carte qui SLIDE DU BAS VERS LE HAUT AU SURVOL/FOCUS
- *  - Plus de dépendance à une barre de titre visible => plus de décalage entre cartes
- *  - Aspect-ratio fixe (16/9) pour stabiliser les hauteurs
+ * WinShirt – Loteries (CPT + Shortcodes)
+ * Ajoute le layout "diagonal" type carousel en biais (drag + wheel)
+ * Shortcode : [winshirt_lotteries status="all" layout="diagonal" columns="3"]
+ *
+ * Chaque méthode est commentée.
  */
 class Lottery {
     private static $instance;
-
-    /** Singleton */
     public static function instance(){ return self::$instance ?: (self::$instance = new self()); }
-
-    /** Enregistrement direct du CPT si appelé lors de l’activation */
     public static function register_post_type(){ self::instance()->register_cpt(); }
 
-    /** Bootstrap plugins/shortcodes */
+    /** Bootstrap : CPT, metaboxes, shortcodes, assets inline */
     public function init(){
         add_action('init',               [$this,'register_cpt']);
         add_action('add_meta_boxes',     [$this,'add_meta_boxes']);
@@ -40,9 +35,9 @@ class Lottery {
         add_action('wp_footer',[$this,'inline_js']);
     }
 
-    /* ╔═══════════════════════════ CPT + META ═══════════════════════════╗ */
+    /* ====== CPT ====== */
 
-    /** Déclare le Custom Post Type "Loterie" */
+    /** Déclare le CPT "winshirt_lottery" */
     public function register_cpt(){
         register_post_type('winshirt_lottery',[
             'labels'=>[
@@ -63,21 +58,21 @@ class Lottery {
         ]);
     }
 
-    /** Ajoute les metaboxes d’administration */
+    /** Ajoute metaboxes */
     public function add_meta_boxes(){
         add_meta_box('ws_lottery_details',__('Détails de la loterie','winshirt'),[$this,'mb_details'],'winshirt_lottery','normal','high');
         add_meta_box('ws_lottery_participants',__('Tickets & entrées','winshirt'),[$this,'mb_participants'],'winshirt_lottery','normal','default');
     }
 
-    /** Affichage Metabox Détails */
+    /** Metabox détails (dates, objectif, valeur, produit lié…) */
     public function mb_details(\WP_Post $post){
         wp_nonce_field('ws_lottery_save','ws_lottery_nonce');
         $start=get_post_meta($post->ID,'_ws_lottery_start',true);
-        $end=get_post_meta($post->ID,'_ws_lottery_end',true);
-        $goal=(int)get_post_meta($post->ID,'_ws_lottery_goal',true);
+        $end  =get_post_meta($post->ID,'_ws_lottery_end',true);
+        $goal =(int)get_post_meta($post->ID,'_ws_lottery_goal',true);
         $value=(string)get_post_meta($post->ID,'_ws_lottery_value',true);
         $terms=(string)get_post_meta($post->ID,'_ws_lottery_terms_url',true);
-        $feat=get_post_meta($post->ID,'_ws_lottery_featured',true)==='yes';
+        $feat =get_post_meta($post->ID,'_ws_lottery_featured',true)==='yes';
         $product=(int)get_post_meta($post->ID,'_ws_lottery_product_id',true);
         $products=function_exists('wc_get_products')? wc_get_products(['status'=>'publish','limit'=>200,'orderby'=>'title','order'=>'ASC']) : [];
         ?>
@@ -107,7 +102,7 @@ class Lottery {
         <?php
     }
 
-    /** Sauvegarde des métas */
+    /** Sauvegarde metas */
     public function save_meta($post_id,\WP_Post $post){
         if(!isset($_POST['ws_lottery_nonce']) || !wp_verify_nonce($_POST['ws_lottery_nonce'],'ws_lottery_save')) return;
         if(defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
@@ -133,7 +128,7 @@ class Lottery {
         if(get_post_meta($post_id,'_ws_lottery_count',true)==='')        update_post_meta($post_id,'_ws_lottery_count',0);
     }
 
-    /** Metabox Tickets (lecture + export) */
+    /** Metabox tickets + export CSV */
     public function mb_participants(\WP_Post $post){
         $rows=(array)get_post_meta($post->ID,'_ws_lottery_participants',true);
         $count=(int)get_post_meta($post->ID,'_ws_lottery_count',true); ?>
@@ -171,9 +166,9 @@ class Lottery {
         <?php
     }
 
-    /* ╔═══════════════════════════ FRONT : POST (formulaire) ═════════════╗ */
+    /* ====== Front : POST formulaire (1 ticket) ====== */
 
-    /** Réception du mini-formulaire (1 ticket) en front */
+    /** Réception du mini-formulaire de participation */
     public function handle_entry_post(){
         if(!isset($_POST['ws_lottery_enter'])) return;
         if(!isset($_POST['ws_lottery_nonce']) || !wp_verify_nonce($_POST['ws_lottery_nonce'],'ws_lottery_enter')) return;
@@ -214,7 +209,7 @@ class Lottery {
         wp_safe_redirect(add_query_arg('ws_lottery','ok',get_permalink($post_id))); exit;
     }
 
-    /** Gabarit d’email simple (HTML) */
+    /** Gabarit email simple */
     private function email_tpl($post_id,$name,$tickets,$from,$to){
         $site=wp_specialchars_decode(get_bloginfo('name'),ENT_QUOTES);
         $title=get_the_title($post_id);
@@ -231,9 +226,9 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ╔═══════════════════════════ SHORTCODES ════════════════════════════╗ */
+    /* ====== Shortcodes ====== */
 
-    /** [winshirt_lotteries] — liste (grid/masonry/slider) */
+    /** Liste des loteries (grid | masonry | slider | diagonal) */
     public function sc_list($atts=[]){
         $a=shortcode_atts([
             'status'=>'active','featured'=>'0','limit'=>'12',
@@ -244,31 +239,31 @@ class Lottery {
 
         $now=current_time('timestamp');
         $q=new \WP_Query([
-            'post_type'=>'winshirt_lottery',
-            'posts_per_page'=>(int)$a['limit'],
+            'post_type'=>'winshirt_lottery','posts_per_page'=>(int)$a['limit'],
             'orderby'=>'date','order'=>'DESC',
         ]);
 
-        $layout=in_array($a['layout'],['grid','masonry','slider'],true)? $a['layout']:'grid';
+        $layout=in_array($a['layout'],['grid','masonry','slider','diagonal'],true)? $a['layout']:'grid';
         $cols=in_array((int)$a['columns'],[2,3,4],true)? (int)$a['columns']:3;
 
         $classes=['ws-lottery-list','layout-'.$layout,'cols-'.$cols];
-        if($layout==='grid') $classes[]='ws-grid';
-        if($layout==='masonry') $classes[]='ws-masonry';
-        $is_slider=($layout==='slider');
+        if($layout==='grid')     $classes[]='ws-grid';
+        if($layout==='masonry')  $classes[]='ws-masonry';
+        if($layout==='slider')   $classes[]='ws-slider';
+        if($layout==='diagonal') $classes[]='ws-diagonal';
 
         $attrs='';
-        if($is_slider){
-            $classes[]='ws-slider';
+        if(in_array($layout,['slider','diagonal'],true)){
             $attrs.=' data-columns="'.(int)$cols.'" data-autoplay="'.(int)$a['autoplay'].'" data-interval="'.(int)$a['interval'].'"';
         }
 
         ob_start();
-        if($is_slider) echo '<div class="ws-slider-wrap">';
+        if(in_array($layout,['slider','diagonal'],true)) echo '<div class="ws-slider-wrap">';
         echo '<div class="'.esc_attr(implode(' ',$classes)).'"'.$attrs.'>';
 
         if($q->have_posts()){
             $printed=0;
+            $i=0;
             while($q->have_posts()){ $q->the_post();
                 $id=get_the_ID();
                 $end=get_post_meta($id,'_ws_lottery_end',true);
@@ -281,11 +276,16 @@ class Lottery {
                 if($a['status']==='all')      $ok=true;
                 if(!$ok) continue;
 
-                echo $this->render_card($id,[
+                // Pour le layout diagonal, on met un data-index pour les transformations
+                $card = $this->render_card($id,[
                     'show_timer'=>$a['show_timer']==='1',
                     'show_count'=>$a['show_count']==='1',
                 ]);
-                $printed++;
+                if($layout==='diagonal'){
+                    $card = preg_replace('/^<article /','<article data-index="'.(int)$i.'" ',$card);
+                }
+                echo $card;
+                $i++; $printed++;
             }
             wp_reset_postdata();
             if($printed===0) echo '<p>'.esc_html__('Aucune loterie disponible.','winshirt').'</p>';
@@ -293,7 +293,7 @@ class Lottery {
             echo '<p>'.esc_html__('Aucune loterie disponible.','winshirt').'</p>';
         }
         echo '</div>';
-        if($is_slider){
+        if(in_array($layout,['slider','diagonal'],true)){
             echo '<button class="ws-nav ws-prev" aria-label="Précédent">‹</button>';
             echo '<button class="ws-nav ws-next" aria-label="Suivant">›</button>';
             echo '<div class="ws-dots" aria-hidden="true"></div>';
@@ -302,14 +302,14 @@ class Lottery {
         return ob_get_clean();
     }
 
-    /** [winshirt_lottery_card id=""] — 1 carte */
+    /** Carte unique */
     public function sc_card($atts=[]){
         $a=shortcode_atts(['id'=>'0','show_timer'=>'1','show_count'=>'1'],$atts,'winshirt_lottery_card');
         $id=(int)$a['id']; if(!$id || get_post_type($id)!=='winshirt_lottery') return '';
         return $this->render_card($id,['show_timer'=>$a['show_timer']==='1','show_count'=>$a['show_count']==='1']);
     }
 
-    /** [winshirt_lottery_form id=""] — mini-form 1 ticket */
+    /** Mini-formulaire 1 ticket */
     public function sc_form($atts=[]){
         $a=shortcode_atts(['id'=>'0'],$atts,'winshirt_lottery_form');
         $id=(int)$a['id']; if(!$id || get_post_type($id)!=='winshirt_lottery') return '';
@@ -326,12 +326,12 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ╔═══════════════════════════ RENDU CARTE ═══════════════════════════╗ */
+    /* ====== Rendu carte ====== */
 
     /**
-     * Rendu d’une carte de loterie
-     * - Aspect ratio 16/9
-     * - Overlay 100% hauteur, caché (translateY(100%)), visible au hover/focus
+     * Rendu d’une carte de loterie :
+     * - figure 16/9 (hauteur homogène)
+     * - overlay full-cover, invisible, visible au hover
      */
     private function render_card($post_id,$opts=[]){
         $title=get_the_title($post_id);
@@ -357,23 +357,25 @@ class Lottery {
                     <?php echo $thumb ?: '<div class="wsl-img wsl-ph"></div>'; ?>
                     <?php if($feat): ?><span class="wsl-badge"><?php esc_html_e('En vedette','winshirt'); ?></span><?php endif; ?>
 
-                    <!-- OVERLAY PLEIN ÉCRAN : caché par défaut, visible au survol -->
+                    <!-- Overlay full-cover, visible uniquement au survol -->
                     <figcaption class="wsl-overlay">
-                        <h3 class="wsl-title"><?php echo esc_html($title); ?></h3>
-                        <?php if($value): ?><p class="wsl-line"><?php echo esc_html(sprintf(__('Valeur: %s','winshirt'),$value)); ?></p><?php endif; ?>
-                        <?php if($show_timer && $end_ts): ?>
-                            <p class="wsl-line wsl-timer" data-end="<?php echo (int)$end_ts; ?>">
-                                <span data-u="d">--</span> <?php esc_html_e('j','winshirt'); ?>
-                                <span data-u="h">--</span> <?php esc_html_e('h','winshirt'); ?>
-                                <span data-u="m">--</span> <?php esc_html_e('m','winshirt'); ?>
-                                <span data-u="s">--</span> <?php esc_html_e('s','winshirt'); ?>
-                            </p>
-                        <?php endif; ?>
-                        <?php if($show_count): ?>
-                            <p class="wsl-line"><?php echo esc_html(sprintf(_n('%d ticket — Objectif: %d','%d tickets — Objectif: %d',$tickets,'winshirt'),$tickets,$goal)); ?></p>
-                        <?php endif; ?>
-                        <p class="wsl-line wsl-date"><?php echo $end_ts? esc_html(sprintf(__('Tirage le %s','winshirt'), date_i18n('d/m/Y',$end_ts))) : esc_html__('Date de tirage à venir','winshirt'); ?></p>
-                        <span class="wsl-btn-ghost"><?php esc_html_e('Participer','winshirt'); ?></span>
+                        <div class="wsl-ov-inner">
+                            <h3 class="wsl-title"><?php echo esc_html($title); ?></h3>
+                            <?php if($value): ?><p class="wsl-line"><?php echo esc_html(sprintf(__('Valeur: %s','winshirt'),$value)); ?></p><?php endif; ?>
+                            <?php if($show_timer && $end_ts): ?>
+                                <p class="wsl-line wsl-timer" data-end="<?php echo (int)$end_ts; ?>">
+                                    <span data-u="d">--</span> <?php esc_html_e('j','winshirt'); ?>
+                                    <span data-u="h">--</span> <?php esc_html_e('h','winshirt'); ?>
+                                    <span data-u="m">--</span> <?php esc_html_e('m','winshirt'); ?>
+                                    <span data-u="s">--</span> <?php esc_html_e('s','winshirt'); ?>
+                                </p>
+                            <?php endif; ?>
+                            <?php if($show_count): ?>
+                                <p class="wsl-line"><?php echo esc_html(sprintf(_n('%d ticket — Objectif: %d','%d tickets — Objectif: %d',$tickets,'winshirt'),$tickets,$goal)); ?></p>
+                            <?php endif; ?>
+                            <p class="wsl-line wsl-date"><?php echo $end_ts? esc_html(sprintf(__('Tirage le %s','winshirt'), date_i18n('d/m/Y',$end_ts))) : esc_html__('Date de tirage à venir','winshirt'); ?></p>
+                            <span class="wsl-btn-ghost"><?php esc_html_e('Participer','winshirt'); ?></span>
+                        </div>
                     </figcaption>
                 </figure>
             </a>
@@ -382,7 +384,7 @@ class Lottery {
         return ob_get_clean();
     }
 
-    /* ╔═══════════════════════════ ADMIN LISTE ═══════════════════════════╗ */
+    /* ====== Admin liste ====== */
 
     public function admin_cols($c){ $c['ws_end']=__('Fin','winshirt'); $c['ws_goal']=__('Objectif','winshirt'); $c['ws_count']=__('Tickets','winshirt'); return $c; }
     public function admin_col_render($col,$id){
@@ -395,7 +397,7 @@ class Lottery {
         return $actions;
     }
 
-    /* ╔═══════════════════════════ EXPORT CSV ════════════════════════════╗ */
+    /* ====== Export CSV ====== */
 
     public function ajax_export_csv(){
         check_admin_referer('ws_lottery_csv');
@@ -410,16 +412,16 @@ class Lottery {
         fclose($out); exit;
     }
 
-    /* ╔═══════════════════════════ HELPERS ═══════════════════════════════╗ */
+    /* ====== Helpers ====== */
 
     private function fmt_dt_local($stored){ if(empty($stored)) return ''; $ts=strtotime($stored); return $ts? date_i18n('Y-m-d\TH:i',$ts):''; }
     private function parse_dt_local($v){ if(empty($v)) return ''; $ts=strtotime($v); return $ts? date_i18n('Y-m-d H:i:s',$ts):''; }
 
-    /* ╔═══════════════════════════ CSS INLINE ════════════════════════════╗ */
+    /* ====== CSS Inline (inclut layout diagonal) ====== */
 
     public function inline_css(){ ?>
         <style id="winshirt-lottery-cards">
-            /* LISTES */
+            /* LISTES de base */
             .ws-lottery-list{margin:10px auto;gap:18px}
             .ws-lottery-list.ws-grid{display:grid}
             .ws-lottery-list.ws-grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -431,7 +433,7 @@ class Lottery {
             .ws-lottery-list.ws-masonry.cols-4{column-count:4}
             .ws-lottery-list.ws-masonry>.wsl-card{break-inside:avoid;display:inline-block;width:100%;margin:0 0 18px}
 
-            /* SLIDER basique (scroll-snap) */
+            /* SLIDER (scroll-snap) */
             .ws-slider-wrap{position:relative}
             .ws-lottery-list.ws-slider{display:flex;overflow:auto;gap:18px;scroll-snap-type:x mandatory;padding:4px 4px 8px 4px;scrollbar-width:none;-ms-overflow-style:none}
             .ws-lottery-list.ws-slider::-webkit-scrollbar{display:none}
@@ -445,33 +447,55 @@ class Lottery {
             .ws-dots button{width:8px;height:8px;border-radius:999px;border:0;background:#cfcfcf}
             .ws-dots button.is-active{background:#111}
 
+            /* DIAGONAL CAROUSEL (inspiré du Pen) */
+            .ws-lottery-list.ws-diagonal{
+                position:relative;
+                height:420px; /* hauteur scène */
+                overflow:hidden;
+                perspective:1200px;
+                --gap-x: 36px;  /* décalage horizontal entre cartes */
+                --gap-y: 26px;  /* décalage vertical (diagonal) */
+                --rot:  -8deg;  /* légère rotation pour l'effet en biais */
+                --skew: -3deg;
+                --scale-step: .06; /* réduction progressive */
+            }
+            .ws-diagonal > .wsl-card{
+                position:absolute;
+                width:min(420px, 80vw);
+                left:50%;
+                top:50%;
+                transform-origin:center center;
+                transition:transform .45s cubic-bezier(.22,.61,.36,1), opacity .35s ease;
+                will-change:transform, opacity;
+                /* valeurs initiales (seront écrasées en JS avec data-index) */
+                transform:translate(-50%,-50%) rotate(var(--rot)) skewY(var(--skew));
+                opacity:.85;
+            }
+            .ws-diagonal .wsl-card.is-active{ opacity:1; }
+
             /* CARTES */
-            .wsl-card{position:relative;border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.10);background:#000}
+            .wsl-card{border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.15);background:#000}
             .wsl-link{display:block;color:inherit;text-decoration:none}
             .wsl-figure{position:relative;margin:0;aspect-ratio:16/9;background:#0a0a0a}
             .wsl-img{width:100%;height:100%;object-fit:cover;display:block}
             .wsl-ph{background:linear-gradient(135deg,#111,#1f1f1f)}
             .wsl-badge{position:absolute;top:12px;left:12px;padding:6px 10px;border-radius:999px;background:#6d28d9;color:#fff;font-size:12px;font-weight:600;z-index:3}
 
-            /* OVERLAY 100% HAUTEUR — Invisible par défaut */
-            .wsl-overlay{
-                position:absolute;inset:0;
-                display:flex;flex-direction:column;justify-content:flex-end;gap:8px;
-                padding:20px;
-                color:#fff;
-                background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 55%, rgba(0,0,0,.98) 100%);
-                transform:translateY(100%);
-                transition:transform .32s ease;
-                will-change:transform;
-            }
-            .wsl-card:hover .wsl-overlay,
-            .wsl-card:focus .wsl-overlay,
-            .wsl-card:focus-within .wsl-overlay{ transform:translateY(0); }
-
+            /* OVERLAY full-cover (affiché au hover/focus) */
+            .wsl-overlay{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center;padding:20px;background:linear-gradient(180deg,rgba(0,0,0,0) 10%,rgba(0,0,0,.9) 85%);opacity:0;transform:translateY(8%);transition:opacity .28s ease, transform .28s ease}
+            .wsl-card:hover .wsl-overlay, .wsl-card:focus .wsl-overlay, .wsl-card:focus-within .wsl-overlay{opacity:1;transform:translateY(0)}
+            .wsl-ov-inner{color:#fff;text-align:center}
             .wsl-title{margin:0 0 6px 0;font-size:20px;line-height:1.25;font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,.35)}
             .wsl-line{margin:0;font-size:14px;color:#E6E6E6}
             .wsl-timer{font-family:ui-monospace,monospace}
-            .wsl-btn-ghost{align-self:flex-start;margin-top:6px;border:1px solid rgba(255,255,255,.95);color:#fff;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;background:transparent}
+            .wsl-btn-ghost{display:inline-block;margin-top:8px;border:1px solid rgba(255,255,255,.95);color:#fff;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;background:transparent}
+
+            /* NAV */
+            .ws-slider-wrap .ws-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:6;border:0;border-radius:999px;width:40px;height:40px;line-height:40px;text-align:center;font-size:22px;font-weight:700;background:#111;color:#fff;opacity:.9;cursor:pointer}
+            .ws-slider-wrap .ws-prev{left:6px}.ws-slider-wrap .ws-next{right:6px}
+            .ws-slider-wrap .ws-dots{position:absolute;left:0;right:0;bottom:8px;display:flex;gap:6px;justify-content:center;z-index:7}
+            .ws-slider-wrap .ws-dots button{width:8px;height:8px;border-radius:999px;border:0;background:#cfcfcf}
+            .ws-slider-wrap .ws-dots button.is-active{background:#111}
 
             @media (max-width:1024px){
                 .ws-lottery-list.ws-grid.cols-3{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -480,17 +504,16 @@ class Lottery {
             @media (max-width:640px){
                 .ws-lottery-list.ws-grid{grid-template-columns:repeat(1,minmax(0,1fr)) !important}
                 .ws-lottery-list.ws-masonry{column-count:1 !important}
-                .ws-lottery-list.ws-slider>.wsl-card{min-width:85vw}
             }
         </style>
     <?php }
 
-    /* ╔═══════════════════════════ JS INLINE ═════════════════════════════╗ */
+    /* ====== JS Inline (timers + carousels + diagonal) ====== */
 
     public function inline_js(){ ?>
         <script>
         (function(){
-            /* Timers (1/s) */
+            /* ===== Compteurs (1/s) ===== */
             function tick(){
                 document.querySelectorAll('.wsl-timer').forEach(function(el){
                     var end=parseInt(el.getAttribute('data-end')||'0',10)*1000; if(!end) return;
@@ -504,42 +527,115 @@ class Lottery {
             }
             tick(); setInterval(tick,1000);
 
-            /* Slider minimal (scroll-snap) + navigation + autoplay conditionnel */
+            /* ===== Slider simple (scroll-snap) — inchangé ===== */
             document.querySelectorAll('.ws-lottery-list.ws-slider').forEach(function(track){
                 var wrap=track.parentElement, prev=wrap.querySelector('.ws-prev'), next=wrap.querySelector('.ws-next'), dots=wrap.querySelector('.ws-dots');
                 var cols=parseInt(track.getAttribute('data-columns')||'3',10);
                 var autoplay=parseInt(track.getAttribute('data-autoplay')||'1',10)===1;
                 var interval=parseInt(track.getAttribute('data-interval')||'4000',10);
-
                 function pages(){ return Math.max(1, Math.ceil(track.scrollWidth/track.clientWidth)); }
-
-                function buildDots(){
-                    if(!dots) return;
-                    dots.innerHTML='';
-                    for(var i=0;i<pages();i++){ var b=document.createElement('button'); if(i===0) b.className='is-active'; dots.appendChild(b); }
-                }
-                function setDot(){
-                    if(!dots) return;
-                    var i=Math.round(track.scrollLeft/track.clientWidth);
-                    dots.querySelectorAll('button').forEach(function(b,idx){ b.classList.toggle('is-active', idx===i); });
-                }
-                function scrollByPage(dir){
-                    track.scrollTo({left: track.scrollLeft + dir*track.clientWidth, behavior:'smooth'}); setTimeout(setDot,350);
-                }
+                function buildDots(){ if(!dots) return; dots.innerHTML=''; for(var i=0;i<pages();i++){ var b=document.createElement('button'); if(i===0) b.className='is-active'; dots.appendChild(b); } }
+                function setDot(){ if(!dots) return; var i=Math.round(track.scrollLeft/track.clientWidth); dots.querySelectorAll('button').forEach(function(b,idx){ b.classList.toggle('is-active', idx===i); }); }
+                function scrollByPage(dir){ track.scrollTo({left: track.scrollLeft + dir*track.clientWidth, behavior:'smooth'}); setTimeout(setDot,350); }
                 prev && prev.addEventListener('click',function(){ scrollByPage(-1); });
                 next && next.addEventListener('click',function(){ scrollByPage(1);  });
                 track.addEventListener('scroll', function(){ window.requestAnimationFrame(setDot); });
-
                 buildDots(); setDot();
-
                 var needAuto = track.querySelectorAll('.wsl-card').length > cols;
-                var t=null;
-                function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){ scrollByPage(1); }, interval); }
+                var t=null; function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){ scrollByPage(1); }, interval); }
                 function stop(){ if(t){ clearInterval(t); t=null; } }
-                start();
-                wrap.addEventListener('mouseenter',stop);
-                wrap.addEventListener('mouseleave',start);
+                start(); track.addEventListener('mouseenter',stop); track.addEventListener('mouseleave',start);
                 window.addEventListener('resize',function(){ buildDots(); setDot(); start(); });
+            });
+
+            /* ===== DIAGONAL CAROUSEL (drag + wheel) =====
+             * Empile les .wsl-card en diagonale via transform:
+             * translateX(i*gapX), translateY(i*gapY), rotate/skew, scale(1 - i*scaleStep)
+             * Navigation : molette, drag, flèches, dots, autoplay conditionnel
+             */
+            document.querySelectorAll('.ws-lottery-list.ws-diagonal').forEach(function(scene){
+                var cards=[].slice.call(scene.querySelectorAll('.wsl-card'));
+                var wrap=scene.parentElement, prev=wrap.querySelector('.ws-prev'), next=wrap.querySelector('.ws-next'), dots=wrap.querySelector('.ws-dots');
+                var cols=parseInt(scene.getAttribute('data-columns')||'3',10); // non utilisé pour la scène mais pour autoplay conditionnel
+                var autoplay=parseInt(scene.getAttribute('data-autoplay')||'1',10)===1;
+                var interval=parseInt(scene.getAttribute('data-interval')||'4000',10);
+
+                var current=0; // index actif
+                var gapX=36, gapY=26, rot=-8, skew=-3, scaleStep=0.06;
+
+                /* Positionne toutes les cartes selon l'index relatif à "current" */
+                function layout(){
+                    cards.forEach(function(el,idx){
+                        var rel=idx-current; // 0 = active, >0 = derrière, <0 = devant (à gauche)
+                        var tx = rel*gapX;
+                        var ty = rel*gapY;
+                        var sc = Math.max(0.5, 1 - Math.abs(rel)*scaleStep);
+                        var z  = 100 - Math.abs(rel);
+                        el.style.transform = 'translate(calc(-50% + '+tx+'px), calc(-50% + '+ty+'px)) rotate('+rot+'deg) skewY('+skew+'deg) scale('+sc+')';
+                        el.style.zIndex = String(z);
+                        el.classList.toggle('is-active', rel===0);
+                        el.style.opacity = (Math.abs(rel)>6)? 0 : 1;
+                        el.style.pointerEvents = (rel===0)? 'auto' : 'none';
+                    });
+                    setDots();
+                }
+
+                /* Dots */
+                function buildDots(){
+                    if(!dots) return;
+                    dots.innerHTML='';
+                    for(var i=0;i<cards.length;i++){
+                        var b=document.createElement('button'); if(i===current) b.className='is-active';
+                        (function(i2){ b.addEventListener('click',function(){ current=i2; layout(); }); })(i);
+                        dots.appendChild(b);
+                    }
+                }
+                function setDots(){
+                    if(!dots) return;
+                    var bs=dots.querySelectorAll('button');
+                    bs.forEach(function(b,i){ b.classList.toggle('is-active', i===current); });
+                }
+
+                /* Nav */
+                function go(d){ current=(current+d+cards.length)%cards.length; layout(); }
+                prev && prev.addEventListener('click',function(){ go(-1); });
+                next && next.addEventListener('click',function(){ go(+1); });
+
+                /* Molette */
+                var wheelLock=false;
+                scene.addEventListener('wheel',function(e){
+                    e.preventDefault();
+                    if(wheelLock) return; wheelLock=true;
+                    go( e.deltaY>0 ? +1 : -1 );
+                    setTimeout(function(){ wheelLock=false; }, 350);
+                }, {passive:false});
+
+                /* Drag souris / tactile */
+                var startX=0, dragging=false;
+                function onDown(e){ dragging=true; startX=(e.touches? e.touches[0].clientX : e.clientX); }
+                function onMove(e){
+                    if(!dragging) return;
+                    var x=(e.touches? e.touches[0].clientX : e.clientX);
+                    var dx=x-startX;
+                    if(Math.abs(dx)>40){ go(dx<0 ? +1 : -1); dragging=false; }
+                }
+                function onUp(){ dragging=false; }
+                scene.addEventListener('mousedown',onDown);
+                scene.addEventListener('mousemove',onMove);
+                document.addEventListener('mouseup',onUp);
+                scene.addEventListener('touchstart',onDown,{passive:true});
+                scene.addEventListener('touchmove',onMove,{passive:true});
+                scene.addEventListener('touchend',onUp);
+
+                /* Autoplay (si > 1 carte) */
+                var needAuto = cards.length > 1;
+                var t=null; function start(){ if(!autoplay||!needAuto) return; stop(); t=setInterval(function(){ go(+1); }, interval); }
+                function stop(){ if(t){ clearInterval(t); t=null; } }
+                start(); wrap.addEventListener('mouseenter',stop); wrap.addEventListener('mouseleave',start);
+
+                /* Init */
+                buildDots(); layout();
+                window.addEventListener('resize', layout);
             });
         })();
         </script>
