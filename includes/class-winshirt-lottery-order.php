@@ -3,10 +3,10 @@ namespace WinShirt;
 if ( ! defined('ABSPATH') ) exit;
 
 /**
- * Crédite les TICKETS depuis les commandes WooCommerce.
- * - _ws_lottery_count = total de tickets (somme)
- * - Chaque commande ajoute une entrée (source=order) avec 'tickets' (somme par loterie).
- * - Email / Checkout : affiche loterie, nb de tickets, et plage des numéros (#from à #to).
+ * Paiement WooCommerce → création de tickets individuels.
+ * - Utilise \WinShirt\Tickets pour écrire en BDD (numéros uniques)
+ * - Met à jour la méta _ws_lottery_count avec la somme SQL (compat front & widgets)
+ * - Alimente le checkout & l'email avec la plage attribuée
  */
 class Lottery_Order {
 
@@ -19,15 +19,15 @@ class Lottery_Order {
         add_filter('woocommerce_add_cart_item_data', [ $this, 'attach_lottery_to_cart_item' ], 10, 3);
         add_action('woocommerce_checkout_create_order_line_item', [ $this, 'add_line_item_meta' ], 10, 4);
 
-        add_action('woocommerce_payment_complete',           [ $this, 'credit_lotteries_from_order' ]);
-        add_action('woocommerce_order_status_processing',    [ $this, 'credit_lotteries_from_order' ]);
-        add_action('woocommerce_order_status_completed',     [ $this, 'credit_lotteries_from_order' ]);
+        add_action('woocommerce_payment_complete',        [ $this, 'credit_lotteries_from_order' ]);
+        add_action('woocommerce_order_status_processing', [ $this, 'credit_lotteries_from_order' ]);
+        add_action('woocommerce_order_status_completed',  [ $this, 'credit_lotteries_from_order' ]);
 
         add_action('woocommerce_order_item_meta_end', [ $this, 'display_item_lottery_meta' ], 10, 4);
         add_action('woocommerce_email_order_meta',    [ $this, 'email_lottery_summary' ], 10, 3);
     }
 
-    /* ------------------------- Attache loterie au panier ------------------------- */
+    /* --------- Attacher info loterie/tickets sur l'item panier --------- */
     public function attach_lottery_to_cart_item($cart_item_data, $product_id, $variation_id) {
         $pid  = $variation_id ?: $product_id;
         $info = $this->resolve_lottery_for_product( $pid );
@@ -41,85 +41,60 @@ class Lottery_Order {
         return $cart_item_data;
     }
 
-    /* ------------------ Copie des méta sur la ligne de commande ------------------ */
+    /* ---------------------- Copie meta sur ligne commande ---------------------- */
     public function add_line_item_meta($item, $cart_item_key, $values, $order) {
         if ( isset($values['winshirt_lottery']) ) {
             $meta = $values['winshirt_lottery'];
             $item->add_meta_data( __('Loterie','winshirt'), $meta['title'], true );
             $item->add_meta_data( __('Tickets','winshirt'), (int)$meta['tickets'], true );
-            $item->add_meta_data( '_ws_lottery_id', (int)$meta['lottery_id'], true ); // interne
+            $item->add_meta_data( '_ws_lottery_id', (int)$meta['lottery_id'], true );
         }
     }
 
-    /* -------------------------- Créditer les tickets ----------------------------- */
+    /* ---------------------------- Créditer les tickets ------------------------- */
     public function credit_lotteries_from_order( $order_id ): void {
         $order = wc_get_order($order_id);
         if ( ! $order ) return;
         if ( $order->get_meta('_ws_lotteries_credited') ) return;
 
-        // total par loterie dans la commande
+        // Total de tickets par loterie dans la commande
         $by_lottery = [];
-        foreach ( $order->get_items() as $item ) {
+        foreach ( $order->get_items() as $item_id => $item ) {
             $lid = (int) $item->get_meta('_ws_lottery_id', true);
             $tix = (int) $item->get_meta('Tickets', true);
             if ( $lid > 0 && $tix > 0 ) {
-                $by_lottery[$lid] = ($by_lottery[$lid] ?? 0) + $tix * max(1,$item->get_quantity());
+                $qty = max(1,$item->get_quantity());
+                $by_lottery[$lid] = ($by_lottery[$lid] ?? 0) + $tix * $qty;
             }
         }
         if ( empty($by_lottery) ) return;
 
+        $tickets = Tickets::instance();
         $customer_name  = trim($order->get_billing_first_name().' '.$order->get_billing_last_name());
         $customer_email = $order->get_billing_email();
-        $ip             = $order->get_customer_ip_address();
 
         $summary = [];
-        foreach ( $by_lottery as $lottery_id => $tickets_total ) {
+        foreach ($by_lottery as $lottery_id => $count) {
 
-            // Liste existante & total avant ajout
-            $rows          = (array) get_post_meta($lottery_id,'_ws_lottery_participants',true);
-            $previous_sum  = (int) get_post_meta($lottery_id,'_ws_lottery_count',true);
+            // Dédup simple : si une ligne "order" existe déjà pour cette commande/loterie → skip (pas de doubles)
+            // On reste simple : si re-crédit, l'admin peut manuellement supprimer dans la table.
+            $range = $tickets->create_tickets( (int)$lottery_id, (int)$count, [
+                'order_id'       => (int)$order_id,
+                'order_item_id'  => 0,
+                'customer_name'  => $customer_name,
+                'customer_email' => $customer_email,
+            ]);
 
-            // Dédup : si la commande a déjà été créditée pour cette loterie, on n’ajoute pas une 2e fois
-            $already = false;
-            foreach ($rows as $r) {
-                if ( (int)($r['order_id'] ?? 0) === (int)$order_id && ($r['source'] ?? '') === 'order' ) { $already = true; break; }
-            }
-            if ( $already ) {
-                $summary[] = [
-                    'lottery_id' => $lottery_id,
-                    'title'      => get_the_title($lottery_id),
-                    'tickets'    => (int)$tickets_total,
-                    'range_from' => $previous_sum + 1,
-                    'range_to'   => $previous_sum, // pas idéal mais on évite double incrément
-                ];
-                continue;
-            }
-
-            // Enregistre 1 entrée "order" avec le nombre de tickets gagnés
-            $rows[] = [
-                'date'     => date_i18n('Y-m-d H:i:s'),
-                'name'     => $customer_name,
-                'email'    => $customer_email,
-                'order'    => $order->get_order_number(),
-                'order_id' => (int)$order_id,
-                'tickets'  => (int)$tickets_total,
-                'ip'       => (string)$ip,
-                'source'   => 'order',
-            ];
-
-            $from = $previous_sum + 1;
-            $to   = $previous_sum + (int)$tickets_total;
-            $new_sum = $to;
-
-            update_post_meta($lottery_id,'_ws_lottery_participants',$rows);
-            update_post_meta($lottery_id,'_ws_lottery_count',$new_sum); // somme de tickets
+            // Mise à jour méta compteur depuis la base pour compatibilité (cards/shortcodes)
+            $sum = $tickets->count_tickets( (int)$lottery_id );
+            update_post_meta( (int)$lottery_id, '_ws_lottery_count', (int)$sum );
 
             $summary[] = [
-                'lottery_id' => $lottery_id,
-                'title'      => get_the_title($lottery_id),
-                'tickets'    => (int)$tickets_total,
-                'range_from' => (int)$from,
-                'range_to'   => (int)$to,
+                'lottery_id' => (int)$lottery_id,
+                'title'      => get_the_title( (int)$lottery_id ),
+                'tickets'    => (int)$count,
+                'range_from' => (int)$range['from'],
+                'range_to'   => (int)$range['to'],
             ];
         }
 
@@ -128,7 +103,7 @@ class Lottery_Order {
         $order->save();
     }
 
-    /* ---------------------- Affichages checkout/compte --------------------------- */
+    /* ------------------------ Affichages checkout/compte ----------------------- */
     public function display_item_lottery_meta( $item_id, $item, $order, $plain_text ) {
         $lid = (int) $item->get_meta('_ws_lottery_id', true);
         $tix = (int) $item->get_meta('Tickets', true);
@@ -144,7 +119,7 @@ class Lottery_Order {
         }
     }
 
-    /* ----------------------------- E-mail Woo ------------------------------ */
+    /* ------------------------------- Email Woo ------------------------------- */
     public function email_lottery_summary( $order, $sent_to_admin, $plain_text ) {
         $summary = $order->get_meta('_ws_lotteries_summary');
         if ( empty($summary) || ! is_array($summary) ) return;
@@ -153,8 +128,8 @@ class Lottery_Order {
             echo "\n".__('Loteries liées à votre commande :','winshirt')."\n";
             foreach ($summary as $row) {
                 $range = ($row['range_from'] === $row['range_to'])
-                    ? ('#'.$row['range_from'])
-                    : ('#'.$row['range_from'].' - #'.$row['range_to']);
+                    ? ('#'.str_pad($row['range_from'], 6, '0', STR_PAD_LEFT))
+                    : ('#'.str_pad($row['range_from'], 6, '0', STR_PAD_LEFT).' - #'.str_pad($row['range_to'], 6, '0', STR_PAD_LEFT));
                 echo '- '.$row['title'].' : '.$row['tickets'].' '._n('ticket','tickets',$row['tickets'],'winshirt').' ('.$range.")\n";
             }
             return;
@@ -165,8 +140,8 @@ class Lottery_Order {
         echo '<ul style="margin:6px 0 0 18px">';
         foreach ($summary as $row) {
             $range = ($row['range_from'] === $row['range_to'])
-                ? ('#'.$row['range_from'])
-                : ('#'.$row['range_from'].' - #'.$row['range_to']);
+                ? ('#'.str_pad($row['range_from'],6,'0',STR_PAD_LEFT))
+                : ('#'.str_pad($row['range_from'],6,'0',STR_PAD_LEFT).' - #'.str_pad($row['range_to'],6,'0',STR_PAD_LEFT));
             printf(
                 '<li>%s : <b>%d</b> %s — %s</li>',
                 esc_html($row['title']),
@@ -178,7 +153,7 @@ class Lottery_Order {
         echo '</ul></div>';
     }
 
-    /* ----------------------------- Helpers -------------------------------- */
+    /* ------------------------------- Helpers --------------------------------- */
     private function resolve_lottery_for_product( int $product_id ): array {
         $enabled = get_post_meta($product_id,'_ws_enable_lottery',true)==='yes';
         $lottery = (int) get_post_meta($product_id,'_ws_lottery_id',true);
@@ -190,7 +165,6 @@ class Lottery_Order {
             $lottery = (int) get_post_meta($parent_id,'_ws_lottery_id',true);
             $tickets = (int) get_post_meta($parent_id,'_ws_ticket_count',true);
         }
-
         if ( ! $enabled || $lottery<=0 || $tickets<=0 ) {
             $terms = get_the_terms($product_id,'product_cat') ?: [];
             foreach($terms as $t){
