@@ -4,8 +4,9 @@ namespace WinShirt;
 if ( ! \defined('ABSPATH') ) { exit; }
 
 /**
- * Loteries (CPT + shortcodes + formulaire) — rendu cartes full-image avec overlay au survol.
- * Classes fortement préfixées (.wsl-*) pour éviter les conflits de thème.
+ * Loteries (CPT + shortcodes + formulaire) — cartes full-image
+ * Titre toujours visible (.wsl-titlebar) + overlay infos au survol (.wsl-overlay)
+ * Classes préfixées .wsl-* pour éviter les conflits thème.
  */
 class Lottery {
 
@@ -227,7 +228,7 @@ class Lottery {
             'featured'   => '0',              // 0|1
             'limit'      => '12',
             'layout'     => 'grid',           // grid|masonry|slider
-            'columns'    => '3',              // 2|3|4 (grid/masonry)
+            'columns'    => '3',              // 2|3|4
             'show_timer' => '1',
             'show_count' => '1',
         ], $atts, 'winshirt_lotteries');
@@ -326,13 +327,19 @@ class Lottery {
         \ob_start(); ?>
         <article class="wsl-card" tabindex="0">
             <a class="wsl-link" href="<?php echo \esc_url($url); ?>" aria-label="<?php echo \esc_attr($title); ?>">
-                <figure class="wsl-figure">
+                <figure class="wsl-figure" style="--wsl-titlebar-h:56px">
                     <?php echo $thumb ?: '<div class="wsl-img wsl-ph"></div>'; ?>
                     <?php if ($feat): ?><span class="wsl-badge"><?php \esc_html_e('En vedette','winshirt'); ?></span><?php endif; ?>
 
-                    <figcaption class="wsl-overlay">
+                    <!-- Title always visible -->
+                    <div class="wsl-titlebar">
                         <h3 class="wsl-title"><?php echo \esc_html($title); ?></h3>
+                    </div>
+
+                    <!-- Overlay: slides up on hover/focus -->
+                    <figcaption class="wsl-overlay">
                         <?php if ($value): ?><p class="wsl-line"><?php echo \esc_html(\sprintf(\__('Valeur: %s','winshirt'),$value)); ?></p><?php endif; ?>
+
                         <?php if ($show_timer && $end_ts): ?>
                             <p class="wsl-line wsl-timer" data-end="<?php echo (int)$end_ts; ?>">
                                 <span data-u="d">--</span> <?php \esc_html_e('j','winshirt'); ?>
@@ -341,9 +348,11 @@ class Lottery {
                                 <span data-u="s">--</span> <?php \esc_html_e('s','winshirt'); ?>
                             </p>
                         <?php endif; ?>
+
                         <?php if ($show_count): ?>
                             <p class="wsl-line"><?php echo \esc_html(\sprintf(\_n('%d ticket — Objectif: %d','%d tickets — Objectif: %d',$tickets,'winshirt'),$tickets,$goal)); ?></p>
                         <?php endif; ?>
+
                         <p class="wsl-line wsl-date"><?php echo $end_ts ? \esc_html(\sprintf(\__('Tirage le %s','winshirt'), \date_i18n('d/m/Y',$end_ts))) : \esc_html__('Date de tirage à venir','winshirt'); ?></p>
                         <span class="wsl-btn-ghost"><?php \esc_html_e('Participer','winshirt'); ?></span>
                     </figcaption>
@@ -413,26 +422,39 @@ class Lottery {
             .wsl-img{width:100%; height:100%; object-fit:cover; display:block}
             .wsl-ph{background:linear-gradient(135deg,#111,#1f1f1f)}
 
-            .wsl-badge{position:absolute;top:12px;left:12px;padding:6px 10px;border-radius:999px;background:#6d28d9;color:#fff;font-size:12px;font-weight:600;z-index:2}
+            .wsl-badge{position:absolute;top:12px;left:12px;padding:6px 10px;border-radius:999px;background:#6d28d9;color:#fff;font-size:12px;font-weight:600;z-index:3}
 
-            /* >>> Overlay 100% caché au repos */
+            /* Barre titre toujours visible */
+            .wsl-titlebar{
+                position:absolute; left:0; right:0; bottom:0;
+                height:var(--wsl-titlebar-h,56px);
+                padding:12px 16px;
+                display:flex; align-items:center;
+                color:#fff; background:rgba(0,0,0,.70);
+                backdrop-filter:saturate(120%) blur(1.5px);
+                z-index:2;
+            }
+            .wsl-title{margin:0; font-size:18px; line-height:1.25; font-weight:800; color:#fff}
+
+            /* Overlay totalement caché au repos, remonte AU-DESSUS du titre */
             .wsl-overlay{
-                position:absolute; inset:auto 0 0 0; padding:16px; color:#fff;
-                background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.85) 85%);
-                transform: translateY(100%);          /* totalement hors champ */
+                position:absolute; left:0; right:0;
+                bottom:calc(var(--wsl-titlebar-h,56px));  /* s’arrête juste au-dessus de la barre titre */
+                padding:16px;
+                color:#fff;
+                background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.90) 85%);
+                transform: translateY(100%);
                 transition: transform .35s ease;
                 display:flex; flex-direction:column; gap:6px; z-index:1;
                 will-change: transform;
             }
-            /* Apparition uniquement au survol/focus */
             .wsl-card:hover .wsl-overlay,
             .wsl-card:focus .wsl-overlay,
             .wsl-card:focus-within .wsl-overlay{ transform: translateY(0%); }
 
-            .wsl-title{margin:0 0 2px; font-size:18px; line-height:1.25; font-weight:700; color:#fff;} /* titre en blanc */
             .wsl-line{margin:0; font-size:14px; color:#E6E6E6}
             .wsl-timer{font-family:ui-monospace,monospace}
-            .wsl-btn-ghost{align-self:flex-start; margin-top:4px; border:1px solid rgba(255,255,255,.9); color:#fff; padding:8px 12px; border-radius:8px; font-weight:600; font-size:14px; background:transparent}
+            .wsl-btn-ghost{align-self:flex-start; margin-top:6px; border:1px solid rgba(255,255,255,.9); color:#fff; padding:8px 12px; border-radius:8px; font-weight:600; font-size:14px; background:transparent}
 
             @media (max-width: 1024px){
                 .ws-lottery-list.ws-grid.cols-3{grid-template-columns:repeat(2,minmax(0,1fr))}
