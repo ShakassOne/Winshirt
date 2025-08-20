@@ -4,8 +4,10 @@ namespace WinShirt;
 if ( ! defined('ABSPATH') ) exit;
 
 /**
- * CPT Loteries + métas + shortcodes + formulaire.
- * ⚠️ Depuis cette version, _ws_lottery_count représente le **TOTAL DE TICKETS** (plus le nombre de participants).
+ * CPT Loteries + shortcodes + formulaire.
+ * Cette version applique les options d'affichage (layout/overlay/fields) et fournit le CSS nécessaire.
+ * - _ws_lottery_count = TOTAL DE TICKETS
+ * - Layouts: grid | masonry | slider (slider = simple bande horizontale sans JS)
  */
 class Lottery {
 
@@ -26,13 +28,16 @@ class Lottery {
         // Formulaire front
         add_action('template_redirect', [ $this, 'handle_entry_post' ]);
 
-        // Export
+        // Export CSV (ancienne compat)
         add_action('wp_ajax_ws_lottery_export_csv', [ $this, 'ajax_export_csv' ]);
 
         // Shortcodes
         add_shortcode('winshirt_lotteries',    [ $this, 'sc_list' ]);
         add_shortcode('winshirt_lottery_card', [ $this, 'sc_card' ]);
         add_shortcode('winshirt_lottery_form', [ $this, 'sc_form' ]);
+
+        // CSS front pour les cartes + masonry
+        add_action('wp_head', [ $this, 'inline_css' ]);
     }
 
     /* ============================ CPT & META =========================== */
@@ -62,7 +67,7 @@ class Lottery {
         add_meta_box('ws_lottery_participants', __('Tickets & entrées','winshirt'), [ $this,'mb_participants' ], 'winshirt_lottery', 'normal', 'default');
     }
 
-    /** Metabox informations générales */
+    /** Metabox informations générales (dates, objectif, etc.) */
     public function mb_details(\WP_Post $post): void {
         wp_nonce_field('ws_lottery_save','ws_lottery_nonce');
 
@@ -102,7 +107,7 @@ class Lottery {
         <?php
     }
 
-    /** Sauvegarde des méta (init des structures) */
+    /** Sauvegarde des méta + initialisations */
     public function save_meta(int $post_id, \WP_Post $post): void {
         if ( ! isset($_POST['ws_lottery_nonce']) || ! wp_verify_nonce($_POST['ws_lottery_nonce'],'ws_lottery_save') ) return;
         if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) return;
@@ -122,18 +127,17 @@ class Lottery {
         update_post_meta($post_id,'_ws_lottery_terms_url',$terms);
         update_post_meta($post_id,'_ws_lottery_featured',$feat);
 
-        // Initialisations si absentes
         if ( get_post_meta($post_id,'_ws_lottery_participants',true)==='' ) update_post_meta($post_id,'_ws_lottery_participants',[]);
-        if ( get_post_meta($post_id,'_ws_lottery_count',true)==='' )        update_post_meta($post_id,'_ws_lottery_count',0); // = total tickets
+        if ( get_post_meta($post_id,'_ws_lottery_count',true)==='' )        update_post_meta($post_id,'_ws_lottery_count',0);
         if ( get_post_meta($post_id,'_ws_lottery_product_id',true)==='' )   update_post_meta($post_id,'_ws_lottery_product_id',0);
     }
 
-    /** Metabox participants/tickets (admin) */
+    /** Metabox tickets/entrées (aperçu) */
     public function mb_participants(\WP_Post $post): void {
         $rows  = (array) get_post_meta($post->ID,'_ws_lottery_participants',true);
         $count = (int) get_post_meta($post->ID,'_ws_lottery_count',true); ?>
         <p><b><?php esc_html_e('Total tickets :','winshirt'); ?></b> <?php echo (int)$count; ?></p>
-        <p><a href="#" class="button" id="ws-export-csv" data-id="<?php echo (int)$post->ID; ?>"><?php esc_html_e('Exporter CSV','winshirt'); ?></a></p>
+        <p><a href="#" class="button" id="ws-export-csv" data-id="<?php echo (int)$post->ID; ?>"><?php esc_html_e('Exporter CSV (compat)','winshirt'); ?></a></p>
         <table class="widefat striped">
             <thead><tr><th>Date</th><th>Nom</th><th>Email</th><th>Commande</th><th>Tickets</th><th>IP</th><th>Source</th></tr></thead>
             <tbody>
@@ -176,7 +180,6 @@ class Lottery {
         }
 
         $rows = (array) get_post_meta($post_id,'_ws_lottery_participants',true);
-        // On autorise plusieurs entrées pour un même email si elles ajoutent des tickets (pas de dédup stricte)
         $tickets_added = 1;
 
         $previous_total = (int) get_post_meta($post_id,'_ws_lottery_count',true);
@@ -194,7 +197,6 @@ class Lottery {
         update_post_meta($post_id,'_ws_lottery_participants',$rows);
         update_post_meta($post_id,'_ws_lottery_count',$new_total);
 
-        // Email : plage de tickets attribués
         $from = $previous_total + 1;
         $to   = $new_total;
         $subject = sprintf(__('Confirmation de participation : %s','winshirt'), get_the_title($post_id));
@@ -204,7 +206,7 @@ class Lottery {
         wp_safe_redirect(add_query_arg('ws_lottery','ok',get_permalink($post_id))); exit;
     }
 
-    /** Email HTML (formulaire) — annonce de la plage de tickets */
+    /** Email HTML (formulaire) — plage de tickets attribués */
     private function email_tpl(int $post_id, string $name, int $tickets, int $from, int $to): string {
         $site  = wp_specialchars_decode(get_bloginfo('name'),ENT_QUOTES);
         $title = get_the_title($post_id);
@@ -221,33 +223,36 @@ class Lottery {
         <?php return ob_get_clean();
     }
 
-    /* ============================== EXPORT ============================= */
-    public function ajax_export_csv(): void {
-        check_admin_referer('ws_lottery_csv');
-        if ( ! current_user_can('edit_posts') ) wp_die('forbidden','',[ 'response'=>403 ]);
-        $post_id = (int)($_GET['post_id'] ?? 0);
-        if ( ! $post_id || get_post_type($post_id)!=='winshirt_lottery' ) wp_die('invalid','',[ 'response'=>400 ]);
-        $rows = (array) get_post_meta($post_id,'_ws_lottery_participants',true);
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="lottery-'.$post_id.'-tickets.csv"');
-        $out = fopen('php://output','w'); fputcsv($out,['date','name','email','order','tickets','ip','source']);
-        foreach($rows as $r){ fputcsv($out,[$r['date']??'',$r['name']??'',$r['email']??'',$r['order']??'',$r['tickets']??0,$r['ip']??'',$r['source']??'']); }
-        fclose($out); exit;
-    }
-
     /* ============================ SHORTCODES =========================== */
 
-    /** Liste des loteries (grid/list) */
+    /**
+     * Liste des loteries
+     * Attributs:
+     * - status: active|finished|all|upcoming (upcoming = alias active)
+     * - featured: 0|1
+     * - limit: int
+     * - layout: grid|masonry|slider (prioritaire sur les méta d’une loterie)
+     * - columns: 2|3|4 (grid/masonry)
+     * - show_timer: 0|1
+     * - show_count: 0|1
+     * - overlay: dark|light|none (force)
+     * - fields: liste csv (value,count,button,date,featured) – force
+     */
     public function sc_list($atts=[]): string {
         $a = shortcode_atts([
-            'status'     => 'active',          // active|finished|all
-            'featured'   => '0',               // 0|1
+            'status'     => 'active',
+            'featured'   => '0',
             'limit'      => '12',
-            'layout'     => 'grid',            // grid|list
-            'columns'    => '3',               // 2|3|4
+            'layout'     => 'grid',
+            'columns'    => '3',
             'show_timer' => '1',
-            'show_count' => '1',               // affiche le total de tickets
+            'show_count' => '1',
+            'overlay'    => '',   // optionnel pour forcer
+            'fields'     => '',   // optionnel pour forcer
         ], $atts, 'winshirt_lotteries');
+
+        // Normalise status (on accepte "upcoming")
+        if ($a['status']==='upcoming') { $a['status']='active'; }
 
         $now = current_time('timestamp');
         $q = new \WP_Query([
@@ -257,24 +262,40 @@ class Lottery {
             'order'          => 'DESC',
         ]);
 
+        $layout = in_array($a['layout'], ['grid','masonry','slider'], true) ? $a['layout'] : 'grid';
+        $cols   = in_array((int)$a['columns'], [2,3,4], true) ? (int)$a['columns'] : 3;
+
+        // Wrapper classes
+        $classes = ['ws-lottery-list','layout-'.$layout,'cols-'.$cols];
+        if ($layout==='masonry') { $classes[]='ws-masonry'; }
+        if ($layout==='grid')    { $classes[]='ws-grid'; }
+        if ($layout==='slider')  { $classes[]='ws-slider'; }
+
         ob_start();
-        $class = $a['layout']==='list' ? 'ws-list' : 'ws-grid cols-'.(int)$a['columns'];
-        echo '<div class="ws-lottery-list '.$class.'">';
+        echo '<div class="'.esc_attr(implode(' ',$classes)).'">';
         if ( $q->have_posts() ) {
             while ( $q->have_posts() ) { $q->the_post();
                 $id  = get_the_ID();
                 $end = get_post_meta($id,'_ws_lottery_end',true);
                 $f   = get_post_meta($id,'_ws_lottery_featured',true)==='yes';
+
+                // Filtrage status/featured
                 $ok  = true;
                 if ( $a['featured']==='1' && ! $f ) $ok = false;
                 if ( $a['status']==='active' )   $ok = $end ? ( strtotime($end) >= $now ) : $ok;
                 if ( $a['status']==='finished' ) $ok = $end && ( strtotime($end) <  $now );
                 if ( ! $ok ) continue;
 
-                echo $this->render_card($id, [
+                // Options de rendu (prennent en compte overlay/fields forcés du shortcode)
+                $render_opts = [
                     'show_timer' => $a['show_timer']==='1',
                     'show_count' => $a['show_count']==='1',
-                ]);
+                    'force'      => [
+                        'overlay' => $a['overlay'],
+                        'fields'  => $a['fields'],
+                    ],
+                ];
+                echo $this->render_card($id, $render_opts);
             }
             wp_reset_postdata();
         } else {
@@ -286,12 +307,22 @@ class Lottery {
 
     /** Carte unique */
     public function sc_card($atts=[]): string {
-        $a = shortcode_atts([ 'id'=>'0', 'show_timer'=>'1', 'show_count'=>'1' ], $atts, 'winshirt_lottery_card');
+        $a = shortcode_atts([
+            'id'         => '0',
+            'show_timer' => '1',
+            'show_count' => '1',
+            'overlay'    => '',
+            'fields'     => '',
+        ], $atts, 'winshirt_lottery_card');
         $id = (int) $a['id'];
         if ( ! $id || get_post_type($id)!=='winshirt_lottery' ) return '';
         return $this->render_card($id, [
             'show_timer' => $a['show_timer']==='1',
             'show_count' => $a['show_count']==='1',
+            'force'      => [
+                'overlay' => $a['overlay'],
+                'fields'  => $a['fields'],
+            ],
         ]);
     }
 
@@ -314,7 +345,11 @@ class Lottery {
 
     /* ============================== RENDUS ============================= */
 
-    /** Carte compacte (utilisée par liste & shortcode) */
+    /**
+     * Rend une carte (petit composant) avec overlay et champs optionnels.
+     * @param int   $post_id
+     * @param array $opts ['show_timer'=>bool,'show_count'=>bool,'force'=>['overlay'=>'','fields'=>'csv']]
+     */
     private function render_card(int $post_id, array $opts=[]): string {
         $title   = get_the_title($post_id);
         $url     = get_permalink($post_id);
@@ -326,25 +361,63 @@ class Lottery {
         $value   = (string) get_post_meta($post_id,'_ws_lottery_value',true);
         $feat    = get_post_meta($post_id,'_ws_lottery_featured',true)==='yes';
 
+        // Récup options d'affichage (depuis Lottery_Display si présent)
+        $overlay = get_post_meta($post_id,'_ws_display_overlay',true) ?: 'dark';
+        $fields  = (array) get_post_meta($post_id,'_ws_display_fields',true) ?: ['value','count','button','date','featured'];
+
+        // Forçage via shortcode
+        if ( !empty($opts['force']['overlay']) ) { $overlay = sanitize_text_field($opts['force']['overlay']); }
+        if ( !empty($opts['force']['fields']) )  { $fields = array_map('trim', explode(',', sanitize_text_field($opts['force']['fields']))); }
+
         $show_timer = ! empty($opts['show_timer']);
         $show_count = ! empty($opts['show_count']);
 
+        // Permettre à Lottery_Display de filtrer les args si nécessaire
+        if ( has_filter('winshirt_lottery_render_card_args') ) {
+            $filtered = apply_filters('winshirt_lottery_render_card_args', [
+                'overlay'    => $overlay,
+                'fields'     => $fields,
+                'show_timer' => $show_timer,
+                'show_count' => $show_count,
+            ], $post_id, $opts['force'] ?? []);
+            $overlay    = $filtered['overlay'];
+            $fields     = $filtered['fields'];
+            $show_timer = (bool)$filtered['show_timer'];
+            $show_count = (bool)$filtered['show_count'];
+        }
+
         ob_start(); ?>
-        <article class="ws-card-mini">
+        <article class="ws-card-mini" data-overlay="<?php echo esc_attr($overlay); ?>">
             <a class="ws-card-mini-media" href="<?php echo esc_url($url); ?>">
-                <?php echo $thumb ?: '<div class="ws-ph"></div>'; ?>
-                <?php if ($feat): ?><span class="ws-mini-badge ws-badge-featured"><?php esc_html_e('En vedette','winshirt'); ?></span><?php endif; ?>
+                <?php echo $thumb ?: '<div class="ws-ph" style="background:#111;height:220px"></div>'; ?>
+                <?php if ($feat && in_array('featured',$fields,true)): ?>
+                    <span class="ws-mini-badge ws-badge-featured"><?php esc_html_e('En vedette','winshirt'); ?></span>
+                <?php endif; ?>
             </a>
             <div class="ws-card-mini-body">
                 <h3 class="ws-card-mini-title"><a href="<?php echo esc_url($url); ?>"><?php echo esc_html($title); ?></a></h3>
-                <?php if ($value): ?><div class="ws-mini-value"><?php echo esc_html(sprintf(__('Valeur: %s','winshirt'),$value)); ?></div><?php endif; ?>
+
+                <?php if (in_array('value',$fields,true) && $value): ?>
+                    <div class="ws-mini-value"><?php echo esc_html(sprintf(__('Valeur: %s','winshirt'),$value)); ?></div>
+                <?php endif; ?>
+
                 <?php if ($show_timer && $end_ts): ?>
                     <div class="ws-mini-timer" data-end="<?php echo (int)$end_ts; ?>"><span data-u="d">--</span>d <span data-u="h">--</span>h <span data-u="m">--</span>m <span data-u="s">--</span>s</div>
                 <?php endif; ?>
-                <?php if ($show_count): ?>
+
+                <?php if ($show_count && in_array('count',$fields,true)): ?>
                     <div class="ws-mini-count"><?php echo esc_html(sprintf(_n('%d ticket','%d tickets',$tickets,'winshirt'),$tickets)); ?><?php if($goal): ?> — <?php echo esc_html(sprintf(__('Objectif: %d','winshirt'),$goal)); ?><?php endif; ?></div>
                 <?php endif; ?>
-                <a class="ws-btn ws-btn-sm" href="<?php echo esc_url($url); ?>"><?php esc_html_e('Participer','winshirt'); ?></a>
+
+                <?php if (in_array('button',$fields,true)): ?>
+                    <a class="ws-btn ws-btn-sm" href="<?php echo esc_url($url); ?>"><?php esc_html_e('Participer','winshirt'); ?></a>
+                <?php endif; ?>
+
+                <?php if (in_array('date',$fields,true)): ?>
+                    <div class="ws-mini-date" style="margin-top:8px;opacity:.85">
+                        <?php echo $end_ts ? esc_html(sprintf(__('Tirage le %s','winshirt'), date_i18n('d/m/Y',$end_ts))) : esc_html__('Date de tirage à venir','winshirt'); ?>
+                    </div>
+                <?php endif; ?>
             </div>
         </article>
         <?php return ob_get_clean();
@@ -370,7 +443,59 @@ class Lottery {
         return $actions;
     }
 
+    /* ============================== EXPORT ============================= */
+    public function ajax_export_csv(): void {
+        check_admin_referer('ws_lottery_csv');
+        if ( ! current_user_can('edit_posts') ) wp_die('forbidden','',[ 'response'=>403 ]);
+        $post_id = (int)($_GET['post_id'] ?? 0);
+        if ( ! $post_id || get_post_type($post_id)!=='winshirt_lottery' ) wp_die('invalid','',[ 'response'=>400 ]);
+        $rows = (array) get_post_meta($post_id,'_ws_lottery_participants',true);
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="lottery-'.$post_id.'-tickets.csv"');
+        $out = fopen('php://output','w'); fputcsv($out,['date','name','email','order','tickets','ip','source']);
+        foreach($rows as $r){ fputcsv($out,[$r['date']??'',$r['name']??'',$r['email']??'',$r['order']??'',$r['tickets']??0,$r['ip']??'',$r['source']??'']); }
+        fclose($out); exit;
+    }
+
     /* ============================== HELPERS ============================ */
     private function fmt_dt_local($stored): string { if(empty($stored))return''; $ts=strtotime($stored); return $ts?date_i18n('Y-m-d\TH:i',$ts):''; }
     private function parse_dt_local(string $v): string { if(empty($v))return''; $ts=strtotime($v); return $ts?date_i18n('Y-m-d H:i:s',$ts):''; }
+
+    /* ============================== CSS FRONT ========================== */
+    /** Injecte le CSS de base pour grid/masonry/slider */
+    public function inline_css(): void { ?>
+        <style id="winshirt-lottery-core">
+            .ws-lottery-list{margin:10px auto;gap:18px}
+            .ws-lottery-list.ws-grid{display:grid}
+            .ws-lottery-list.ws-grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+            .ws-lottery-list.ws-grid.cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+            .ws-lottery-list.ws-grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+            /* Masonry natif CSS (columns) */
+            .ws-lottery-list.ws-masonry{column-gap:18px}
+            .ws-lottery-list.ws-masonry.cols-2{column-count:2}
+            .ws-lottery-list.ws-masonry.cols-3{column-count:3}
+            .ws-lottery-list.ws-masonry.cols-4{column-count:4}
+            .ws-lottery-list.ws-masonry > .ws-card-mini{break-inside:avoid; display:inline-block; width:100%; margin:0 0 18px}
+            /* Slider simple sans JS */
+            .ws-lottery-list.ws-slider{display:flex; overflow:auto; gap:18px; scroll-snap-type:x mandatory; padding-bottom:8px}
+            .ws-lottery-list.ws-slider > .ws-card-mini{min-width:320px; scroll-snap-align:start}
+            /* Card */
+            .ws-card-mini{position:relative; overflow:hidden; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.08); background:#0a0a0a; color:#fff}
+            .ws-card-mini a{color:inherit; text-decoration:none}
+            .ws-card-mini-media img{width:100%;height:auto;display:block}
+            .ws-card-mini .ws-mini-badge{position:absolute;top:12px;left:12px;padding:4px 8px;border-radius:12px;background:#6d28d9;font-size:12px}
+            .ws-card-mini .ws-card-mini-body{padding:14px}
+            .ws-card-mini .ws-card-mini-title{font-size:18px;line-height:1.2;margin:0 0 6px}
+            .ws-card-mini .ws-mini-value{opacity:.85;margin-bottom:6px}
+            .ws-card-mini .ws-mini-timer{font-family:ui-monospace,monospace;opacity:.9;margin-bottom:6px}
+            .ws-card-mini .ws-mini-count{opacity:.9;margin-bottom:10px}
+            .ws-btn{display:inline-block;padding:8px 14px;border-radius:999px;background:#fff;color:#111;text-decoration:none;font-weight:600}
+            .ws-btn.ws-btn-sm{padding:6px 12px;font-size:13px}
+            /* overlays */
+            .ws-card-mini[data-overlay="dark"] .ws-card-mini-media{position:relative}
+            .ws-card-mini[data-overlay="dark"] .ws-card-mini-media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 40%, rgba(0,0,0,.6) 100%);}
+            .ws-card-mini[data-overlay="light"] .ws-card-mini-media{position:relative}
+            .ws-card-mini[data-overlay="light"] .ws-card-mini-media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 40%, rgba(255,255,255,.45) 100%);}
+        </style>
+    <?php }
 }
