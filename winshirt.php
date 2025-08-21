@@ -14,7 +14,7 @@ define('WINSHIRT_DIR', plugin_dir_path(__FILE__));
 define('WINSHIRT_URL', plugin_dir_url(__FILE__));
 
 // Inclure les fichiers de classes (tous commentés pour débug)
-winshirt_require('includes/class-winshirt-lottery.php');
+// winshirt_require('includes/class-winshirt-lottery.php');
 // winshirt_require('includes/class-winshirt-lottery-template.php');
 // winshirt_require('includes/class-winshirt-tickets.php');
 // winshirt_require('includes/class-winshirt-lottery-order.php');
