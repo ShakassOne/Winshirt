@@ -1,40 +1,32 @@
 <?php
 /**
- * Plugin Name: WinShirt (SAFE)
- * Description: Safe bootstrap (affichage loteries uniquement) le temps d’identifier le fatal.
- * Version: 2.0.0-safe
- * Author: Winshirt by Shakass Communication
+ * Plugin Name: WinShirt (Quarantine)
+ * Description: Bootstrap neutre (aucune inclusion) pour rétablir le site sans supprimer l’extension. À remplacer par la version complète après diagnostic.
+ * Version: 0.0.1
+ * Author: WinShirt by Shakass Communication
  */
+
 if ( ! defined('ABSPATH') ) exit;
 
-define('WINSHIRT_DIR', plugin_dir_path(__FILE__));
-define('WINSHIRT_URL', plugin_dir_url(__FILE__));
+/**
+ * IMPORTANT :
+ * - Ce bootstrap ne charge AUCUN fichier.
+ * - Il ne déclare AUCUNE classe.
+ * - Il ne touche PAS à WooCommerce.
+ * => Impossible qu’il provoque un fatal au front.
+ */
 
-function winshirt_require_safe($rel){
-    $p = WINSHIRT_DIR . ltrim($rel,'/');
-    if ( file_exists($p) ) { require_once $p; return true; }
-    return false;
-}
-
-/* On charge UNIQUEMENT le cœur CPT + template (shortcodes/cartes). */
-winshirt_require_safe('includes/class-winshirt-lottery.php');
-winshirt_require_safe('includes/class-winshirt-lottery-template.php');
-
-/* Activation : on enregistre le CPT s’il existe, puis flush. */
-register_activation_hook(__FILE__, function(){
-    if ( class_exists('\\WinShirt\\Lottery') ) {
-        if ( method_exists('\\WinShirt\\Lottery','register_cpt') ) {
-            \WinShirt\Lottery::instance()->register_cpt();
-        } elseif ( method_exists('\\WinShirt\\Lottery','register_post_type') ) {
-            \WinShirt\Lottery::register_post_type();
-        }
-    }
-    flush_rewrite_rules();
+/** Petite bannière en admin pour rappeler l’état “quarantaine”. */
+add_action('admin_notices', function () {
+    if ( ! current_user_can('activate_plugins') ) return;
+    echo '<div class="notice notice-warning"><p><strong>WinShirt</strong> est en <em>mode quarantaine</em> (aucune fonctionnalité chargée). '
+       . 'Utilise la doc/diag fournis pour réinstaller le bootstrap complet en toute sécurité.</p></div>';
 });
-register_deactivation_hook(__FILE__, function(){ flush_rewrite_rules(); });
 
-/* Bootstrap min. */
-add_action('plugins_loaded', function(){
-    if ( class_exists('\\WinShirt\\Lottery') )          \WinShirt\Lottery::instance()->init();
-    if ( class_exists('\\WinShirt\\Lottery_Template') ) \WinShirt\Lottery_Template::instance()->init();
+/** Lien rapide vers le mini diagnostic (optionnel). */
+add_action('plugins_loaded', function () {
+    if ( isset($_GET['winshirt_diag']) && current_user_can('manage_options') ) {
+        require_once __DIR__ . '/DEV_DIAG/winshirt_diag.php';
+        exit;
+    }
 });
