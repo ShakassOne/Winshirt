@@ -17,7 +17,7 @@ define('WINSHIRT_URL', plugin_dir_url(__FILE__));
  * - true  : côté front, charge tout SAUF le Template (pas de carrousel).
  * - false : charge aussi le Template côté front (à réactiver après fix du slider).
  */
-if (!defined('WINSHIRT_FRONT_SAFE_PARTIAL')) define('WINSHIRT_FRONT_SAFE_PARTIAL', false);
+if (!defined('WINSHIRT_FRONT_SAFE_PARTIAL')) define('WINSHIRT_FRONT_SAFE_PARTIAL', true);
 
 /** Logger */
 if (!function_exists('winshirt_log')) {
