@@ -1,11 +1,28 @@
+
 <?php
 /**
  * Plugin Name: WinShirt
+ * Plugin URI: https://winshirt.fr
  * Description: Bootstrap tolérant. Template chargé en front. Diagonal actif; slider neutralisé (optionnel) sans casser le site.
  * Version: 2.0.5
  * Author: WinShirt by Shakass Communication
+ * Author URI: https://shakass.com/
  * Text Domain: winshirt
  */
+
+// Hook pour personnaliser l'affichage des liens dans la liste des plugins
+add_filter('plugin_row_meta', 'winshirt_custom_plugin_links', 10, 2);
+
+function winshirt_custom_plugin_links($links, $file) {
+    if (plugin_basename(__FILE__) == $file) {
+        // Personnaliser l'auteur avec des liens HTML
+        $author_link = '<a href="https://winshirt.fr">WinShirt</a> by <a href="https://shakass.com/">Shakass Communication</a>';
+        
+        // Ajouter le lien personnalisé à la fin
+        $links[] = $author_link;
+    }
+    return $links;
+}
 
 if (!defined('ABSPATH')) exit;
 
