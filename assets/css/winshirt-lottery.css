@@ -1,0 +1,136 @@
+/* ========== Base ========== */
+:root{
+  --wsl-gap:24px;
+  --wsl-cols:3;
+  --wsl-radius:18px;
+  --wsl-overlay-h:38%;
+  --wsl-overlay-h-hover:62%;
+  --wsl-overlay-bg: rgba(0,0,0,.55);
+  --wsl-overlay-bg-hover: rgba(0,0,0,.78);
+}
+.wsl-empty{opacity:.7}
+
+/* Grid */
+.wsl-grid{
+  display:grid;
+  gap:var(--wsl-gap);
+  grid-template-columns:repeat(var(--wsl-cols), minmax(0,1fr));
+}
+
+/* Carte */
+.wsl-card{
+  position:relative;
+  overflow:hidden;
+  border-radius:var(--wsl-radius);
+  background:#111;
+  isolation:isolate;
+}
+.wsl-media{display:block;line-height:0}
+.wsl-media img{
+  width:100%;height:420px;object-fit:cover;display:block;
+  transform:translateZ(0);
+}
+
+/* Badge */
+.wsl-badge{
+  position:absolute; left:16px; top:16px; z-index:3;
+  padding:6px 12px; font-size:12px; color:#fff; background:#6b4eff; border-radius:999px;
+}
+
+/* Overlay collé en bas, toujours même départ (titre visible) */
+.wsl-overlay{
+  position:absolute; left:0; right:0; bottom:0; z-index:2;
+  padding:16px 18px 18px;
+  color:#fff;
+  background:linear-gradient(to top, var(--wsl-overlay-bg) 0%, rgba(0,0,0,0) 100%);
+  height:calc(var(--wsl-overlay-h));
+  display:flex; flex-direction:column; justify-content:flex-end; gap:10px;
+  transition:height .35s ease, background .35s ease;
+}
+.wsl-card:hover .wsl-overlay{
+  height:calc(var(--wsl-overlay-h-hover));
+  background:linear-gradient(to top, var(--wsl-overlay-bg-hover) 0%, rgba(0,0,0,0) 100%);
+}
+
+/* Titre blanc, bottom */
+.wsl-title{
+  margin:0 0 6px 0; color:#fff; font-weight:800; letter-spacing:.2px; font-size:22px;
+}
+
+/* Meta */
+.wsl-meta{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.wsl-meta li{opacity:.95}
+.wsl-btn{
+  align-self:flex-start;margin-top:8px;
+  background:#111; color:#fff; padding:10px 14px; border-radius:9px; text-decoration:none;
+  border:1px solid rgba(255,255,255,.2);
+}
+
+/* ===== Sliders ===== */
+
+/* wrapper commun */
+.wsl-swiper{position:relative}
+.wsl-swiper .swiper{overflow:visible}
+.wsl-swiper .swiper-wrapper{align-items:center}
+
+/* flèches */
+.wsl-nav{
+  position:absolute; top:50%; transform:translateY(-50%); z-index:10;
+  width:42px;height:42px;border-radius:999px;background:#2c2c2c;display:flex;align-items:center;justify-content:center;
+  box-shadow:none; /* pas d’ombre demandée */
+  cursor:pointer; opacity:.9;
+}
+.wsl-nav span{display:block;width:8px;height:8px;border-top:2px solid #fff;border-right:2px solid #fff;transform:rotate(225deg)}
+.wsl-prev{left:-64px}
+.wsl-next{right:-64px}
+.wsl-next span{transform:rotate(45deg)}
+
+/* dots */
+.wsl-dots{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.wsl-dots .swiper-pagination-bullet{width:8px;height:8px;background:#111;opacity:.25;border-radius:999px}
+.wsl-dots .swiper-pagination-bullet-active{opacity:.85}
+
+/* slides */
+.wsl-slider .swiper-slide{width:clamp(280px, 36vw, 720px)}
+.wsl-card--slider .wsl-media img{height: clamp(360px, 42vh, 520px)}
+
+/* ===== Diagonal (type CodePen) ===== */
+.wsl-diagonal{--diag-space: 140px; /* spacing fort */ }
+.wsl-diagonal .swiper-slide{
+  width: clamp(280px, 42vw, 900px);
+  transition: transform .45s ease, z-index .45s ease;
+  will-change: transform;
+}
+.wsl-diagonal .swiper-slide:not(.swiper-slide-active){
+  transform: rotateZ(-11deg) translateY(28px) translateX(-10px);
+  z-index:1;
+}
+.wsl-diagonal .swiper-slide-next{
+  transform: rotateZ(11deg) translateY(28px) translateX(10px);
+  z-index:1;
+}
+.wsl-diagonal .swiper-slide-active{
+  transform: rotateZ(0deg) translateY(0) translateX(0);
+  z-index:2;
+}
+.wsl-diagonal .swiper-wrapper{
+  gap: var(--diag-space);
+}
+.wsl-diagonal .wsl-card--slider .wsl-media img{
+  height: clamp(420px, 65vh, 720px);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 1024px){
+  .wsl-grid{--wsl-cols:2}
+  .wsl-prev{left:-36px} .wsl-next{right:-36px}
+  .wsl-diagonal .wsl-card--slider .wsl-media img{height: 70vh}
+}
+@media (max-width: 640px){
+  .wsl-grid{--wsl-cols:1}
+  .wsl-slider .swiper-slide{width:88vw}
+  .wsl-diagonal .swiper-slide{width:88vw}
+  .wsl-diagonal .wsl-card--slider .wsl-media img{height:75vh}
+  .wsl-prev{left:-16px} .wsl-next{right:-16px}
+  :root{ --wsl-overlay-h:34%; --wsl-overlay-h-hover:66%; }
+}
