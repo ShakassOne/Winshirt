@@ -1,19 +1,27 @@
 <?php
 /**
  * Plugin Name: WinShirt
- * Description: Bootstrap tolérant + shortcodes actifs (avec fallback) + menu admin minimal.
- * Version: 2.0.1
+ * Description: Bootstrap tolérant avec SAFE MODE (front en fallback), admin complet pour diagnostic.
+ * Version: 2.0.2
  * Author: WinShirt by Shakass Communication
  * Text Domain: winshirt
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('WINSHIRT_VERSION', '2.0.1');
+define('WINSHIRT_VERSION', '2.0.2');
 define('WINSHIRT_DIR', plugin_dir_path(__FILE__));
 define('WINSHIRT_URL', plugin_dir_url(__FILE__));
 
-/** Logger léger (même fichier que le mu-plugin si présent) */
+/** === SAFE MODE FRONT ===
+ * true  = le front N'INCLUT AUCUN module (fallbacks uniquement)
+ * false = modules chargés aussi côté front (quand on sera prêt)
+ */
+if (!defined('WINSHIRT_FRONT_SAFE_MODE')) {
+    define('WINSHIRT_FRONT_SAFE_MODE', true);
+}
+
+/** Logger léger vers wp-content/winshirt_fatal.log */
 if (!function_exists('winshirt_log')) {
     function winshirt_log(string $msg): void {
         $line = '[WinShirt ' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
@@ -39,51 +47,57 @@ if (!function_exists('winshirt_require')) {
     }
 }
 
-/** 1) Charger ce qui existe (jamais fatal) */
+/** 1) Chargement des modules — ADMIN UNIQUEMENT tant que SAFE MODE = true */
 add_action('plugins_loaded', function () {
-    // Cœur loterie + gabarits + tickets + commandes + affichage + lien produits
-    winshirt_require('includes/class-winshirt-lottery.php');
-    winshirt_require('includes/class-winshirt-lottery-template.php');
-    winshirt_require('includes/class-winshirt-tickets.php');
-    winshirt_require('includes/class-winshirt-lottery-order.php');
-    winshirt_require('includes/class-winshirt-lottery-display.php');
-    winshirt_require('includes/class-winshirt-lottery-product-link.php');
+    $is_admin_context = is_admin() || (function_exists('wp_doing_ajax') && wp_doing_ajax()) || (defined('REST_REQUEST') && REST_REQUEST);
+    $load_in_front = !$is_admin_context && !WINSHIRT_FRONT_SAFE_MODE ? true : false;
 
-    // Init conditionnel (aucun fatal si la classe manque)
-    $boot = function (string $class, string $label) {
-        if (!class_exists($class)) { winshirt_log("init SKIP {$label}"); return; }
-        try {
-            if (method_exists($class, 'instance') && method_exists($class, 'init')) {
-                $class::instance()->init();
-                winshirt_log("init OK {$label}: instance()->init()");
-            } elseif (method_exists($class, 'init')) {
-                $class::init();
-                winshirt_log("init OK {$label}: static init()");
-            } else {
-                winshirt_log("init NOINIT {$label}");
+    // On charge les modules si on est en admin/REST/AJAX, ou sur le front uniquement si SAFE MODE = false
+    if ($is_admin_context || $load_in_front) {
+        winshirt_require('includes/class-winshirt-lottery.php');
+        winshirt_require('includes/class-winshirt-lottery-template.php');
+        winshirt_require('includes/class-winshirt-tickets.php');
+        winshirt_require('includes/class-winshirt-lottery-order.php');
+        winshirt_require('includes/class-winshirt-lottery-display.php');
+        winshirt_require('includes/class-winshirt-lottery-product-link.php');
+
+        $boot = function (string $class, string $label) {
+            if (!class_exists($class)) { winshirt_log("init SKIP {$label}"); return; }
+            try {
+                if (method_exists($class, 'instance') && method_exists($class, 'init')) {
+                    $class::instance()->init();
+                    winshirt_log("init OK {$label}: instance()->init()");
+                } elseif (method_exists($class, 'init')) {
+                    $class::init();
+                    winshirt_log("init OK {$label}: static init()");
+                } else {
+                    winshirt_log("init NOINIT {$label}");
+                }
+            } catch (\Throwable $t) {
+                winshirt_log("init THROW {$label}: " . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
             }
-        } catch (\Throwable $t) {
-            winshirt_log("init THROW {$label}: " . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
-        }
-    };
+        };
 
-    $boot('\\WinShirt\\Lottery',              'Lottery');
-    $boot('\\WinShirt\\Lottery_Template',     'Lottery_Template');
-    $boot('\\WinShirt\\Tickets',              'Tickets');
-    $boot('\\WinShirt\\Lottery_Order',        'Lottery_Order');
-    $boot('\\WinShirt\\Lottery_Display',      'Lottery_Display');
-    $boot('\\WinShirt\\Lottery_Product_Link', 'Lottery_Product_Link');
+        $boot('\\WinShirt\\Lottery',              'Lottery');
+        $boot('\\WinShirt\\Lottery_Template',     'Lottery_Template');
+        $boot('\\WinShirt\\Tickets',              'Tickets');
+        $boot('\\WinShirt\\Lottery_Order',        'Lottery_Order');
+        $boot('\\WinShirt\\Lottery_Display',      'Lottery_Display');
+        $boot('\\WinShirt\\Lottery_Product_Link', 'Lottery_Product_Link');
+    } else {
+        winshirt_log('SAFE MODE FRONT: aucun module chargé côté front.');
+    }
 }, 5);
 
-/** 2) Shortcodes TOUJOURS enregistrés (avec fallback, donc plus d’affichage “en clair”) */
+/** 2) Shortcodes TOUJOURS enregistrés — fallback côté front si SAFE MODE */
 add_action('init', function () {
-    // [winshirt_lotteries ...]
-    add_shortcode('winshirt_lotteries', function ($atts = []) {
+
+    $render_list = function ($atts) {
         $atts = shortcode_atts([
             'status'      => 'all',
             'featured'    => '0',
             'limit'       => '12',
-            'layout'      => 'grid',   // grid|slider|diagonal
+            'layout'      => 'grid',
             'columns'     => '3',
             'gap'         => '24',
             'show_timer'  => '1',
@@ -93,7 +107,18 @@ add_action('init', function () {
             'loop'        => '0',
         ], $atts, 'winshirt_lotteries');
 
-        // Si le template existe, on lui délègue
+        // Si front en SAFE MODE → fallback propre
+        if (!is_admin() && WINSHIRT_FRONT_SAFE_MODE) {
+            ob_start(); ?>
+            <div class="winshirt-lotteries winshirt-fallback" data-layout="<?php echo esc_attr($atts['layout']); ?>">
+                <div class="winshirt-alert" style="padding:12px;border:1px dashed #ccc;border-radius:8px;">
+                    WinShirt : affichage temporaire (SAFE MODE). Liste — status=<?php echo esc_html($atts['status']); ?>, limit=<?php echo esc_html($atts['limit']); ?>.
+                </div>
+            </div>
+            <?php return ob_get_clean();
+        }
+
+        // Sinon, déléguer si dispo
         if (class_exists('\\WinShirt\\Lottery_Template') && method_exists('\\WinShirt\\Lottery_Template', 'render_list')) {
             try {
                 return \WinShirt\Lottery_Template::render_list($atts);
@@ -102,20 +127,28 @@ add_action('init', function () {
             }
         }
 
-        // Fallback propre (placeholder) pour éviter le shortcode “en clair”
+        // Fallback si classe indisponible
         ob_start(); ?>
-        <div class="winshirt-lotteries winshirt-fallback" data-layout="<?php echo esc_attr($atts['layout']); ?>">
+        <div class="winshirt-lotteries winshirt-fallback">
             <div class="winshirt-alert" style="padding:12px;border:1px dashed #ccc;border-radius:8px;">
-                WinShirt : module d’affichage non chargé. Liste (fallback) – status=<?php echo esc_html($atts['status']); ?>, limit=<?php echo esc_html($atts['limit']); ?>.
+                WinShirt : module d’affichage non chargé. Liste (fallback).
             </div>
         </div>
-        <?php
-        return ob_get_clean();
-    });
+        <?php return ob_get_clean();
+    };
 
-    // [winshirt_lottery_card id="123"]
-    add_shortcode('winshirt_lottery_card', function ($atts = []) {
+    $render_card = function ($atts) {
         $atts = shortcode_atts(['id' => '0', 'show_timer' => '1', 'show_count' => '1'], $atts, 'winshirt_lottery_card');
+
+        if (!is_admin() && WINSHIRT_FRONT_SAFE_MODE) {
+            ob_start(); ?>
+            <div class="winshirt-lottery-card winshirt-fallback" data-id="<?php echo esc_attr($atts['id']); ?>">
+                <div class="winshirt-alert" style="padding:12px;border:1px dashed #ccc;border-radius:8px;">
+                    WinShirt : affichage temporaire (SAFE MODE). Carte — id=<?php echo esc_html($atts['id']); ?>.
+                </div>
+            </div>
+            <?php return ob_get_clean();
+        }
 
         if (class_exists('\\WinShirt\\Lottery_Template') && method_exists('\\WinShirt\\Lottery_Template', 'render_card')) {
             try {
@@ -128,16 +161,19 @@ add_action('init', function () {
         ob_start(); ?>
         <div class="winshirt-lottery-card winshirt-fallback" data-id="<?php echo esc_attr($atts['id']); ?>">
             <div class="winshirt-alert" style="padding:12px;border:1px dashed #ccc;border-radius:8px;">
-                WinShirt : module d’affichage non chargé. Carte (fallback) – id=<?php echo esc_html($atts['id']); ?>.
+                WinShirt : module d’affichage non chargé. Carte (fallback).
             </div>
         </div>
-        <?php
-        return ob_get_clean();
-    });
+        <?php return ob_get_clean();
+    };
+
+    add_shortcode('winshirt_lotteries', $render_list);
+    add_shortcode('winshirt_lottery_card', $render_card);
 }, 9);
 
-/** 3) Assets (chargés seulement si présents) */
+/** 3) Assets — on évite d’injecter quoi que ce soit tant que SAFE MODE front est actif */
 add_action('wp_enqueue_scripts', function () {
+    if (WINSHIRT_FRONT_SAFE_MODE) return; // pas d'assets en front pendant le SAFE MODE
     $css = WINSHIRT_DIR . 'assets/css/winshirt-lottery.css';
     if (file_exists($css)) {
         wp_enqueue_style('winshirt-lottery', WINSHIRT_URL . 'assets/css/winshirt-lottery.css', [], WINSHIRT_VERSION);
@@ -148,7 +184,7 @@ add_action('wp_enqueue_scripts', function () {
     }
 }, 20);
 
-/** 4) Menu admin minimal (pour ne pas “disparaître”) */
+/** 4) Menu admin minimal */
 add_action('admin_menu', function () {
     add_menu_page(
         'WinShirt',
@@ -158,12 +194,12 @@ add_action('admin_menu', function () {
         function () {
             $log_url = esc_url(add_query_arg('winshirt_fatal_log', '1', home_url('/')));
             echo '<div class="wrap"><h1>WinShirt</h1>';
-            echo '<p>Bootstrap actif. Utilitaires :</p>';
+            echo '<p>SAFE MODE front: <strong>' . (WINSHIRT_FRONT_SAFE_MODE ? 'ON' : 'OFF') . '</strong></p>';
             echo '<ul style="list-style:disc;margin-left:20px">';
             echo '<li><a href="' . $log_url . '" target="_blank">Ouvrir le log runtime</a></li>';
-            echo '<li>Shortcodes : <code>[winshirt_lotteries]</code>, <code>[winshirt_lottery_card id="123"]</code></li>';
+            echo '<li>Shortcodes: <code>[winshirt_lotteries]</code> / <code>[winshirt_lottery_card id="123"]</code></li>';
             echo '</ul>';
-            echo '<p style="opacity:.7">Si l’affichage est “fallback”, vérifie la présence des classes dans <em>includes/</em>.</p>';
+            echo '<p style="opacity:.7">Admin complet chargé pour diagnostic. Front en fallback tant que SAFE MODE = ON.</p>';
             echo '</div>';
         },
         'dashicons-tickets-alt',
@@ -171,15 +207,14 @@ add_action('admin_menu', function () {
     );
 }, 9);
 
-/** 5) Bandeau d’état (optionnel) */
+/** 5) Bandeau d’état */
 add_action('admin_notices', function () {
     if (!current_user_can('activate_plugins')) return;
-    echo '<div class="notice notice-info"><p><strong>WinShirt</strong> : bootstrap chargé. '
-       . 'Les shortcodes sont enregistrés (fallback si modules manquants). '
-       . 'Menu <em>WinShirt</em> disponible dans l’admin.</p></div>';
+    echo '<div class="notice notice-info"><p><strong>WinShirt</strong> : Admin complet chargé. '
+       . 'Front en <em>SAFE MODE</em> (fallbacks), aucun module inclus côté front tant que WINSHIRT_FRONT_SAFE_MODE = true.</p></div>';
 });
 
-/** 6) Activation : en douceur + flush */
+/** 6) Activation douce + flush */
 register_activation_hook(__FILE__, function () {
     try {
         if (class_exists('\\WinShirt\\Lottery')) {
@@ -190,7 +225,6 @@ register_activation_hook(__FILE__, function () {
             }
         }
         if (class_exists('\\WinShirt\\Tickets') && method_exists('\\WinShirt\\Tickets', 'install')) {
-            // instance()->install() ou static install() selon les versions
             try {
                 if (method_exists('\\WinShirt\\Tickets', 'instance')) {
                     \WinShirt\Tickets::instance()->install();
