@@ -3,6 +3,8 @@
  * WinShirt — Template stable (grid, masonry, diagonal, slider scroll-snap)
  * - Aucune dépendance externe (pas de Swiper).
  * - CSS/JS minimal inline, isolé, sans fatal possible.
+ * - Diagonal orienté "bas droite → haut gauche" (RTL pour l'effet visuel).
+ * - Mobile : 1 colonne pour grid/diagonal, 1 colonne CSS pour masonry.
  * - Source: CPT (ws-lottery|winshirt_lottery|lottery) sinon Articles (cat/tag loterie...).
  */
 namespace WinShirt;
@@ -18,7 +20,7 @@ class Lottery_Template
     }
 
     public function init(): void {
-        // Rien : on rend tout en inline pour éviter des problèmes d’assets/front
+        // Rien : inline CSS/JS pour éviter les soucis d’enqueue/dépendances.
     }
 
     /** ------ Public API utilisée par le bootstrap ------ */
@@ -33,9 +35,9 @@ class Lottery_Template
             'gap'         => '24',
             'show_timer'  => '1',
             'show_count'  => '1',
-            'autoplay'    => '0',      // ignoré ici (pas de lib)
-            'speed'       => '600',    // ignoré ici (pas de lib)
-            'loop'        => '0',      // ignoré ici (pas de lib)
+            'autoplay'    => '0',      // ignoré (pas de lib)
+            'speed'       => '600',    // ignoré (pas de lib)
+            'loop'        => '0',      // ignoré (pas de lib)
         ], $atts, 'winshirt_lotteries');
 
         // Coercition défensive
@@ -49,7 +51,7 @@ class Lottery_Template
         // Récupération des items (CPT sinon posts)
         $items = self::fetch_items($limit, (string) $a['status'], (int) $a['featured']);
 
-        // Placeholder si vide (évite l’impression d’erreur)
+        // Placeholder si vide
         if (empty($items)) {
             $items = [[
                 'id'    => 0,
@@ -60,14 +62,10 @@ class Lottery_Template
             ]];
         }
 
-        // HTML
         ob_start();
+        self::print_base_css(); // injecte une seule fois
 
-        // CSS commun inline (isolé par namespace data-attr)
-        self::print_base_css();
-
-        // Conteneur et variantes de layout
-        $ns = 'wslt-'.wp_generate_password(6, false, false); // mini namespace pour éviter collisions d’ID/JS
+        $ns = 'wslt-'.wp_generate_password(6, false, false); // namespace isolant
         ?>
         <div class="winshirt-lotteries" data-wslt="<?php echo esc_attr($ns); ?>" data-layout="<?php echo esc_attr($layout); ?>">
             <?php
@@ -76,7 +74,8 @@ class Lottery_Template
                     self::render_masonry($items, $columns, $gap, $showTimer, $showCount);
                     break;
                 case 'diagonal':
-                    self::render_diagonal($items, $columns, $gap, $showTimer, $showCount);
+                    // Orientation voulue : "bas droite → haut gauche"
+                    self::render_diagonal($items, $columns, $gap, $showTimer, $showCount, true /*rtl*/);
                     break;
                 case 'slider':
                     self::render_slider($items, $gap, $showTimer, $showCount, $ns);
@@ -93,7 +92,7 @@ class Lottery_Template
     }
 
     public static function render_card(array $atts): string {
-        $id        = isset($atts['id']) ? (int) $atts['id'] : 0;
+        $id        = isset($atts['id']) ? (int)$atts['id'] : 0;
         $showTimer = !empty($atts['show_timer']);
         $showCount = !empty($atts['show_count']);
 
@@ -144,12 +143,8 @@ class Lottery_Template
                 'orderby'        => 'date',
                 'order'          => 'DESC',
             ];
-            // Filtre featured si tu utilises une meta (ex: _ws_featured = 1)
             if ($featured === 1) {
-                $args['meta_query'] = [[
-                    'key'   => '_ws_featured',
-                    'value' => '1',
-                ]];
+                $args['meta_query'] = [[ 'key' => '_ws_featured', 'value' => '1' ]];
             }
             $q = new \WP_Query($args);
             if ($q->have_posts()) {
@@ -225,19 +220,22 @@ class Lottery_Template
             .wslt-meta{opacity:.75;font:400 13px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
             .wslt-sep{opacity:.6}
 
-            /* Grid */
+            /* Grid (desktop: inline style pour colonnes/gap ; mobile: 1 col) */
             .wslt-grid{display:grid}
-            /* gap/columns injectés inline */
 
-            /* Masonry (CSS columns simple, pas de JS) */
+            /* Masonry (CSS columns, pas de JS) */
             .wslt-masonry{column-gap:var(--wslt-gap,24px)}
-            .wslt-masonry .wslt-masonry-item{break-inside:avoid;border:1px solid #eee;border-radius:12px;background:#fff;display:block;margin:0 0 var(--wslt-gap,24px)}
+            .wslt-masonry .wslt-masonry-item{
+                break-inside:avoid;border:1px solid #eee;border-radius:12px;background:#fff;display:block;
+                margin:0 0 var(--wslt-gap,24px)
+            }
 
-            /* Diagonal (effet alterné) */
-            .wslt-diagonal{display:grid}
+            /* Diagonal : orientation bas droite → haut gauche via flux RTL */
+            .wslt-diagonal{display:grid; direction: rtl;} /* important pour l'orientation visuelle */
             .wslt-diagonal .wslt-card{transform:translateY(0);transition:transform .25s ease}
-            .wslt-diagonal .wslt-card:nth-child(odd){transform:translateY(-6px)}
-            .wslt-diagonal .wslt-card:nth-child(even){transform:translateY(6px)}
+            /* Décalage alterné : en RTL l'ordre visuel se lit de droite à gauche */
+            .wslt-diagonal .wslt-card:nth-child(odd){ transform:translateY(6px) }
+            .wslt-diagonal .wslt-card:nth-child(even){ transform:translateY(-6px) }
             @media (hover:hover){
               .wslt-diagonal .wslt-card:hover{transform:translateY(0) scale(1.01)}
             }
@@ -250,6 +248,13 @@ class Lottery_Template
             @media (min-width:900px){ .wslt-slide{min-width:32%} }
             .wslt-nav{position:absolute;inset:0 0 auto 0;display:flex;justify-content:space-between;pointer-events:none}
             .wslt-btn{pointer-events:auto;border:none;border-radius:999px;background:rgba(255,255,255,.8);box-shadow:0 1px 6px rgba(0,0,0,.08);width:36px;height:36px;margin:8px;cursor:pointer}
+
+            /* ===== Responsive mobile : une seule colonne ===== */
+            @media (max-width: 640px){
+              .wslt-grid{grid-template-columns:1fr !important; gap: var(--wslt-gap,16px) !important;}
+              .wslt-diagonal{grid-template-columns:1fr !important; gap: var(--wslt-gap,16px) !important;}
+              .wslt-masonry{columns:1 !important; column-gap: var(--wslt-gap,16px) !important;}
+            }
         </style>
         <?php
     }
@@ -263,7 +268,8 @@ class Lottery_Template
     }
 
     private static function render_grid(array $items, int $columns, int $gap, bool $showTimer, bool $showCount): void {
-        $style = 'grid-template-columns:repeat('.(int)$columns.',minmax(0,1fr));gap:'.(int)$gap.'px;';
+        // Desktop: colonnes/gap inline. Mobile: media query forcera 1 colonne.
+        $style = '--wslt-gap:'.$gap.'px;grid-template-columns:repeat('.(int)$columns.',minmax(0,1fr));gap:'.(int)$gap.'px;';
         echo '<div class="wslt-grid" style="'.esc_attr($style).'">';
         foreach ($items as $it) {
             echo '<article class="wslt-card">';
@@ -279,6 +285,7 @@ class Lottery_Template
     }
 
     private static function render_masonry(array $items, int $columns, int $gap, bool $showTimer, bool $showCount): void {
+        // Desktop: N colonnes; mobile: 1 via media query.
         $style = '--wslt-gap:'.$gap.'px;columns:'.$columns.';';
         echo '<div class="wslt-masonry" style="'.esc_attr($style).'">';
         foreach ($items as $it) {
@@ -294,9 +301,12 @@ class Lottery_Template
         echo '</div>';
     }
 
-    private static function render_diagonal(array $items, int $columns, int $gap, bool $showTimer, bool $showCount): void {
-        $style = 'grid-template-columns:repeat('.(int)$columns.',minmax(0,1fr));gap:'.(int)$gap.'px;';
-        echo '<div class="wslt-diagonal" style="'.esc_attr($style).'">';
+    private static function render_diagonal(array $items, int $columns, int $gap, bool $showTimer, bool $showCount, bool $rtl = true): void {
+        // Desktop: N colonnes; mobile: 1 via media query.
+        // Pour l’orientation "bas droite → haut gauche", on passe en flux RTL si $rtl = true.
+        $style = '--wslt-gap:'.$gap.'px;grid-template-columns:repeat('.(int)$columns.',minmax(0,1fr));gap:'.(int)$gap.'px;';
+        $dir   = $rtl ? ' wslt-diagonal-rtl' : '';
+        echo '<div class="wslt-diagonal'.$dir.'" style="'.esc_attr($style).'">';
         foreach ($items as $it) {
             echo '<article class="wslt-card">';
             self::render_media($it['thumb'], $it['perma']);
@@ -335,7 +345,6 @@ class Lottery_Template
         echo '  </div>';
         echo '</div>';
 
-        // JS minimal et cloisonné
         ?>
         <script>
         (function(){
@@ -346,9 +355,8 @@ class Lottery_Template
             var next = document.getElementById('<?php echo esc_js($nextId); ?>');
 
             function slideBy(delta){
-              try{
-                track.scrollBy({ left: delta, behavior: 'smooth' });
-              }catch(e){ track.scrollLeft += delta; }
+              try{ track.scrollBy({ left: delta, behavior: 'smooth' }); }
+              catch(e){ track.scrollLeft += delta; }
             }
 
             var step = Math.round(track.clientWidth * 0.8) || 300;
