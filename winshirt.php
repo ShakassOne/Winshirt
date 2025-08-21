@@ -1,30 +1,27 @@
 <?php
 /**
  * Plugin Name: WinShirt
- * Description: Bootstrap tolérant. Template chargé en front mais slider neutralisé pour éviter les fatales. Shortcodes avec fallback + log.
- * Version: 2.0.4
+ * Description: Bootstrap tolérant. Template chargé en front. Diagonal actif; slider neutralisé (optionnel) sans casser le site.
+ * Version: 2.0.5
  * Author: WinShirt by Shakass Communication
  * Text Domain: winshirt
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('WINSHIRT_VERSION', '2.0.4');
+define('WINSHIRT_VERSION', '2.0.5');
 define('WINSHIRT_DIR', plugin_dir_path(__FILE__));
 define('WINSHIRT_URL', plugin_dir_url(__FILE__));
 
-/** Désactive le code slider/diagonal côté front même si le Template est chargé */
+/** Désactiver le slider uniquement (diagonal reste actif) */
 if (!defined('WINSHIRT_DISABLE_SLIDER')) define('WINSHIRT_DISABLE_SLIDER', true);
 
-/** Logger léger vers wp-content/winshirt_fatal.log */
+/** Logger léger */
 if (!function_exists('winshirt_log')) {
     function winshirt_log(string $msg): void {
         $line = '[WinShirt ' . date('Y-m-d H:i:s') . '] ' . $msg . PHP_EOL;
-        if (defined('WP_CONTENT_DIR')) {
-            @file_put_contents(WP_CONTENT_DIR . '/winshirt_fatal.log', $line, FILE_APPEND);
-        } else {
-            @error_log($line);
-        }
+        if (defined('WP_CONTENT_DIR')) @file_put_contents(WP_CONTENT_DIR . '/winshirt_fatal.log', $line, FILE_APPEND);
+        else @error_log($line);
     }
 }
 
@@ -37,21 +34,14 @@ if (!function_exists('winshirt_require')) {
     }
 }
 
-/** 1) Inclusions modules (admin + front) — tout est protégé */
+/** 1) Inclusions (admin + front) */
 add_action('plugins_loaded', function () {
-    // Modules cœur
     winshirt_require('includes/class-winshirt-lottery.php');
     winshirt_require('includes/class-winshirt-tickets.php');
     winshirt_require('includes/class-winshirt-lottery-order.php');
     winshirt_require('includes/class-winshirt-lottery-display.php');
     winshirt_require('includes/class-winshirt-lottery-product-link.php');
-
-    // Template (renderer/cartes/carrousel) — la source probable du crash
-    try {
-        winshirt_require('includes/class-winshirt-lottery-template.php');
-    } catch (\Throwable $t) {
-        winshirt_log('include THROW Template: ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
-    }
+    winshirt_require('includes/class-winshirt-lottery-template.php');
 
     $boot = function (string $class, string $label) {
         if (!class_exists($class)) { winshirt_log("init SKIP {$label}"); return; }
@@ -69,23 +59,16 @@ add_action('plugins_loaded', function () {
     $boot('\\WinShirt\\Lottery_Order',        'Lottery_Order');
     $boot('\\WinShirt\\Lottery_Display',      'Lottery_Display');
     $boot('\\WinShirt\\Lottery_Product_Link', 'Lottery_Product_Link');
-
-    // Boot Template dans un try/catch indépendant
-    try {
-        $boot('\\WinShirt\\Lottery_Template', 'Lottery_Template');
-    } catch (\Throwable $t) {
-        winshirt_log('boot THROW Template: ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
-    }
+    $boot('\\WinShirt\\Lottery_Template',     'Lottery_Template');
 }, 5);
 
-/** 2) Shortcodes — coercition anti-crash + fallback propre */
+/** 2) Shortcodes — ne forcer QUE le slider → grid; laisser diagonal intact */
 add_action('init', function () {
 
     $coerce_layout = function (string $layout): string {
-        if (!WINSHIRT_DISABLE_SLIDER) return $layout;
-        // Neutralise les chemins "slider" ou "diagonal" → grid
         $l = strtolower(trim($layout));
-        return in_array($l, ['slider', 'diagonal'], true) ? 'grid' : $l;
+        if (WINSHIRT_DISABLE_SLIDER && $l === 'slider') return 'grid'; // neutralise uniquement le slider
+        return in_array($l, ['grid','masonry','diagonal','slider'], true) ? $l : 'grid';
     };
 
     add_shortcode('winshirt_lotteries', function ($atts = []) use ($coerce_layout) {
@@ -93,7 +76,7 @@ add_action('init', function () {
             'status'      => 'all',
             'featured'    => '0',
             'limit'       => '12',
-            'layout'      => 'grid',   // grid|slider|diagonal (on force grid si slider désactivé)
+            'layout'      => 'grid',
             'columns'     => '3',
             'gap'         => '24',
             'show_timer'  => '1',
@@ -103,22 +86,17 @@ add_action('init', function () {
             'loop'        => '0',
         ], $atts, 'winshirt_lotteries');
 
-        // Anti-crash : si slider désactivé, on force grid
         $atts['layout'] = $coerce_layout($atts['layout']);
 
         if (class_exists('\\WinShirt\\Lottery_Template') && method_exists('\\WinShirt\\Lottery_Template', 'render_list')) {
-            try {
-                return \WinShirt\Lottery_Template::render_list($atts);
-            } catch (\Throwable $t) {
-                winshirt_log('shortcode list THROW: ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
-            }
+            try { return \WinShirt\Lottery_Template::render_list($atts); }
+            catch (\Throwable $t) { winshirt_log('shortcode list THROW: ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine()); }
         }
 
-        // Fallback propre si le template n'est pas disponible
         ob_start(); ?>
         <div class="winshirt-lotteries winshirt-fallback" data-layout="<?php echo esc_attr($atts['layout']); ?>">
             <div class="winshirt-alert" style="padding:12px;border:1px dashed #ccc;border-radius:8px;">
-                WinShirt : affichage fallback (template indisponible). Liste — status=<?php echo esc_html($atts['status']); ?>, limit=<?php echo esc_html($atts['limit']); ?>.
+                WinShirt : template indisponible. Liste (fallback).
             </div>
         </div>
         <?php return ob_get_clean();
@@ -128,48 +106,37 @@ add_action('init', function () {
         $atts = shortcode_atts(['id' => '0', 'show_timer' => '1', 'show_count' => '1'], $atts, 'winshirt_lottery_card');
 
         if (class_exists('\\WinShirt\\Lottery_Template') && method_exists('\\WinShirt\\Lottery_Template', 'render_card')) {
-            try {
-                return \WinShirt\Lottery_Template::render_card($atts);
-            } catch (\Throwable $t) {
-                winshirt_log('shortcode card THROW: ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine());
-            }
+            try { return \WinShirt\Lottery_Template::render_card($atts); }
+            catch (\Throwable $t) { winshirt_log('shortcode card THROW: ' . $t->getMessage() . ' @ ' . $t->getFile() . ':' . $t->getLine()); }
         }
 
         ob_start(); ?>
         <div class="winshirt-lottery-card winshirt-fallback" data-id="<?php echo esc_attr($atts['id']); ?>">
             <div class="winshirt-alert" style="padding:12px;border:1px dashed #ccc;border-radius:8px;">
-                WinShirt : affichage fallback (template indisponible). Carte — id=<?php echo esc_html($atts['id']); ?>.
+                WinShirt : template indisponible. Carte (fallback).
             </div>
         </div>
         <?php return ob_get_clean();
     });
 }, 9);
 
-/** 3) Assets — seulement si le Template est présent ET slider autorisé */
+/** 3) Assets — on injecte uniquement si nécessaire (aucune lib externe ici) */
 add_action('wp_enqueue_scripts', function () {
-    if (!class_exists('\\WinShirt\\Lottery_Template')) return;
-    if (WINSHIRT_DISABLE_SLIDER) return; // on n’injecte pas le JS du carrousel
-
-    $css = WINSHIRT_DIR . 'assets/css/winshirt-lottery.css';
-    if (file_exists($css)) wp_enqueue_style('winshirt-lottery', WINSHIRT_URL . 'assets/css/winshirt-lottery.css', [], WINSHIRT_VERSION);
-
-    $js = WINSHIRT_DIR . 'assets/js/winshirt-lottery.js';
-    if (file_exists($js)) wp_enqueue_script('winshirt-lottery', WINSHIRT_URL . 'assets/js/winshirt-lottery.js', ['jquery'], WINSHIRT_VERSION, true);
+    // rien de spécial; la classe imprime son CSS inline
 }, 20);
 
-/** 4) Menu admin (état) */
+/** 4) Menu admin */
 add_action('admin_menu', function () {
     add_menu_page(
         'WinShirt','WinShirt','manage_options','winshirt',
         function () {
-            $log_url = esc_url(home_url('/wp-content/winshirt_log.php')); // viewer autonome
+            $viewer = esc_url(home_url('/wp-content/winshirt_log.php'));
             echo '<div class="wrap"><h1>WinShirt</h1>';
-            echo '<p>Template en front: <strong>ON</strong> &nbsp;|&nbsp; Slider: <strong>' . (WINSHIRT_DISABLE_SLIDER ? 'OFF (neutralisé)' : 'ON') . '</strong></p>';
+            echo '<p>Slider : <strong>' . (WINSHIRT_DISABLE_SLIDER ? 'OFF (neutralisé)' : 'ON') . '</strong> — Diagonal : <strong>ON</strong></p>';
             echo '<ul style="list-style:disc;margin-left:20px">';
-            echo '<li><a href="' . $log_url . '" target="_blank">Voir le log runtime (viewer autonome)</a></li>';
-            echo '<li>Shortcodes: <code>[winshirt_lotteries]</code> / <code>[winshirt_lottery_card id="123"]</code></li>';
-            echo '</ul>';
-            echo '</div>';
+            echo '<li><a href="'.$viewer.'" target="_blank">Voir le log (viewer autonome)</a></li>';
+            echo '<li>Shortcodes : <code>[winshirt_lotteries]</code> / <code>[winshirt_lottery_card id="123"]</code></li>';
+            echo '</ul></div>';
         },
         'dashicons-tickets-alt',56
     );
