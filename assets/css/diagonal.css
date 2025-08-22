@@ -33,29 +33,29 @@
 .winshirt-diagonal .carousel {
   position: relative;
   z-index: 1;
-  height: 70vh; /* laisse respirer sous header */
+  height: 70vh;
   overflow: hidden;
   pointer-events: none;
 }
 
+/* Items */
 .winshirt-diagonal .carousel-item {
   --items: 10;
   --width: clamp(150px, 30vw,  300px);
   --height: clamp(200px, 40vw,  400px);
-  --x: calc(var(--active) * 800%);
-  --y: calc(var(--active) * 200%);
-  --rot: calc(var(--active) * 120deg);
-  --opacity: calc(var(--zIndex) / var(--items) * 3 - 2);
-  overflow: hidden;
+  --x: 0;
+  --y: 0;
+  --rot: 0deg;
+  --opacity: 1; /* ✅ valeur par défaut visible */
+
   position: absolute;
-  z-index: var(--zIndex);
+  z-index: var(--zIndex, 1);
   width: var(--width);
   height: var(--height);
   margin: calc(var(--height) * -0.5) 0 0 calc(var(--width) * -0.5);
   border-radius: 12px;
   top: 50%;
   left: 50%;
-  user-select: none;
   transform-origin: 0% 100%;
   box-shadow: 0 10px 50px 10px rgba(0,0,0,.35);
   background: #000;
@@ -64,14 +64,15 @@
   transition: transform .8s cubic-bezier(0,0.02,0,1);
 }
 
+/* Box interne */
 .winshirt-diagonal .carousel-box {
   position: absolute;
   inset: 0;
   display: block;
   text-decoration: none;
   color: inherit;
+  opacity: var(--opacity, 1); /* ✅ fallback visible */
   transition: opacity .8s cubic-bezier(0,0.02,0,1);
-  opacity: var(--opacity);
 }
 
 .winshirt-diagonal .carousel-box:before {
@@ -116,8 +117,15 @@
   pointer-events: none;
 }
 
-/* Responsive tweak: sur mobile on garde le comportement diagonal
-   mais on réduit l’échelle (hauteur) */
+/* Responsive : mobile */
 @media (max-width: 600px) {
-  .winshirt-diagonal .carousel { height: 60vh; }
+  .winshirt-diagonal .carousel { height: auto; }
+  .winshirt-diagonal .carousel-item {
+    position: static;
+    margin: 12px 0;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16/10;
+    transform: none;
+  }
 }
