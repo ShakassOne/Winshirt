@@ -1,118 +1,65 @@
-// assets/js/diagonal.js
-(() => {
-  "use strict";
+(function () {
+  'use strict';
 
-  // Vitesse
-  const SPEED_WHEEL = 0.02;
-  const SPEED_DRAG  = -0.10;
+  function log(){ try{ console.log.apply(console, arguments); }catch(e){} }
 
-  // Calcule un z-index “pyramidal”
-  const getZindex = (arr, activeIdx) =>
-    arr.map((_, i) => (activeIdx === i) ? arr.length : arr.length - Math.abs(activeIdx - i));
+  function enhance(root){
+    if(!root) return;
 
-  // Initialise UNE instance (un conteneur .winshirt-diagonal)
-  function initInstance(root) {
-    if (!root || root.__winshirtDiagonalInited) return;
-    const items = root.querySelectorAll('.carousel-item');
-    if (!items.length) return;
-
-    root.__winshirtDiagonalInited = true;
-    root.setAttribute('data-count', String(items.length));
-
-    // État local à l’instance
-    let progress = 50;
-    let startX   = 0;
-    let active   = 0;
-    let isDown   = false;
-
-    // Rendu d’un item
-    const displayItem = (item, index, activeIndex) => {
-      const zIndex = getZindex([...items], activeIndex)[index];
-      item.style.setProperty('--zIndex', zIndex);
-      item.style.setProperty('--active', (index - activeIndex) / items.length);
-    };
-
-    // Animation
-    const animate = () => {
-      progress = Math.max(0, Math.min(progress, 100));
-      active   = Math.floor((progress / 100) * (items.length - 1));
-      items.forEach((item, index) => displayItem(item, index, active));
-    };
-    animate();
-
-    // Click sur une carte
-    items.forEach((item, i) => {
-      item.addEventListener('click', () => {
-        progress = (i / items.length) * 100 + 10;
-        animate();
-      });
-    });
-
-    // Handlers (scopés au container)
-    const onWheel = (e) => {
-      const delta = (e.deltaY || 0) * SPEED_WHEEL;
-      progress += delta;
-      animate();
-    };
-
-    const onMove = (e) => {
-      // Curseurs “cosmétiques”
-      const cursors = root.querySelectorAll('.cursor');
-      if (e.type === 'mousemove') {
-        cursors.forEach(c => {
-          c.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
-        });
-      }
-      if (!isDown) return;
-      const x = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
-      const delta = (x - startX) * SPEED_DRAG;
-      progress += delta;
-      startX = x;
-      animate();
-    };
-
-    const onDown = (e) => {
-      isDown = true;
-      startX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
-    };
-    const onUp = () => { isDown = false; };
-
-    // Listeners sur le conteneur (pas sur document)
-    root.addEventListener('wheel', onWheel, { passive: true });
-    root.addEventListener('mousedown', onDown);
-    root.addEventListener('mousemove', onMove);
-    root.addEventListener('mouseup', onUp);
-    root.addEventListener('mouseleave', onUp);
-    root.addEventListener('touchstart', onDown, { passive: true });
-    root.addEventListener('touchmove', onMove,  { passive: true });
-    root.addEventListener('touchend', onUp);
-
-    // Petit log utile en dev (harmless en prod)
-    if (window && window.console) {
-      const uid = root.id || '(no-id)';
-      console.log(`[WinShirt:diagonal] OK, items=${items.length} uid=${uid}`);
+    var uid   = root.getAttribute('data-uid') || 'n/a';
+    var car   = root.querySelector('.carousel');
+    if(!car){
+      log('[WinShirt:diagonal] abort(no .carousel) uid=', uid);
+      return;
     }
+
+    var items = car.querySelectorAll('.carousel-item');
+    var n = items.length;
+    log('[WinShirt:diagonal] init uid=', uid, 'items=', n);
+
+    // Visible de base, on ajoute juste la couche "enhanced"
+    root.classList.add('is-enhanced');
+
+    // S’il n’y a aucun item, on ne fait rien de plus
+    if(!n) return;
+
+    // Cursors (optionnels, silencieux si non trouvés)
+    var c1 = root.querySelector('.cursor');
+    var c2 = root.querySelector('.cursor2');
+
+    function onEnter(){
+      if(c1){ c1.style.opacity = '1'; }
+      if(c2){ c2.style.opacity = '1'; }
+    }
+    function onLeave(){
+      if(c1){ c1.style.opacity = '0'; }
+      if(c2){ c2.style.opacity = '0'; }
+    }
+    function onMove(e){
+      var r = root.getBoundingClientRect();
+      var x = e.clientX - r.left;
+      var y = e.clientY - r.top;
+      if(c1){ c1.style.transform = 'translate('+(x-9)+'px,'+(y-9)+'px)'; }
+      if(c2){ c2.style.transform = 'translate('+(x-9)+'px,'+(y-9)+'px)'; }
+    }
+
+    root.addEventListener('mouseenter', onEnter);
+    root.addEventListener('mouseleave', onLeave);
+    root.addEventListener('mousemove',  onMove);
   }
 
-  // Init sur DOM prêt
-  const boot = () => {
-    document.querySelectorAll('.winshirt-diagonal').forEach(initInstance);
-  };
+  function boot(){
+    var roots = document.querySelectorAll('.winshirt-diagonal');
+    if(!roots.length){
+      log('[WinShirt:diagonal] no roots');
+      return;
+    }
+    roots.forEach(enhance);
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
   } else {
     boot();
-  }
-
-  // Support Elementor (édition / preview)
-  if (window.elementorFrontend && window.elementorFrontend.hooks) {
-    window.elementorFrontend.hooks.addAction('frontend/element_ready/widget', () => {
-      boot();
-    });
-    // certains widgets utilisent 'frontend/element_ready/global'
-    window.elementorFrontend.hooks.addAction('frontend/element_ready/global', () => {
-      boot();
-    });
   }
 })();
