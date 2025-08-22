@@ -34,10 +34,9 @@ function winshirt_diagonal_enqueue_assets() {
  * $items : tableau d’items (['title','image','permalink','num'])
  * Si $items est null, on tente une requête de secours (10 derniers).
  */
-function winshirt_lotteries_render_diagonal(array $items = null) {
-    // Si ton shortcode principal te passe déjà la liste -> on l’utilise.
+function winshirt_lotteries_render_diagonal(array $items = null, array $atts = []) {
+    // Si ton shortcode principal ne passe rien -> fallback
     if ($items === null) {
-        // fallback très simple (à adapter si besoin au CPT exact)
         $q = new WP_Query([
             'post_type'      => 'winshirt_lottery',
             'posts_per_page' => 10,
@@ -70,7 +69,7 @@ function winshirt_lotteries_render_diagonal(array $items = null) {
     <div id="<?php echo esc_attr($uid); ?>" class="winshirt-diagonal">
         <div class="carousel">
             <?php foreach ($items as $i => $it): ?>
-                <div class="carousel-item">
+                <div class="carousel-item" style="--opacity:1"><!-- fallback visible si JS inactif -->
                     <a class="carousel-box" href="<?php echo esc_url($it['permalink']); ?>">
                         <div class="title"><?php echo esc_html($it['title']); ?></div>
                         <?php if (!empty($it['num'])): ?>
@@ -89,14 +88,3 @@ function winshirt_lotteries_render_diagonal(array $items = null) {
     <?php
     return ob_get_clean();
 }
-
-/**
- * ⚠️ À insérer dans TON handler existant du shortcode [winshirt_lotteries]
- * Exemple d’usage dans ta fonction:
- *
- *   if ( ( $atts['layout'] ?? '' ) === 'diagonal' ) {
- *       // $items = ... -> ton tableau existant (ou laisse null pour fallback)
- *       return winshirt_lotteries_render_diagonal( $items ?? null );
- *   }
- *
- */
