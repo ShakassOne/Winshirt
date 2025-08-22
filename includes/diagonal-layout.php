@@ -1,125 +1,130 @@
 <?php
 /**
- * Diagonal Carousel layout (WinShirt by Shakass Communication)
- * - Ne modifie rien ailleurs : ce fichier se suffit à lui-même.
- * - Enqueue ses assets via WINSHIRT_PLUGIN_URL + assets/css|js
+ * Diagonal Carousel layout (Winshirt)
+ * Author: Shakass Communication
+ * Description: Rendu "diagonal" avec fallback gracieux (grille visible sans JS)
  */
 
 if (!defined('ABSPATH')) exit;
 
 /**
- * Enqueue CSS/JS du layout diagonal (idempotent)
+ * Enqueue assets uniquement pour ce layout
  */
 function winshirt_diagonal_enqueue_assets() {
-    if (!function_exists('wp_enqueue_style')) return;
+    if (wp_style_is('winshirt-diagonal', 'enqueued')) return;
 
-    if (!wp_style_is('winshirt-diagonal', 'enqueued')) {
-        wp_enqueue_style(
-            'winshirt-diagonal',
-            WINSHIRT_PLUGIN_URL . 'assets/css/diagonal.css',
-            [],
-            '1.1'
-        );
-    }
+    wp_enqueue_style(
+        'winshirt-diagonal',
+        WINSHIRT_PLUGIN_URL . 'assets/css/diagonal.css',
+        [],
+        '1.1'
+    );
 
-    if (!wp_script_is('winshirt-diagonal', 'enqueued')) {
-        wp_enqueue_script(
-            'winshirt-diagonal',
-            WINSHIRT_PLUGIN_URL . 'assets/js/diagonal.js',
-            [],
-            '1.1',
-            true
-        );
-    }
+    wp_enqueue_script(
+        'winshirt-diagonal',
+        WINSHIRT_PLUGIN_URL . 'assets/js/diagonal.js',
+        [],
+        '1.1',
+        true
+    );
 }
 
 /**
- * Fallback data si aucun tableau $items n’est fourni.
- * On tente plusieurs post_types pour être sûr d’avoir quelque chose (CPT loterie, produits, articles).
+ * Fallback: tente de récupérer 10 éléments publiés.
+ * Adapte le post_type ici si besoin.
  */
-function winshirt_diagonal_build_items_fallback($max = 10) : array {
-    $types_to_try = ['winshirt_lottery', 'lottery', 'product', 'post'];
+function winshirt_diagonal_fallback_items($max = 10) {
     $items = [];
 
-    foreach ($types_to_try as $pt) {
+    // 1) CPT attendu
+    $q = new WP_Query([
+        'post_type'      => 'winshirt_lottery',
+        'posts_per_page' => $max,
+        'post_status'    => 'publish',
+        'no_found_rows'  => true,
+    ]);
+
+    if (!$q->have_posts()) {
+        // 2) Fallback sur posts classiques
         $q = new WP_Query([
-            'post_type'      => $pt,
+            'post_type'      => 'post',
             'posts_per_page' => $max,
             'post_status'    => 'publish',
+            'no_found_rows'  => true,
         ]);
-
-        while ($q->have_posts()) {
-            $q->the_post();
-            $items[] = [
-                'title'     => get_the_title(),
-                'permalink' => get_permalink(),
-                'image'     => get_the_post_thumbnail_url(get_the_ID(), 'large') ?: WINSHIRT_PLUGIN_URL . 'assets/placeholder.jpg',
-                'num'       => null, // num sera ajouté plus bas
-            ];
-        }
-        wp_reset_postdata();
-
-        if (!empty($items)) break; // on s’arrête dès qu’on a trouvé des contenus
     }
 
-    // ajoute un numéro 01, 02, …
-    foreach ($items as $i => &$it) {
-        $it['num'] = str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT);
+    $i = 0;
+    while ($q->have_posts()) {
+        $q->the_post();
+        $i++;
+        $items[] = [
+            'title'     => get_the_title(),
+            'permalink' => get_permalink(),
+            'image'     => get_the_post_thumbnail_url(get_the_ID(), 'large') ?: WINSHIRT_PLUGIN_URL . 'assets/placeholder.jpg',
+            'num'       => str_pad((string)$i, 2, '0', STR_PAD_LEFT),
+        ];
     }
+    wp_reset_postdata();
+
     return $items;
 }
 
 /**
  * Rendu du layout diagonal.
- * @param array|null $items tableau d’items [title, permalink, image, num]
+ * $items : tableau d’items (['title','image','permalink','num'])
+ * Si null => fallback automatique.
  */
 function winshirt_lotteries_render_diagonal(array $items = null) {
-    // Fallback contenu
     if ($items === null) {
-        $items = winshirt_diagonal_build_items_fallback(10);
+        $items = winshirt_diagonal_fallback_items(10);
     }
 
-    // Sécurité anti-array vide : on montre un texte (donc pas “vide”)
-    if (empty($items)) {
-        return '<div class="winshirt-diagonal-empty">Aucune loterie/élément à afficher.</div>';
-    }
-
-    // Enqueue assets CSS/JS
+    // Enqueue CSS/JS
     winshirt_diagonal_enqueue_assets();
 
-    $uid = 'winshirt-diagonal-' . wp_generate_uuid4();
-
-    // Inline CSS minimaliste de secours (au cas où diagonal.css ne se charge pas)
-    $inline_css = '
-    <style>
-      #'.$uid.'.winshirt-diagonal .carousel{position:relative;height:70vh;overflow:hidden}
-      #'.$uid.'.winshirt-diagonal .carousel-item{position:absolute;top:50%;left:50%;width:300px;height:400px;margin:-200px 0 0 -150px;border-radius:12px;background:#000;box-shadow:0 10px 50px 10px rgba(0,0,0,.2)}
-      #'.$uid.'.winshirt-diagonal .carousel-item img{width:100%;height:100%;object-fit:cover;display:block}
-      @media (max-width:600px){#'.$uid.'.winshirt-diagonal .carousel{height:auto}#'.$uid.'.winshirt-diagonal .carousel-item{position:static;margin:12px 0;width:100%;height:auto;aspect-ratio:16/10}}
-    </style>';
+    $uid   = 'winshirt-diagonal-' . wp_generate_uuid4();
+    $count = is_array($items) ? count($items) : 0;
 
     ob_start(); ?>
-    <?php echo $inline_css; ?>
     <div id="<?php echo esc_attr($uid); ?>"
          class="winshirt-diagonal"
          data-uid="<?php echo esc_attr($uid); ?>"
-         data-count="<?php echo (int)count($items); ?>">
-        <div class="carousel">
-            <?php foreach ($items as $i => $it): ?>
-                <div class="carousel-item" data-index="<?php echo (int)$i; ?>">
-                    <a class="carousel-box" href="<?php echo esc_url($it['permalink']); ?>">
-                        <div class="title"><?php echo esc_html($it['title']); ?></div>
-                        <?php if (!empty($it['num'])): ?>
-                            <div class="num"><?php echo esc_html($it['num']); ?></div>
-                        <?php endif; ?>
-                        <img loading="lazy" src="<?php echo esc_url($it['image']); ?>" alt="<?php echo esc_attr($it['title']); ?>" />
-                    </a>
-                </div>
-            <?php endforeach; ?>
-        </div>
-        <div class="cursor"></div>
-        <div class="cursor cursor2"></div>
+         data-count="<?php echo esc_attr($count); ?>">
+        <?php if ($count === 0): ?>
+            <div class="winshirt-diagonal-empty">
+                Aucune loterie à afficher.
+            </div>
+        <?php else: ?>
+            <div class="carousel" aria-live="polite">
+                <?php foreach ($items as $it): ?>
+                    <div class="carousel-item">
+                        <a class="carousel-box" href="<?php echo esc_url($it['permalink']); ?>">
+                            <div class="title"><?php echo esc_html($it['title']); ?></div>
+                            <?php if (!empty($it['num'])): ?>
+                                <div class="num"><?php echo esc_html($it['num']); ?></div>
+                            <?php endif; ?>
+                            <img loading="lazy"
+                                 src="<?php echo esc_url($it['image']); ?>"
+                                 alt="<?php echo esc_attr($it['title']); ?>" />
+                        </a>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <div class="cursor" aria-hidden="true"></div>
+            <div class="cursor cursor2" aria-hidden="true"></div>
+        <?php endif; ?>
     </div>
     <?php
     return ob_get_clean();
 }
+
+/**
+ * ⚠️ Intégration dans TON shortcode existant [winshirt_lotteries]
+ * Exemple minimal à l'intérieur de ta fonction de rendu:
+ *
+ * if ( ( $atts['layout'] ?? '' ) === 'diagonal' ) {
+ *     // Si tu as déjà $items calculés, passe-les ici, sinon laisse null:
+ *     return winshirt_lotteries_render_diagonal( $items ?? null );
+ * }
+ */
