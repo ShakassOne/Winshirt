@@ -10,6 +10,10 @@
  * Text Domain: winshirt
  */
 
+// === Winshirt constants (plugin root) ===
+if (!defined('WINSHIRT_PLUGIN_FILE')) define('WINSHIRT_PLUGIN_FILE', __FILE__);
+if (!defined('WINSHIRT_PLUGIN_URL'))  define('WINSHIRT_PLUGIN_URL', plugin_dir_url(__FILE__));
+if (!defined('WINSHIRT_PLUGIN_PATH')) define('WINSHIRT_PLUGIN_PATH', plugin_dir_path(__FILE__));
 if (!defined('ABSPATH')) exit;
 
 define('WINSHIRT_VERSION', '2.0.5');
