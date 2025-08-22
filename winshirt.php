@@ -1,10 +1,13 @@
 <?php
 /**
- * Plugin Name: Winshirt
+ * Plugin Name: Winshirt — by Shakass Communication
+ * Plugin URI:  https://winshirt.fr
  * Description: Shortcodes & layouts Winshirt (dont le carrousel diagonal).
  * Version:     1.0.1
- * Author:      Winshirt
+ * Author:      Shakass Communication
+ * Author URI:  https://shakass.fr
  * License:     GPLv2 or later
+ * Text Domain: winshirt
  */
 
 if (!defined('ABSPATH')) exit;
@@ -66,10 +69,6 @@ function winshirt_build_items_from_query($count = 10, $atts = []) {
     }
     wp_reset_postdata();
 
-    /**
-     * Permet à ton thème/une autre extension de fournir ses propres items,
-     * si tu ne veux pas t’appuyer sur la WP_Query ci-dessus.
-     */
     return apply_filters('winshirt_lotteries_items', $items, $atts);
 }
 
@@ -109,7 +108,7 @@ function winshirt_lotteries_shortcode($atts = []) {
         'gap'         => 24,
         'show_timer'  => 0,
         'show_count'  => 0,
-        'status'      => 'all', // laissé pour compat
+        'status'      => 'all',
     ], $atts, 'winshirt_lotteries');
 
     $atts['layout'] = winshirt_normalize_layout($atts['layout']);
@@ -128,7 +127,7 @@ function winshirt_lotteries_shortcode($atts = []) {
         // Si pas trouvé, on tombe en grid
     }
 
-    // Rendu MASONRY → pour l’instant on tombe en grid (tu peux brancher ton rendu masonry ici)
+    // Rendu MASONRY → fallback grid pour l’instant
     if ($atts['layout'] === 'masonry') {
         return winshirt_render_grid($items, $atts);
     }
@@ -138,11 +137,4 @@ function winshirt_lotteries_shortcode($atts = []) {
 }
 add_shortcode('winshirt_lotteries', 'winshirt_lotteries_shortcode');
 
-/**
- * Enqueue générique possible (optionnel) – on laisse le layout diagonal gérer ses propres assets dans includes/diagonal-layout.php
- * Si tu préfères forcer globalement :
- *
- * add_action('wp_enqueue_scripts', function () {
- *     wp_register_style('winshirt-grid', WINSHIRT_PLUGIN_URL.'assets/css/grid.css', [], '1.0');
- * });
- */
+/* Note: les assets diagonal (CSS/JS) sont gérés dans includes/diagonal-layout.php */
