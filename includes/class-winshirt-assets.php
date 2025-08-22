@@ -1,83 +1,31 @@
 <?php
-/**
- * WinShirt - Gestion des Assets (Version Sécurisée)
- * 
- * @package WinShirt
- * @since 1.0.0
- */
-
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined('ABSPATH') ) exit;
 
 class WinShirt_Assets {
-    
-    public function __construct() {
-        // Chargement conditionnel des assets
-        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_assets' ) );
-        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+    public static function init(){
+        add_action('wp_enqueue_scripts', [__CLASS__,'register_front']);
+        add_action('admin_enqueue_scripts', [__CLASS__,'admin']);
     }
-    
-    /**
-     * Assets front-end (seulement sur nos pages)
-     */
-    public function enqueue_frontend_assets() {
-        // SÉCURITÉ : Ne charger que sur nos pages spécifiques
-        if ( ! $this->is_winshirt_page() ) {
-            return;
-        }
-        
-        wp_enqueue_style(
-            'winshirt-frontend',
-            WINSHIRT_PLUGIN_URL . 'assets/css/frontend.css',
-            array(),
-            WINSHIRT_VERSION
-        );
-        
-        wp_enqueue_script(
-            'winshirt-frontend',
-            WINSHIRT_PLUGIN_URL . 'assets/js/frontend.js',
-            array( 'jquery' ),
-            WINSHIRT_VERSION,
-            true
-        );
+    public static function register_front(){
+        wp_register_style('winshirt-frontend', WINSHIRT_URL.'assets/css/frontend.css', [], WINSHIRT_VERSION);
+        wp_register_style('winshirt-diagonal', WINSHIRT_URL.'assets/css/diagonal.css', ['winshirt-frontend'], WINSHIRT_VERSION);
+        wp_register_script('winshirt-diagonal', WINSHIRT_URL.'assets/js/diagonal.js', [], WINSHIRT_VERSION, true);
     }
-    
-    /**
-     * Assets admin (seulement sur nos pages)
-     */
-    public function enqueue_admin_assets( $hook ) {
-        // SÉCURITÉ : Ne charger que sur nos pages admin
-        if ( strpos( $hook, 'winshirt' ) === false ) {
-            return;
+    public static function admin($hook){
+        // CSS admin léger (zones, etc.) s'il y a lieu
+        $admin_css = WINSHIRT_DIR.'assets/css/admin-zones.css';
+        if ( file_exists($admin_css) ) {
+            wp_enqueue_style('winshirt-admin-zones', WINSHIRT_URL.'assets/css/admin-zones.css', [], WINSHIRT_VERSION);
         }
-        
-        wp_enqueue_style(
-            'winshirt-admin',
-            WINSHIRT_PLUGIN_URL . 'assets/css/admin.css',
-            array(),
-            WINSHIRT_VERSION
-        );
     }
-    
-    /**
-     * Vérifier si on est sur une page WinShirt
-     */
-    private function is_winshirt_page() {
-        // Vérifier shortcodes
-        global $post;
-        if ( $post && ( 
-            has_shortcode( $post->post_content, 'winshirt_customizer' ) ||
-            has_shortcode( $post->post_content, 'winshirt_gallery' )
-        )) {
-            return true;
+    public static function need_front(){
+        if ( ! wp_style_is('winshirt-frontend','enqueued') ) {
+            wp_enqueue_style('winshirt-frontend');
         }
-        
-        // Vérifier pages spécifiques
-        if ( is_page( array( 'winshirt-customizer', 'winshirt-gallery' ) ) ) {
-            return true;
-        }
-        
-        return false;
+    }
+    public static function enqueue_diagonal(){
+        self::need_front();
+        wp_enqueue_style('winshirt-diagonal');
+        wp_enqueue_script('winshirt-diagonal');
     }
 }
-
-new WinShirt_Assets();
