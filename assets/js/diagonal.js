@@ -1,64 +1,118 @@
-/* ===== WinShirt diagonal (by Shakass Communication) ===== */
-(function () {
+// assets/js/diagonal.js
+(() => {
+  "use strict";
+
+  // Vitesse
+  const SPEED_WHEEL = 0.02;
+  const SPEED_DRAG  = -0.10;
+
+  // Calcule un z-index “pyramidal”
+  const getZindex = (arr, activeIdx) =>
+    arr.map((_, i) => (activeIdx === i) ? arr.length : arr.length - Math.abs(activeIdx - i));
+
+  // Initialise UNE instance (un conteneur .winshirt-diagonal)
   function initInstance(root) {
-    try {
-      const track = root.querySelector('.carousel');
-      const items = Array.from(root.querySelectorAll('.carousel-item'));
-      if (!track || !items.length) {
-        console.warn('[WinShirt:diagonal] aucun item', root);
-        return;
+    if (!root || root.__winshirtDiagonalInited) return;
+    const items = root.querySelectorAll('.carousel-item');
+    if (!items.length) return;
+
+    root.__winshirtDiagonalInited = true;
+    root.setAttribute('data-count', String(items.length));
+
+    // État local à l’instance
+    let progress = 50;
+    let startX   = 0;
+    let active   = 0;
+    let isDown   = false;
+
+    // Rendu d’un item
+    const displayItem = (item, index, activeIndex) => {
+      const zIndex = getZindex([...items], activeIndex)[index];
+      item.style.setProperty('--zIndex', zIndex);
+      item.style.setProperty('--active', (index - activeIndex) / items.length);
+    };
+
+    // Animation
+    const animate = () => {
+      progress = Math.max(0, Math.min(progress, 100));
+      active   = Math.floor((progress / 100) * (items.length - 1));
+      items.forEach((item, index) => displayItem(item, index, active));
+    };
+    animate();
+
+    // Click sur une carte
+    items.forEach((item, i) => {
+      item.addEventListener('click', () => {
+        progress = (i / items.length) * 100 + 10;
+        animate();
+      });
+    });
+
+    // Handlers (scopés au container)
+    const onWheel = (e) => {
+      const delta = (e.deltaY || 0) * SPEED_WHEEL;
+      progress += delta;
+      animate();
+    };
+
+    const onMove = (e) => {
+      // Curseurs “cosmétiques”
+      const cursors = root.querySelectorAll('.cursor');
+      if (e.type === 'mousemove') {
+        cursors.forEach(c => {
+          c.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+        });
       }
+      if (!isDown) return;
+      const x = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
+      const delta = (x - startX) * SPEED_DRAG;
+      progress += delta;
+      startX = x;
+      animate();
+    };
 
-      // Positionnement diagonal simple
-      const n = items.length;
-      const mid = (n - 1) / 2;
-      const gapX = 80;   // px vers la droite
-      const gapY = -24;  // px vers le haut
-      const rot  = -10;  // degrés
+    const onDown = (e) => {
+      isDown = true;
+      startX = e.clientX || (e.touches && e.touches[0]?.clientX) || 0;
+    };
+    const onUp = () => { isDown = false; };
 
-      items.forEach((el, i) => {
-        const k = i - mid;
-        const x = Math.round(k * gapX);
-        const y = Math.round(k * gapY);
-        const r = k * rot;
-        const z = 100 + i; // ordre d’empilement croissant
+    // Listeners sur le conteneur (pas sur document)
+    root.addEventListener('wheel', onWheel, { passive: true });
+    root.addEventListener('mousedown', onDown);
+    root.addEventListener('mousemove', onMove);
+    root.addEventListener('mouseup', onUp);
+    root.addEventListener('mouseleave', onUp);
+    root.addEventListener('touchstart', onDown, { passive: true });
+    root.addEventListener('touchmove', onMove,  { passive: true });
+    root.addEventListener('touchend', onUp);
 
-        el.style.setProperty('--x', x + 'px');
-        el.style.setProperty('--y', y + 'px');
-        el.style.setProperty('--rot', r + 'deg');
-        el.style.setProperty('--zIndex', z);
-        el.style.setProperty('--opacity', '1');
-      });
-
-      // Cursors (optionnel)
-      const c1 = root.querySelector('.cursor');
-      const c2 = root.querySelector('.cursor2');
-      root.addEventListener('mousemove', (e) => {
-        if (!c1 || !c2) return;
-        const rect = root.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        c1.style.transform = `translate(${x}px, ${y}px)`;
-        c2.style.transform = `translate(${x}px, ${y}px)`;
-      });
-
-      console.info('[WinShirt:diagonal] OK, items=', n, 'uid=', root.dataset.uid);
-    } catch (err) {
-      console.error('[WinShirt:diagonal] erreur', err);
+    // Petit log utile en dev (harmless en prod)
+    if (window && window.console) {
+      const uid = root.id || '(no-id)';
+      console.log(`[WinShirt:diagonal] OK, items=${items.length} uid=${uid}`);
     }
   }
 
-  function ready(fn) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', fn);
-    } else {
-      fn();
-    }
+  // Init sur DOM prêt
+  const boot = () => {
+    document.querySelectorAll('.winshirt-diagonal').forEach(initInstance);
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
   }
 
-  ready(function () {
-    document
-      .querySelectorAll('.winshirt-diagonal')
-      .forEach(initInstance);
-  });
+  // Support Elementor (édition / preview)
+  if (window.elementorFrontend && window.elementorFrontend.hooks) {
+    window.elementorFrontend.hooks.addAction('frontend/element_ready/widget', () => {
+      boot();
+    });
+    // certains widgets utilisent 'frontend/element_ready/global'
+    window.elementorFrontend.hooks.addAction('frontend/element_ready/global', () => {
+      boot();
+    });
+  }
 })();
