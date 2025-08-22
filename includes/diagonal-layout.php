@@ -15,14 +15,14 @@ function winshirt_diagonal_enqueue_assets() {
 
     wp_enqueue_style(
         'winshirt-diagonal',
-        WINSHIRT_PLUGIN_URL . 'assets/diagonal.css',
+        WINSHIRT_PLUGIN_URL . 'assets/css/diagonal.css',
         [],
         '1.0'
     );
 
     wp_enqueue_script(
         'winshirt-diagonal',
-        WINSHIRT_PLUGIN_URL . 'assets/diagonal.js',
+        WINSHIRT_PLUGIN_URL . 'assets/js/diagonal.js',
         [],
         '1.0',
         true
