@@ -18,7 +18,9 @@ require_once WINSHIRT_DIR . 'includes/class-winshirt-admin.php';
 require_once WINSHIRT_DIR . 'includes/diagonal-layout.php';
 require_once WINSHIRT_DIR . 'includes/shortcode-winshirt-lotteries.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-slugs.php';
+require_once WINSHIRT_DIR . 'includes/class-winshirt-archive-overlay.php';
 WinShirt_Slugs::init();
+WinShirt_Archive_Overlay::init();
 
 add_action('plugins_loaded', function () {
     WinShirt_Assets::init();
