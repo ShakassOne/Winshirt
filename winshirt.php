@@ -21,7 +21,6 @@ require_once WINSHIRT_DIR . 'includes/class-winshirt-lottery-meta.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-product-link.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-slugs.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-archive-overlay.php';
-require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
 
 
 // Initialisation
