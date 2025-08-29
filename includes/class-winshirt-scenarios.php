@@ -163,13 +163,25 @@ class WS_Scenarios {
                         </div>
                         
                         <div class="winshirt-form-group">
+                            <label for="objectiveTickets">🎯 Objectif minimum de tickets</label>
+                            <input type="number" id="objectiveTickets" value="5000" step="1">
+                            <small style="color: #666; font-size: 0.8rem;">Seuil pour éviter les remboursements</small>
+                        </div>
+                        
+                        <div class="winshirt-form-group">
+                            <label for="actualSold">📈 Tickets déjà vendus (simulation)</label>
+                            <input type="number" id="actualSold" value="0" step="1">
+                            <small style="color: #666; font-size: 0.8rem;">Pour voir votre position actuelle</small>
+                        </div>
+                        
+                        <div class="winshirt-form-group">
                             <label for="tvaRate">Taux TVA (%)</label>
                             <input type="number" id="tvaRate" value="20" step="0.01">
                         </div>
                         
                         <div class="winshirt-checkbox-group">
                             <input type="checkbox" id="refundEnabled" checked>
-                            <label for="refundEnabled">🔄 Activation du remboursement si objectif non atteint</label>
+                            <label for="refundEnabled">🔄 Remboursement si objectif non atteint</label>
                         </div>
                         
                         <div class="winshirt-form-group">
@@ -397,6 +409,36 @@ class WS_Scenarios {
             color: #2d3748;
         }
         
+        .winshirt-objective-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 5px;
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .winshirt-objective-badge.warning {
+            background: #fed7d7;
+            color: #c53030;
+        }
+        
+        .winshirt-scenario-card.objective-reached {
+            box-shadow: 0 0 0 2px #10b981;
+        }
+        
+        .winshirt-metric.warning {
+            background: #fed7d7 !important;
+            color: #c53030;
+        }
+        
+        .winshirt-form-group small {
+            display: block;
+            margin-top: 3px;
+        }
+        
         @media (max-width: 1200px) {
             .winshirt-main-content {
                 grid-template-columns: 1fr;
@@ -430,7 +472,11 @@ class WS_Scenarios {
             
             const revenueHT = tickets * ticketPriceHT;
             const productCosts = tickets * productCostPerTicket;
-            const refundCosts = config.refundEnabled ? tickets * config.refundValue : 0;
+            
+            // Remboursement seulement si objectif non atteint ET remboursement activé
+            const needsRefund = config.refundEnabled && tickets < config.objectiveTickets;
+            const refundCosts = needsRefund ? tickets * config.refundValue : 0;
+            
             const totalCosts = config.fixedCosts + productCosts + refundCosts + config.prizeValue;
             const netProfit = revenueHT - totalCosts;
             
@@ -442,7 +488,8 @@ class WS_Scenarios {
                 refundCosts,
                 totalCosts,
                 netProfit,
-                isRefunded: config.refundEnabled
+                isRefunded: needsRefund,
+                objectiveReached: tickets >= config.objectiveTickets
             };
         }
         
@@ -466,15 +513,16 @@ class WS_Scenarios {
         function createScenarioCard(scenario) {
             const status = getScenarioStatus(scenario.netProfit);
             const statusText = {
-                'profitable': '🚀 Rentable',
-                'break-even': '⚖️ Équilibre',
-                'loss': '⚠️ Perte'
+                'profitable': scenario.objectiveReached ? '🚀 Objectif atteint' : '💡 Rentable',
+                'break-even': scenario.objectiveReached ? '⚖️ Équilibre OK' : '⚖️ Équilibre',
+                'loss': scenario.objectiveReached ? '⚠️ Objectif mais perte' : '⚠️ Perte + Remb.'
             }[status];
             
             return `
-                <div class=\"winshirt-scenario-card \${status}\">
+                <div class=\"winshirt-scenario-card \${status} \${scenario.objectiveReached ? 'objective-reached' : ''}\">
                     <div class=\"winshirt-scenario-title\">\${scenario.tickets.toLocaleString()} tickets</div>
                     <span class=\"winshirt-status-badge winshirt-status-\${status}\">\${statusText}</span>
+                    \${scenario.objectiveReached ? '<div class=\"winshirt-objective-badge\">✅ Objectif OK</div>' : '<div class=\"winshirt-objective-badge warning\">❌ Sous objectif</div>'}
                     
                     <div class=\"winshirt-scenario-metrics\">
                         <div class=\"winshirt-metric\">
@@ -490,7 +538,7 @@ class WS_Scenarios {
                             <div class=\"winshirt-metric-label\">Coûts Produits</div>
                         </div>
                         \${scenario.isRefunded ? `
-                        <div class=\"winshirt-metric\">
+                        <div class=\"winshirt-metric warning\">
                             <div class=\"winshirt-metric-value\">\${formatEuro(scenario.refundCosts)}</div>
                             <div class=\"winshirt-metric-label\">Remboursements</div>
                         </div>` : ''}
@@ -574,11 +622,27 @@ class WS_Scenarios {
                 prizeValue: parseFloat(document.getElementById('prizeValue').value) || 0,
                 tvaRate: parseFloat(document.getElementById('tvaRate').value) || 20,
                 refundEnabled: document.getElementById('refundEnabled').checked,
-                refundValue: parseFloat(document.getElementById('refundValue').value) || 5
+                refundValue: parseFloat(document.getElementById('refundValue').value) || 5,
+                objectiveTickets: parseFloat(document.getElementById('objectiveTickets').value) || 5000,
+                actualSold: parseFloat(document.getElementById('actualSold').value) || 0
             };
             
-            // Générer différents scénarios
-            const ticketCounts = [1000, 2000, 3000, 4000, 5000, 6000];
+            // Générer différents scénarios + le scénario actuel si renseigné
+            let ticketCounts = [1000, 2000, 3000, 4000, 5000, 6000];
+            
+            // Ajouter l'objectif s'il est différent des valeurs par défaut
+            if (config.objectiveTickets && !ticketCounts.includes(config.objectiveTickets)) {
+                ticketCounts.push(config.objectiveTickets);
+            }
+            
+            // Ajouter le nombre actuel vendu s'il est renseigné
+            if (config.actualSold > 0 && !ticketCounts.includes(config.actualSold)) {
+                ticketCounts.push(config.actualSold);
+            }
+            
+            // Trier les valeurs
+            ticketCounts.sort((a, b) => a - b);
+            
             const scenarios = ticketCounts.map(count => calculateScenario(count, config));
             
             // Mettre à jour l'affichage
