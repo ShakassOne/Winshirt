@@ -6,7 +6,6 @@
  * Author: WinShirt by Shakass Communication
  * Text Domain: winshirt
  */
-
 if ( ! defined('ABSPATH') ) exit;
 
 // Constantes
@@ -15,23 +14,13 @@ define('WINSHIRT_FILE', __FILE__);
 define('WINSHIRT_DIR', plugin_dir_path(__FILE__));
 define('WINSHIRT_URL', plugin_dir_url(__FILE__));
 
-if ( is_admin() ) {
-    require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
-}
-
 // Inclusions obligatoires
 require_once WINSHIRT_DIR . 'includes/class-winshirt-admin.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-lottery-meta.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-product-link.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-slugs.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-archive-overlay.php';
-
-if ( is_admin() ) {
-    require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
-}
-
-
-
+require_once WINSHIRT_DIR . 'includes/class-winshirt-scenarios.php'; // 👈 NOUVELLE LIGNE
 
 // Initialisation
 add_action('plugins_loaded', function () {
@@ -40,6 +29,7 @@ add_action('plugins_loaded', function () {
     if ( class_exists('WS_Product_Link') ) WS_Product_Link::init();
     if ( class_exists('WS_Slugs') ) WS_Slugs::init();
     if ( class_exists('WS_Archive_Overlay') ) WS_Archive_Overlay::init();
+    if ( class_exists('WS_Scenarios') ) WS_Scenarios::init(); // 👈 NOUVELLE LIGNE
 });
 
 // Activation
