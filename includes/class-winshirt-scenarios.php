@@ -17,13 +17,35 @@ class WS_Scenarios {
      * Ajoute le menu admin
      */
     public static function add_admin_menu() {
+        // Créer le menu principal WinShirt s'il n'existe pas
+        add_menu_page(
+            'WinShirt',                    // Page title
+            'WinShirt',                    // Menu title
+            'manage_options',              // Capability
+            'winshirt_main',               // Menu slug
+            [__CLASS__, 'render_main_page'], // Callback pour la page principale
+            'dashicons-tickets-alt',       // Icon
+            30                            // Position
+        );
+        
+        // Ajouter le sous-menu Scénarios
         add_submenu_page(
-            'winshirt_settings', // Parent slug (celui de votre menu principal)
-            'Simulateur de Scénarios',
-            'Scénarios',
+            'winshirt_main',               // Parent slug
+            'Simulateur de Scénarios',     // Page title
+            'Scénarios',                   // Menu title
+            'manage_options',              // Capability
+            'winshirt_scenarios',          // Menu slug
+            [__CLASS__, 'render_page']     // Callback
+        );
+        
+        // Renommer le premier sous-menu (éviter la duplication)
+        add_submenu_page(
+            'winshirt_main',
+            'Dashboard WinShirt',
+            'Dashboard',
             'manage_options',
-            'winshirt_scenarios',
-            [__CLASS__, 'render_page']
+            'winshirt_main',
+            [__CLASS__, 'render_main_page']
         );
     }
     
@@ -31,7 +53,8 @@ class WS_Scenarios {
      * Charge les scripts et styles
      */
     public static function enqueue_scripts($hook) {
-        if ($hook !== 'winshirt_page_winshirt_scenarios') return;
+        // Vérifier si on est sur une page WinShirt
+        if (strpos($hook, 'winshirt') === false) return;
         
         // Chart.js pour les graphiques
         wp_enqueue_script(
@@ -44,6 +67,48 @@ class WS_Scenarios {
         
         // Styles inline pour le simulateur
         wp_add_inline_style('wp-admin', self::get_css());
+    }
+    
+    /**
+     * Page principale du dashboard
+     */
+    public static function render_main_page() {
+        ?>
+        <div class="wrap">
+            <h1>🎯 WinShirt Dashboard</h1>
+            <div style="background: white; padding: 30px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <h2>Bienvenue dans WinShirt !</h2>
+                <p>Gérez vos loteries et simulez vos scénarios de rentabilité.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 30px;">
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 10px; text-align: center;">
+                        <h3 style="margin: 0 0 10px 0;">📊 Simulateur</h3>
+                        <p style="margin: 0 0 15px 0; opacity: 0.9;">Testez la rentabilité de vos loteries</p>
+                        <a href="<?php echo admin_url('admin.php?page=winshirt_scenarios'); ?>" 
+                           style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; display: inline-block;">
+                            Accéder →
+                        </a>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 25px; border-radius: 10px; text-align: center;">
+                        <h3 style="margin: 0 0 10px 0;">🎫 Loteries</h3>
+                        <p style="margin: 0 0 15px 0; opacity: 0.9;">Gérez vos loteries en cours</p>
+                        <span style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; display: inline-block;">
+                            Bientôt disponible
+                        </span>
+                    </div>
+                    
+                    <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 25px; border-radius: 10px; text-align: center;">
+                        <h3 style="margin: 0 0 10px 0;">⚙️ Paramètres</h3>
+                        <p style="margin: 0 0 15px 0; opacity: 0.9;">Configuration du plugin</p>
+                        <span style="background: rgba(255,255,255,0.2); color: white; padding: 8px 16px; border-radius: 6px; display: inline-block;">
+                            Bientôt disponible
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php
     }
     
     /**
