@@ -22,15 +22,10 @@ require_once WINSHIRT_DIR . 'includes/class-winshirt-product-link.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-slugs.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-archive-overlay.php';
 
-// AVANT : require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
-// HOTFIX : ne charge que côté admin, et seulement si le fichier existe
 if ( is_admin() ) {
-    $simulator_path = WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
-    if ( file_exists($simulator_path) ) { require_once $simulator_path; }
+    require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
 }
 
-// Si le fichier est dans: wp-content/plugins/winshirt/admin/class-winshirt-simulator.php
-require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
 
 
 // Initialisation
