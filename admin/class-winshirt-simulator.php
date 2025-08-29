@@ -1,12 +1,12 @@
 <?php
 /**
- * WinShirt - Simulateur de Scénarios (BETA-3 compat)
- * - Page admin "Simulateur" (sous WinShirt si dispo, sinon top-level).
+ * WinShirt - Simulateur de Scénarios (PAGE COMPLÈTE)
+ * - Ajoute un menu top-level "Simulateur" (slug: winshirt-simulator) + alias sous "WinShirt" si présent.
  * - Formulaire (produits, lots, coûts), calcul rentabilité (tirage vs remboursement).
- * - Prépa du lot TOUJOURS incluse (tu le veux dépensé dès le départ).
+ * - Prépa du lot TOUJOURS incluse (dépensée dès le départ, comme demandé).
  * - Graphique Chart.js.
- * - Sauvegarde/chargement de scénarios (CPT ws_scenario).
- * Compat PHP ≥ 7.0 (pas de type hints retour, pas de wp_generate_uuid4).
+ * - Sauvegarde/chargement des scénarios (CPT ws_scenario).
+ * Compat PHP ≥ 7.0 (pas de type hints retour, pas de fonctions exotiques).
  */
 if ( ! defined('ABSPATH') ) exit;
 
@@ -25,32 +25,38 @@ class WinShirt_Simulator {
     public function register_cpt() {
         register_post_type(self::CPT, array(
             'labels' => array(
-                'name' => 'Scénarios',
+                'name'          => 'Scénarios',
                 'singular_name' => 'Scénario',
-                'menu_name' => 'Scénarios',
+                'menu_name'     => 'Scénarios',
             ),
-            'public' => false,
-            'show_ui' => false,
+            'public'       => false,
+            'show_ui'      => false,
             'show_in_menu' => false,
-            'supports' => array('title'),
+            'supports'     => array('title'),
         ));
     }
 
     public function add_menu() {
-        // Essaye d'ajouter sous le parent "WinShirt"
-        $parent = 'winshirt';
-        $added = add_submenu_page(
-            $parent, 'Simulateur', 'Simulateur', 'manage_options',
-            self::MENU_SLUG, array($this,'render_admin_page')
+        // 1) Toujours un top-level garanti (évite toute 404 d’admin)
+        add_menu_page(
+            'Simulateur WinShirt',            // Page title
+            'Simulateur',                     // Menu title
+            'manage_options',                 // Capability
+            self::MENU_SLUG,                  // Slug
+            array($this,'render_admin_page'), // Callback
+            'dashicons-chart-area',           // Icon
+            56                                // Position
         );
 
-        // Si parent absent, crée un top-level minimal + sous-menu
-        if ( empty($added) ) {
-            add_menu_page('WinShirt','WinShirt','manage_options',$parent,function(){
-                echo '<div class="wrap"><h1>WinShirt</h1><p>Tableau de bord WinShirt</p></div>';
-            }, 'dashicons-tickets', 56);
-            add_submenu_page($parent,'Simulateur','Simulateur','manage_options',self::MENU_SLUG,array($this,'render_admin_page'));
-        }
+        // 2) Alias sous le parent "WinShirt" si présent (pratique si tu as déjà un menu parent)
+        add_submenu_page(
+            'winshirt',                       // parent slug (si inexistant, WP ignore simplement)
+            'Simulateur',
+            'Simulateur',
+            'manage_options',
+            self::MENU_SLUG,                  // même slug, donc les deux liens pointent vers la même page
+            array($this,'render_admin_page')
+        );
     }
 
     public function enqueue($hook) {
@@ -59,11 +65,11 @@ class WinShirt_Simulator {
         wp_enqueue_media();
         wp_enqueue_script('chartjs','https://cdn.jsdelivr.net/npm/chart.js',array(), '4.4.1', true);
 
-        // CSS inline
+        // CSS inline minimal & propre
         $css = '
         .ws-card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin:16px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
         .ws-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-        .ws-col-1{grid-column:span 1}.ws-col-2{span:2}.ws-col-3{grid-column:span 3}
+        .ws-col-1{grid-column:span 1}.ws-col-2{grid-column:span 2}.ws-col-3{grid-column:span 3}
         .ws-col-4{grid-column:span 4}.ws-col-6{grid-column:span 6}.ws-col-8{grid-column:span 8}.ws-col-12{grid-column:span 12}
         .ws-label{font-weight:600;margin-bottom:4px;display:block}
         .ws-input{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px}
@@ -81,7 +87,7 @@ class WinShirt_Simulator {
             echo '<style id="winshirt-simulator-css">'.$css.'</style>';
         });
 
-        // JS duplication + media
+        // JS duplication + media picker
         $js = '(function($){
           function mediaPick($btn){
             $btn.off("click").on("click", function(e){
@@ -300,11 +306,11 @@ class WinShirt_Simulator {
                 $refund_total = ($refund_enabled && $volume < $threshold) ? $refund_amt * $volume : 0.0;
 
                 // Interne – Tirage
-                $profit_internal_draw = $ca_ht - $var_total_internal - $fixed_non_prize - $prep - $value;
+                $profit_internal_draw   = $ca_ht - $var_total_internal - $fixed_non_prize - $prep - $value;
                 // Interne – Remboursement
                 $profit_internal_refund = $ca_ht - $var_total_internal - $fixed_non_prize - $prep - $refund_total;
                 // Externe – Tirage
-                $profit_external_draw = $ca_ht - $var_total_external - $fixed_non_prize - $prep - $value;
+                $profit_external_draw   = $ca_ht - $var_total_external - $fixed_non_prize - $prep - $value;
                 // Externe – Remboursement
                 $profit_external_refund = $ca_ht - $var_total_external - $fixed_non_prize - $prep - $refund_total;
 
@@ -418,7 +424,7 @@ class WinShirt_Simulator {
         echo '</form>';
 
         // Liste scénarios
-        echo '<div class="ws-card"><h2>Scénarios enregistrés</h2>';
+        echo '<div class="ws-card'><h2>Scénarios enregistrés</h2>';
         if ($existing) {
             echo '<table class="ws"><thead><tr><th>Titre</th><th>Date</th><th>Charger</th></tr></thead><tbody>';
             foreach ($existing as $post) {
@@ -468,7 +474,7 @@ class WinShirt_Simulator {
         echo '<div class="ws-col-3"><label class="ws-label">Valeur (HT)</label><input class="ws-input" type="number" step="0.01" name="prize_value_ht[]" value="'.esc_attr($d['value_ht']).'"></div>';
         echo '<div class="ws-col-3"><label class="ws-label">Prépa (HT)</label><input class="ws-input" type="number" step="0.01" name="prize_prep_ht[]" value="'.esc_attr($d['prep_ht']).'"></div>';
         echo '<div class="ws-col-2"><label class="ws-label">Image</label><div class="ws-flex"><input class="ws-input" id="'.$target.'" type="text" name="prize_image[]" value="'.esc_attr($d['image']).'"><button class="ws-btn ws-pick-media" data-target="'.$target.'">Choisir</button></div></div>';
-        echo '<div class="ws-col-12" style="display:flex;justify-content:flex-end;"><button class="ws-btn secondary ws-remove-row">Suppr.</button></div>';
+        echo '<div class="ws-col-12" style="display:flex;justify-content:flex-end;"><button class="ws-btn secondary ws-remove_row ws-remove-row">Suppr.</button></div>';
         echo '</div></div>';
     }
 
