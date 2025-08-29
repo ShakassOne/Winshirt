@@ -1,9 +1,9 @@
 <?php
 /**
- * WinShirt - Simulateur (SAFE-MIN)
- * Objectif: éliminer toute cause d'erreur critique côté admin.
+ * WinShirt - Simulateur (SAFE-MIN, boot immédiat)
+ * Objectif: garantir l'affichage de la page admin sans erreur critique.
  * - Menu top-level "Simulateur" (slug: winshirt-simulator)
- * - AUCUN enqueue, AUCUN CPT, AUCUNE dépendance.
+ * - AUCUN enqueue, AUCUN CPT, AUCUNE dépendance externe.
  * - Formulaire minimal + calculs basiques en PHP pur.
  * Compat PHP >= 7.0
  */
@@ -15,75 +15,78 @@ class WinShirt_Simulator_SafeMin {
     const MENU_SLUG = 'winshirt-simulator';
 
     public function __construct() {
-        // Hooks minimum vitaux
+        // Enregistre le menu tout de suite
         add_action('admin_menu', array($this,'add_menu'));
     }
 
     public function add_menu() {
+        // Crée systématiquement un menu top-level fiable
         add_menu_page(
-            'Simulateur WinShirt (SAFE-MIN)',
-            'Simulateur',
-            'manage_options',
-            self::MENU_SLUG,
-            array($this,'render_admin_page'),
-            'dashicons-chart-area',
-            56
+            'Simulateur WinShirt (SAFE-MIN)', // Titre de page
+            'Simulateur',                     // Titre du menu
+            'manage_options',                 // Capacité requise
+            self::MENU_SLUG,                  // Slug unique
+            array($this,'render_admin_page'), // Callback
+            'dashicons-chart-area',           // Icône
+            56                                // Position
         );
     }
 
-    // ---------- OUTILS ----------
+    // ----------------- OUTILS -----------------
     private function num($v,$def=0.0){
         if (is_string($v)) $v = str_replace(',','.',$v);
         return is_numeric($v) ? (float)$v : (float)$def;
     }
     private function price_ht($ttc, $tva){ return (float)$ttc / (1.0 + (float)$tva); }
 
-    // ---------- PAGE ----------
+    // ----------------- PAGE -------------------
     public function render_admin_page() {
         if ( ! current_user_can('manage_options') ) return;
 
-        // Valeurs par défaut
+        // Défauts
         $d = array(
             'tva' => 0.20,
             'price_ttc' => 20.00,
-            'cost_unit_ht' => 4.00,
-            'ship_unit_ht' => 5.00,
-            'fixed_ht' => 5360.00, // structure+com+huissier+divers+sacs
+            'cost_unit_ht' => 4.00,   // coût produit HT hors port
+            'ship_unit_ht' => 5.00,   // port unitaire HT
+            'fixed_ht' => 5360.00,    // structure+com+huissier+divers+sacs
             'volume' => 3000,
             'prize_value_ht' => 7000.00,
-            'prep_ht' => 5000.00, // incluse d'office
+            'prep_ht' => 5000.00,     // incluse d'office (prépa)
             'refund_enabled' => 1,
             'refund_amount_ht' => 5.00,
             'draw_threshold' => 5000,
-            'mode' => 'draw', // draw | refund
+            'mode' => 'draw',         // draw | refund
         );
 
-        // POST -> lecture en safe
+        // Lecture POST en safe
         $p = isset($_POST) ? wp_unslash($_POST) : array();
         $cfg = array();
-        $cfg['tva']             = isset($p['tva']) ? $this->num($p['tva'], $d['tva']) : $d['tva'];
-        $cfg['price_ttc']       = isset($p['price_ttc']) ? $this->num($p['price_ttc'],$d['price_ttc']) : $d['price_ttc'];
-        $cfg['cost_unit_ht']    = isset($p['cost_unit_ht']) ? $this->num($p['cost_unit_ht'],$d['cost_unit_ht']) : $d['cost_unit_ht'];
-        $cfg['ship_unit_ht']    = isset($p['ship_unit_ht']) ? $this->num($p['ship_unit_ht'],$d['ship_unit_ht']) : $d['ship_unit_ht'];
-        $cfg['fixed_ht']        = isset($p['fixed_ht']) ? $this->num($p['fixed_ht'],$d['fixed_ht']) : $d['fixed_ht'];
-        $cfg['volume']          = isset($p['volume']) ? (int)$p['volume'] : $d['volume'];
-        $cfg['prize_value_ht']  = isset($p['prize_value_ht']) ? $this->num($p['prize_value_ht'],$d['prize_value_ht']) : $d['prize_value_ht'];
-        $cfg['prep_ht']         = isset($p['prep_ht']) ? $this->num($p['prep_ht'],$d['prep_ht']) : $d['prep_ht'];
-        $cfg['refund_enabled']  = !empty($p['refund_enabled']) ? 1 : (isset($p['ws_submitted']) ? 0 : $d['refund_enabled']);
-        $cfg['refund_amount_ht']= isset($p['refund_amount_ht']) ? $this->num($p['refund_amount_ht'],$d['refund_amount_ht']) : $d['refund_amount_ht'];
-        $cfg['draw_threshold']  = isset($p['draw_threshold']) ? (int)$p['draw_threshold'] : $d['draw_threshold'];
-        $cfg['mode']            = isset($p['mode']) && in_array($p['mode'], array('draw','refund'), true) ? $p['mode'] : $d['mode'];
+        $cfg['tva']              = isset($p['tva']) ? $this->num($p['tva'], $d['tva']) : $d['tva'];
+        $cfg['price_ttc']        = isset($p['price_ttc']) ? $this->num($p['price_ttc'], $d['price_ttc']) : $d['price_ttc'];
+        $cfg['cost_unit_ht']     = isset($p['cost_unit_ht']) ? $this->num($p['cost_unit_ht'], $d['cost_unit_ht']) : $d['cost_unit_ht'];
+        $cfg['ship_unit_ht']     = isset($p['ship_unit_ht']) ? $this->num($p['ship_unit_ht'], $d['ship_unit_ht']) : $d['ship_unit_ht'];
+        $cfg['fixed_ht']         = isset($p['fixed_ht']) ? $this->num($p['fixed_ht'], $d['fixed_ht']) : $d['fixed_ht'];
+        $cfg['volume']           = isset($p['volume']) ? (int)$p['volume'] : $d['volume'];
+        $cfg['prize_value_ht']   = isset($p['prize_value_ht']) ? $this->num($p['prize_value_ht'], $d['prize_value_ht']) : $d['prize_value_ht'];
+        $cfg['prep_ht']          = isset($p['prep_ht']) ? $this->num($p['prep_ht'], $d['prep_ht']) : $d['prep_ht'];
+        $cfg['refund_enabled']   = !empty($p['refund_enabled']) ? 1 : (isset($p['ws_submitted']) ? 0 : $d['refund_enabled']);
+        $cfg['refund_amount_ht'] = isset($p['refund_amount_ht']) ? $this->num($p['refund_amount_ht'], $d['refund_amount_ht']) : $d['refund_amount_ht'];
+        $cfg['draw_threshold']   = isset($p['draw_threshold']) ? (int)$p['draw_threshold'] : $d['draw_threshold'];
+        $cfg['mode']             = (isset($p['mode']) && in_array($p['mode'], array('draw','refund'), true)) ? $p['mode'] : $d['mode'];
 
-        // Calculs minimalistes (une seule ligne produit, une seule ligne lot)
+        // Calculs minimalistes (1 produit, 1 lot)
         $price_ht = $this->price_ht($cfg['price_ttc'], $cfg['tva']);
         $unit_var = $cfg['cost_unit_ht'] + $cfg['ship_unit_ht'];
         $ca_ht    = $cfg['volume'] * $price_ht;
         $var_tot  = $cfg['volume'] * $unit_var;
 
-        // Prépa: TOUJOURS incluse (ta règle)
+        // Prépa: TOUJOURS incluse (dépensée dès le départ)
         $fixed = $cfg['fixed_ht'] + $cfg['prep_ht'];
 
-        $refund_total = ( $cfg['refund_enabled'] && $cfg['volume'] < $cfg['draw_threshold'] ) ? $cfg['refund_amount_ht'] * $cfg['volume'] : 0.0;
+        $refund_total = ( $cfg['refund_enabled'] && $cfg['volume'] < $cfg['draw_threshold'] )
+            ? $cfg['refund_amount_ht'] * $cfg['volume']
+            : 0.0;
 
         if ($cfg['mode']==='draw') {
             $profit = $ca_ht - $var_tot - $fixed - $cfg['prize_value_ht'];
@@ -91,9 +94,9 @@ class WinShirt_Simulator_SafeMin {
             $profit = $ca_ht - $var_tot - $fixed - $refund_total;
         }
 
-        // ----- Rendu HTML (sans JS/CSS externes) -----
+        // ----- Rendu HTML sans dépendances -----
         echo '<div class="wrap"><h1>WinShirt – Simulateur (SAFE-MIN)</h1>';
-        echo '<p style="color:#6b7280;margin:8px 0;">Cette page minimale sert à confirmer que l’admin charge sans erreur. Si elle s’affiche, on pourra réactiver pas à pas les fonctionnalités avancées.</p>';
+        echo '<p style="color:#6b7280;margin:8px 0;">Version minimale pour garantir l’accès. Si cette page s’affiche, on pourra réactiver les fonctionnalités avancées étape par étape.</p>';
 
         echo '<form method="post" style="background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;max-width:980px;">';
         echo '<input type="hidden" name="ws_submitted" value="1" />';
@@ -122,7 +125,7 @@ class WinShirt_Simulator_SafeMin {
         echo '<label><input type="checkbox" name="refund_enabled" value="1" '.checked(1,$cfg['refund_enabled'],false).' /> Remboursement activé</label>';
         echo '</div>';
         echo '<div style="display:flex;align-items:flex-end;gap:8px;padding:6px 0;">';
-        echo '<label><input type="radio" name="mode" value="draw" '.checked('draw',$cfg['mode'],false).' /> Tirage (lot attribué)</label> ';
+        echo '<label><input type="radio" name="mode" value="draw" '.checked('draw',$cfg['mode'],false).' /> Tirage (lot attribué)</label>';
         echo '<label style="margin-left:12px;"><input type="radio" name="mode" value="refund" '.checked('refund',$cfg['mode'],false).' /> Remboursement (pas de lot)</label>';
         echo '</div>';
         echo '</div>';
@@ -157,9 +160,10 @@ class WinShirt_Simulator_SafeMin {
         return $s;
     }
 }
-}
+} // class guard
 
-// Boot admin-only
-add_action('plugins_loaded', function(){
-    if ( is_admin() ) { new WinShirt_Simulator_SafeMin(); }
-});
+// ---------- BOOT IMMÉDIAT & ADMIN-ONLY ----------
+// (pas de hook tardif; la classe est instanciée dès l'inclusion du fichier)
+if ( is_admin() ) {
+    new WinShirt_Simulator_SafeMin();
+}
