@@ -153,6 +153,12 @@ class WS_Scenarios {
                         </div>
                         
                         <div class="winshirt-form-group">
+                            <label for="stockBuffer">📦 Stock tampon (unités)</label>
+                            <input type="number" id="stockBuffer" value="50" step="1">
+                            <small style="color: #666; font-size: 0.8rem;">Produits déjà imprimés en stock</small>
+                        </div>
+                        
+                        <div class="winshirt-form-group">
                             <label for="fixedCosts">🏢 Charges fixes totales (€)</label>
                             <input type="number" id="fixedCosts" value="17360" step="0.01">
                         </div>
@@ -343,7 +349,7 @@ class WS_Scenarios {
         .winshirt-scenario-metrics {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            gap: 8px;
             margin-bottom: 15px;
         }
         
@@ -447,7 +453,7 @@ class WS_Scenarios {
         }
         
         .winshirt-scenario-card.break-even-special::before {
-            content: '🎯';
+            content: "🎯";
             position: absolute;
             top: -15px;
             right: -15px;
@@ -492,47 +498,68 @@ class WS_Scenarios {
         // Fonction pour calculer le point d'équilibre (break-even)
         function calculateBreakEven(config) {
             const ticketPriceHT = config.ticketPrice / (1 + config.tvaRate / 100);
-            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost + config.shippingCost;
+            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost;
+            const shippingCostPerTicket = config.shippingCost;
             
-            // Calcul du point d'équilibre sans remboursement (cas idéal)
-            // Revenue - Costs = 0
-            // tickets * ticketPriceHT - (config.fixedCosts + tickets * productCostPerTicket + config.prizeValue) = 0
-            // tickets * (ticketPriceHT - productCostPerTicket) = config.fixedCosts + config.prizeValue
+            // Coût du stock tampon (payé même si on vend peu)
+            const stockBufferCost = config.stockBuffer * productCostPerTicket;
             
-            const margeSurTicket = ticketPriceHT - productCostPerTicket;
+            // Marge par ticket (prix de vente - coûts variables par ticket)
+            const margeSurTicket = ticketPriceHT - productCostPerTicket - shippingCostPerTicket;
             
             if (margeSurTicket <= 0) {
                 return null; // Impossible d'être rentable
             }
             
-            const breakEvenTickets = Math.ceil((config.fixedCosts + config.prizeValue) / margeSurTicket);
+            // Coûts fixes totaux = charges fixes + prix du lot + stock tampon
+            const totalFixedCosts = config.fixedCosts + config.prizeValue + stockBufferCost;
+            
+            const breakEvenTickets = Math.ceil(totalFixedCosts / margeSurTicket);
             
             return breakEvenTickets;
         }
+        
+        // Fonction pour calculer les métriques d'un scénario
         function calculateScenario(tickets, config) {
             const ticketPriceHT = config.ticketPrice / (1 + config.tvaRate / 100);
-            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost + config.shippingCost;
+            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost;
+            const shippingCostPerTicket = config.shippingCost;
             
             const revenueHT = tickets * ticketPriceHT;
-            const productCosts = tickets * productCostPerTicket;
+            
+            // Calcul des coûts produits selon le stock tampon
+            let productCosts;
+            if (tickets <= config.stockBuffer) {
+                // On vend moins que le stock tampon : coût du stock tampon complet
+                productCosts = config.stockBuffer * productCostPerTicket;
+            } else {
+                // On vend plus que le stock : coût du stock + coût des ventes supplémentaires
+                const additionalUnits = tickets - config.stockBuffer;
+                productCosts = (config.stockBuffer * productCostPerTicket) + (additionalUnits * productCostPerTicket);
+            }
+            
+            // Transport : seulement pour ce qui est vendu et expédié
+            const shippingCosts = tickets * shippingCostPerTicket;
             
             // Remboursement seulement si objectif non atteint ET remboursement activé
             const needsRefund = config.refundEnabled && tickets < config.objectiveTickets;
             const refundCosts = needsRefund ? tickets * config.refundValue : 0;
             
-            const totalCosts = config.fixedCosts + productCosts + refundCosts + config.prizeValue;
+            const totalCosts = config.fixedCosts + productCosts + shippingCosts + refundCosts + config.prizeValue;
             const netProfit = revenueHT - totalCosts;
             
             return {
-                tickets,
-                revenueHT,
+                tickets: tickets,
+                revenueHT: revenueHT,
                 fixedCosts: config.fixedCosts,
-                productCosts,
-                refundCosts,
-                totalCosts,
-                netProfit,
+                productCosts: productCosts,
+                shippingCosts: shippingCosts,
+                refundCosts: refundCosts,
+                totalCosts: totalCosts,
+                netProfit: netProfit,
                 isRefunded: needsRefund,
-                objectiveReached: tickets >= config.objectiveTickets
+                objectiveReached: tickets >= config.objectiveTickets,
+                stockBuffer: config.stockBuffer
             };
         }
         
@@ -558,9 +585,9 @@ class WS_Scenarios {
             
             // Cas spécial pour le break-even
             if (scenario.isBreakEven) {
-                return `
+                return \`
                     <div class=\"winshirt-scenario-card break-even break-even-special\">
-                        <div class=\"winshirt-scenario-title\">🎯 ${scenario.tickets.toLocaleString()} tickets</div>
+                        <div class=\"winshirt-scenario-title\">🎯 \${scenario.tickets.toLocaleString()} tickets</div>
                         <span class=\"winshirt-status-badge winshirt-status-break-even\">💰 Point d'équilibre</span>
                         <div class=\"winshirt-objective-badge\">⚖️ Break-Even</div>
                         
@@ -575,13 +602,17 @@ class WS_Scenarios {
                             </div>
                             <div class=\"winshirt-metric\">
                                 <div class=\"winshirt-metric-value\">\${formatEuro(scenario.productCosts)}</div>
-                                <div class=\"winshirt-metric-label\">Coûts Produits</div>
+                                <div class=\"winshirt-metric-label\">Prod. + Stock</div>
                             </div>
-                            \${scenario.isRefunded ? `
+                            <div class=\"winshirt-metric\">
+                                <div class=\"winshirt-metric-value\">\${formatEuro(scenario.shippingCosts)}</div>
+                                <div class=\"winshirt-metric-label\">Transport</div>
+                            </div>
+                            \${scenario.isRefunded ? \`
                             <div class=\"winshirt-metric warning\">
                                 <div class=\"winshirt-metric-value\">\${formatEuro(scenario.refundCosts)}</div>
                                 <div class=\"winshirt-metric-label\">Remboursements</div>
-                            </div>` : ''}
+                            </div>\` : ''}
                         </div>
                         
                         <div class=\"winshirt-result-summary\">
@@ -591,7 +622,7 @@ class WS_Scenarios {
                             <div style=\"font-size: 0.9rem; color: #718096;\">Seuil de rentabilité</div>
                         </div>
                     </div>
-                `;
+                \`;
             }
             
             const statusText = {
@@ -600,7 +631,7 @@ class WS_Scenarios {
                 'loss': scenario.objectiveReached ? '⚠️ Objectif mais perte' : '⚠️ Perte + Remb.'
             }[status];
             
-            return `
+            return \`
                 <div class=\"winshirt-scenario-card \${status} \${scenario.objectiveReached ? 'objective-reached' : ''}\">
                     <div class=\"winshirt-scenario-title\">\${scenario.tickets.toLocaleString()} tickets</div>
                     <span class=\"winshirt-status-badge winshirt-status-\${status}\">\${statusText}</span>
@@ -617,13 +648,17 @@ class WS_Scenarios {
                         </div>
                         <div class=\"winshirt-metric\">
                             <div class=\"winshirt-metric-value\">\${formatEuro(scenario.productCosts)}</div>
-                            <div class=\"winshirt-metric-label\">Coûts Produits</div>
+                            <div class=\"winshirt-metric-label\">Prod. + Stock</div>
                         </div>
-                        \${scenario.isRefunded ? `
+                        <div class=\"winshirt-metric\">
+                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.shippingCosts)}</div>
+                            <div class=\"winshirt-metric-label\">Transport</div>
+                        </div>
+                        \${scenario.isRefunded ? \`
                         <div class=\"winshirt-metric warning\">
                             <div class=\"winshirt-metric-value\">\${formatEuro(scenario.refundCosts)}</div>
                             <div class=\"winshirt-metric-label\">Remboursements</div>
-                        </div>` : ''}
+                        </div>\` : ''}
                     </div>
                     
                     <div class=\"winshirt-result-summary\">
@@ -633,7 +668,7 @@ class WS_Scenarios {
                         <div style=\"font-size: 0.9rem; color: #718096;\">Résultat net</div>
                     </div>
                 </div>
-            `;
+            \`;
         }
         
         // Fonction pour mettre à jour le graphique
@@ -650,7 +685,7 @@ class WS_Scenarios {
             profitChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: ticketCounts.map(t => `\${t.toLocaleString()}`),
+                    labels: ticketCounts.map(t => \`\${t.toLocaleString()}\`),
                     datasets: [{
                         label: 'Bénéfice Net (€)',
                         data: profits,
@@ -700,6 +735,7 @@ class WS_Scenarios {
                 printCost: parseFloat(document.getElementById('printCost').value) || 2,
                 bagCost: parseFloat(document.getElementById('bagCost').value) || 0.5,
                 shippingCost: parseFloat(document.getElementById('shippingCost').value) || 0.17,
+                stockBuffer: parseFloat(document.getElementById('stockBuffer').value) || 50,
                 fixedCosts: parseFloat(document.getElementById('fixedCosts').value) || 17360,
                 prizeValue: parseFloat(document.getElementById('prizeValue').value) || 0,
                 tvaRate: parseFloat(document.getElementById('tvaRate').value) || 20,
@@ -752,12 +788,12 @@ class WS_Scenarios {
         }
         
         // Initialisation
-        jQuery(document).ready(function($) {
+        jQuery(document).ready(function(\$) {
             // Mise à jour initiale
             updateSimulation();
             
             // Écouter les changements
-            $('input').on('input change', updateSimulation);
+            \$('input').on('input change', updateSimulation);
         });
         ";
     }
