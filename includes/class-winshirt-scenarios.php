@@ -495,28 +495,41 @@ class WS_Scenarios {
         // Variables globales
         let profitChart = null;
         
-        // Fonction pour calculer le point d'équilibre (break-even)
+        // Fonction pour calculer le point d'équilibre (break-even) par approche itérative
         function calculateBreakEven(config) {
-            const ticketPriceHT = config.ticketPrice / (1 + config.tvaRate / 100);
-            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost;
-            const shippingCostPerTicket = config.shippingCost;
+            // Recherche par dichotomie pour trouver le point d'équilibre exact
+            let min = 1;
+            let max = 50000; // Maximum réaliste
+            let bestTickets = null;
+            let bestProfit = Infinity;
             
-            // Coût du stock tampon (payé même si on vend peu)
-            const stockBufferCost = config.stockBuffer * productCostPerTicket;
-            
-            // Marge par ticket (prix de vente - coûts variables par ticket)
-            const margeSurTicket = ticketPriceHT - productCostPerTicket - shippingCostPerTicket;
-            
-            if (margeSurTicket <= 0) {
-                return null; // Impossible d'être rentable
+            for (let i = 0; i < 50; i++) { // Maximum 50 itérations
+                let middle = Math.floor((min + max) / 2);
+                let scenario = calculateScenario(middle, config);
+                
+                // Si on trouve un profit très proche de 0 (± 50€)
+                if (Math.abs(scenario.netProfit) < 50) {
+                    return middle;
+                }
+                
+                // Garder le plus proche de 0
+                if (Math.abs(scenario.netProfit) < Math.abs(bestProfit)) {
+                    bestProfit = scenario.netProfit;
+                    bestTickets = middle;
+                }
+                
+                // Ajuster la recherche
+                if (scenario.netProfit < 0) {
+                    min = middle + 1;
+                } else {
+                    max = middle - 1;
+                }
+                
+                // Si la plage devient trop petite, on arrête
+                if (max <= min) break;
             }
             
-            // Coûts fixes totaux = charges fixes + prix du lot + stock tampon
-            const totalFixedCosts = config.fixedCosts + config.prizeValue + stockBufferCost;
-            
-            const breakEvenTickets = Math.ceil(totalFixedCosts / margeSurTicket);
-            
-            return breakEvenTickets;
+            return bestTickets;
         }
         
         // Fonction pour calculer les métriques d'un scénario
