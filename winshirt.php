@@ -28,6 +28,7 @@ if ( is_admin() ) {
 
 
 
+
 // Initialisation
 add_action('plugins_loaded', function () {
     if ( class_exists('WS_Admin') ) WS_Admin::init();
