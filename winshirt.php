@@ -15,6 +15,10 @@ define('WINSHIRT_FILE', __FILE__);
 define('WINSHIRT_DIR', plugin_dir_path(__FILE__));
 define('WINSHIRT_URL', plugin_dir_url(__FILE__));
 
+if ( is_admin() ) {
+    require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
+}
+
 // Inclusions obligatoires
 require_once WINSHIRT_DIR . 'includes/class-winshirt-admin.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-lottery-meta.php';
