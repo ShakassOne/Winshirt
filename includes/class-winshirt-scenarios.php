@@ -585,44 +585,35 @@ class WS_Scenarios {
             
             // Cas spécial pour le break-even
             if (scenario.isBreakEven) {
-                return \`
-                    <div class=\"winshirt-scenario-card break-even break-even-special\">
-                        <div class=\"winshirt-scenario-title\">🎯 \${scenario.tickets.toLocaleString()} tickets</div>
-                        <span class=\"winshirt-status-badge winshirt-status-break-even\">💰 Point d'équilibre</span>
-                        <div class=\"winshirt-objective-badge\">⚖️ Break-Even</div>
-                        
-                        <div class=\"winshirt-scenario-metrics\">
-                            <div class=\"winshirt-metric\">
-                                <div class=\"winshirt-metric-value\">\${formatEuro(scenario.revenueHT)}</div>
-                                <div class=\"winshirt-metric-label\">CA HT</div>
-                            </div>
-                            <div class=\"winshirt-metric\">
-                                <div class=\"winshirt-metric-value\">\${formatEuro(scenario.totalCosts)}</div>
-                                <div class=\"winshirt-metric-label\">Total Charges</div>
-                            </div>
-                            <div class=\"winshirt-metric\">
-                                <div class=\"winshirt-metric-value\">\${formatEuro(scenario.productCosts)}</div>
-                                <div class=\"winshirt-metric-label\">Prod. + Stock</div>
-                            </div>
-                            <div class=\"winshirt-metric\">
-                                <div class=\"winshirt-metric-value\">\${formatEuro(scenario.shippingCosts)}</div>
-                                <div class=\"winshirt-metric-label\">Transport</div>
-                            </div>
-                            \${scenario.isRefunded ? \`
-                            <div class=\"winshirt-metric warning\">
-                                <div class=\"winshirt-metric-value\">\${formatEuro(scenario.refundCosts)}</div>
-                                <div class=\"winshirt-metric-label\">Remboursements</div>
-                            </div>\` : ''}
-                        </div>
-                        
-                        <div class=\"winshirt-result-summary\">
-                            <div class=\"winshirt-result-value neutral\">
-                                \${formatEuro(scenario.netProfit)}
-                            </div>
-                            <div style=\"font-size: 0.9rem; color: #718096;\">Seuil de rentabilité</div>
-                        </div>
-                    </div>
-                \`;
+                return '<div class=\"winshirt-scenario-card break-even break-even-special\">' +
+                    '<div class=\"winshirt-scenario-title\">🎯 ' + scenario.tickets.toLocaleString() + ' tickets</div>' +
+                    '<span class=\"winshirt-status-badge winshirt-status-break-even\">💰 Point d\\'équilibre</span>' +
+                    '<div class=\"winshirt-objective-badge\">⚖️ Break-Even</div>' +
+                    '<div class=\"winshirt-scenario-metrics\">' +
+                        '<div class=\"winshirt-metric\">' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.revenueHT) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">CA HT</div>' +
+                        '</div>' +
+                        '<div class=\"winshirt-metric\">' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCosts) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">Total Charges</div>' +
+                        '</div>' +
+                        '<div class=\"winshirt-metric\">' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.productCosts) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">Prod. + Stock</div>' +
+                        '</div>' +
+                        '<div class=\"winshirt-metric\">' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.shippingCosts) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">Transport</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class=\"winshirt-result-summary\">' +
+                        '<div class=\"winshirt-result-value neutral\">' +
+                            formatEuro(scenario.netProfit) +
+                        '</div>' +
+                        '<div style=\"font-size: 0.9rem; color: #718096;\">Seuil de rentabilité</div>' +
+                    '</div>' +
+                '</div>';
             }
             
             const statusText = {
@@ -631,44 +622,53 @@ class WS_Scenarios {
                 'loss': scenario.objectiveReached ? '⚠️ Objectif mais perte' : '⚠️ Perte + Remb.'
             }[status];
             
-            return \`
-                <div class=\"winshirt-scenario-card \${status} \${scenario.objectiveReached ? 'objective-reached' : ''}\">
-                    <div class=\"winshirt-scenario-title\">\${scenario.tickets.toLocaleString()} tickets</div>
-                    <span class=\"winshirt-status-badge winshirt-status-\${status}\">\${statusText}</span>
-                    \${scenario.objectiveReached ? '<div class=\"winshirt-objective-badge\">✅ Objectif OK</div>' : '<div class=\"winshirt-objective-badge warning\">❌ Sous objectif</div>'}
-                    
-                    <div class=\"winshirt-scenario-metrics\">
-                        <div class=\"winshirt-metric\">
-                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.revenueHT)}</div>
-                            <div class=\"winshirt-metric-label\">CA HT</div>
-                        </div>
-                        <div class=\"winshirt-metric\">
-                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.totalCosts)}</div>
-                            <div class=\"winshirt-metric-label\">Total Charges</div>
-                        </div>
-                        <div class=\"winshirt-metric\">
-                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.productCosts)}</div>
-                            <div class=\"winshirt-metric-label\">Prod. + Stock</div>
-                        </div>
-                        <div class=\"winshirt-metric\">
-                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.shippingCosts)}</div>
-                            <div class=\"winshirt-metric-label\">Transport</div>
-                        </div>
-                        \${scenario.isRefunded ? \`
-                        <div class=\"winshirt-metric warning\">
-                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.refundCosts)}</div>
-                            <div class=\"winshirt-metric-label\">Remboursements</div>
-                        </div>\` : ''}
-                    </div>
-                    
-                    <div class=\"winshirt-result-summary\">
-                        <div class=\"winshirt-result-value \${scenario.netProfit > 1000 ? 'positive' : scenario.netProfit >= -1000 ? 'neutral' : 'negative'}\">
-                            \${formatEuro(scenario.netProfit)}
-                        </div>
-                        <div style=\"font-size: 0.9rem; color: #718096;\">Résultat net</div>
-                    </div>
-                </div>
-            \`;
+            var refundHtml = '';
+            if (scenario.isRefunded) {
+                refundHtml = '<div class=\"winshirt-metric warning\">' +
+                    '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.refundCosts) + '</div>' +
+                    '<div class=\"winshirt-metric-label\">Remboursements</div>' +
+                '</div>';
+            }
+            
+            var objectiveBadge = scenario.objectiveReached ? 
+                '<div class=\"winshirt-objective-badge\">✅ Objectif OK</div>' : 
+                '<div class=\"winshirt-objective-badge warning\">❌ Sous objectif</div>';
+            
+            var resultClass = scenario.netProfit > 1000 ? 'positive' : 
+                             scenario.netProfit >= -1000 ? 'neutral' : 'negative';
+            
+            var cardClass = status + (scenario.objectiveReached ? ' objective-reached' : '');
+            
+            return '<div class=\"winshirt-scenario-card ' + cardClass + '\">' +
+                '<div class=\"winshirt-scenario-title\">' + scenario.tickets.toLocaleString() + ' tickets</div>' +
+                '<span class=\"winshirt-status-badge winshirt-status-' + status + '\">' + statusText + '</span>' +
+                objectiveBadge +
+                '<div class=\"winshirt-scenario-metrics\">' +
+                    '<div class=\"winshirt-metric\">' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.revenueHT) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">CA HT</div>' +
+                    '</div>' +
+                    '<div class=\"winshirt-metric\">' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCosts) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">Total Charges</div>' +
+                    '</div>' +
+                    '<div class=\"winshirt-metric\">' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.productCosts) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">Prod. + Stock</div>' +
+                    '</div>' +
+                    '<div class=\"winshirt-metric\">' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.shippingCosts) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">Transport</div>' +
+                    '</div>' +
+                    refundHtml +
+                '</div>' +
+                '<div class=\"winshirt-result-summary\">' +
+                    '<div class=\"winshirt-result-value ' + resultClass + '\">' +
+                        formatEuro(scenario.netProfit) +
+                    '</div>' +
+                    '<div style=\"font-size: 0.9rem; color: #718096;\">Résultat net</div>' +
+                '</div>' +
+            '</div>';
         }
         
         // Fonction pour mettre à jour le graphique
@@ -685,7 +685,7 @@ class WS_Scenarios {
             profitChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: ticketCounts.map(t => \`\${t.toLocaleString()}\`),
+                    labels: ticketCounts.map(function(t) { return t.toLocaleString(); }),
                     datasets: [{
                         label: 'Bénéfice Net (€)',
                         data: profits,
@@ -694,7 +694,9 @@ class WS_Scenarios {
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
-                        pointBackgroundColor: profits.map(p => p > 1000 ? '#10b981' : p >= -1000 ? '#f59e0b' : '#ef4444'),
+                        pointBackgroundColor: profits.map(function(p) { 
+                            return p > 1000 ? '#10b981' : p >= -1000 ? '#f59e0b' : '#ef4444'; 
+                        }),
                         pointBorderColor: '#ffffff',
                         pointBorderWidth: 2,
                         pointRadius: 6
@@ -788,12 +790,12 @@ class WS_Scenarios {
         }
         
         // Initialisation
-        jQuery(document).ready(function(\$) {
+        jQuery(document).ready(function() {
             // Mise à jour initiale
             updateSimulation();
             
             // Écouter les changements
-            \$('input').on('input change', updateSimulation);
+            jQuery('input').on('input change', updateSimulation);
         });
         ";
     }
