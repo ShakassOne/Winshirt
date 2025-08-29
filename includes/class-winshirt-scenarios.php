@@ -128,37 +128,37 @@ class WS_Scenarios {
                         <h2>⚙️ Configuration</h2>
                         
                         <div class="winshirt-form-group">
-                            <label for="ticketPrice">Prix ticket TTC (€)</label>
+                            <label for="ticketPrice">💰 Prix de vente du produit TTC (€)</label>
                             <input type="number" id="ticketPrice" value="20" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="tshirtCost">Coût T-Shirt (€)</label>
+                            <label for="tshirtCost">👕 Prix d'achat du produit (€)</label>
                             <input type="number" id="tshirtCost" value="2" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="printCost">Coût impression (€)</label>
+                            <label for="printCost">🎨 Coût personnalisation/impression (€)</label>
                             <input type="number" id="printCost" value="2" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="bagCost">Coût sac (€)</label>
+                            <label for="bagCost">🛍️ Coût emballage/sac (€)</label>
                             <input type="number" id="bagCost" value="0.5" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="shippingCost">Coût port (€)</label>
+                            <label for="shippingCost">📦 Coût expédition unitaire (€)</label>
                             <input type="number" id="shippingCost" value="0.17" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="fixedCosts">Charges fixes (€)</label>
+                            <label for="fixedCosts">🏢 Charges fixes totales (€)</label>
                             <input type="number" id="fixedCosts" value="17360" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="prizeValue">Valeur du lot (€)</label>
+                            <label for="prizeValue">🎁 Coût du lot à gagner (€)</label>
                             <input type="number" id="prizeValue" value="0" step="0.01">
                         </div>
                         
@@ -169,11 +169,11 @@ class WS_Scenarios {
                         
                         <div class="winshirt-checkbox-group">
                             <input type="checkbox" id="refundEnabled" checked>
-                            <label for="refundEnabled">Remboursement activé</label>
+                            <label for="refundEnabled">🔄 Activation du remboursement si objectif non atteint</label>
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="refundValue">Valeur remboursement ticket (€)</label>
+                            <label for="refundValue">💸 Montant remboursement par ticket (€)</label>
                             <input type="number" id="refundValue" value="5" step="0.01">
                         </div>
                     </div>
@@ -426,19 +426,19 @@ class WS_Scenarios {
         // Fonction pour calculer les métriques d'un scénario
         function calculateScenario(tickets, config) {
             const ticketPriceHT = config.ticketPrice / (1 + config.tvaRate / 100);
-            const textileCostPerTicket = config.tshirtCost + config.printCost + config.bagCost + config.shippingCost;
+            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost + config.shippingCost;
             
             const revenueHT = tickets * ticketPriceHT;
-            const textileCosts = tickets * textileCostPerTicket;
+            const productCosts = tickets * productCostPerTicket;
             const refundCosts = config.refundEnabled ? tickets * config.refundValue : 0;
-            const totalCosts = config.fixedCosts + textileCosts + refundCosts + config.prizeValue;
+            const totalCosts = config.fixedCosts + productCosts + refundCosts + config.prizeValue;
             const netProfit = revenueHT - totalCosts;
             
             return {
                 tickets,
                 revenueHT,
                 fixedCosts: config.fixedCosts,
-                textileCosts,
+                productCosts,
                 refundCosts,
                 totalCosts,
                 netProfit,
@@ -486,8 +486,8 @@ class WS_Scenarios {
                             <div class=\"winshirt-metric-label\">Total Charges</div>
                         </div>
                         <div class=\"winshirt-metric\">
-                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.textileCosts)}</div>
-                            <div class=\"winshirt-metric-label\">Textile</div>
+                            <div class=\"winshirt-metric-value\">\${formatEuro(scenario.productCosts)}</div>
+                            <div class=\"winshirt-metric-label\">Coûts Produits</div>
                         </div>
                         \${scenario.isRefunded ? `
                         <div class=\"winshirt-metric\">
