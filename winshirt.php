@@ -21,7 +21,7 @@ require_once WINSHIRT_DIR . 'includes/class-winshirt-lottery-meta.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-product-link.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-slugs.php';
 require_once WINSHIRT_DIR . 'includes/class-winshirt-archive-overlay.php';
-// après les define('WINSHIRT_DIR', ...) etc.
+// Si le fichier est dans: wp-content/plugins/winshirt/admin/class-winshirt-simulator.php
 require_once WINSHIRT_DIR . 'admin/class-winshirt-simulator.php';
 
 
