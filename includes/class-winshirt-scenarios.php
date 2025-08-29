@@ -495,38 +495,37 @@ class WS_Scenarios {
         // Variables globales
         let profitChart = null;
         
-        // Fonction pour calculer le point d'équilibre (break-even) par approche itérative
+        // Fonction pour calculer le point d'équilibre (break-even) par recherche précise
         function calculateBreakEven(config) {
-            // Recherche par dichotomie pour trouver le point d'équilibre exact
-            let min = 1;
-            let max = 50000; // Maximum réaliste
             let bestTickets = null;
             let bestProfit = Infinity;
             
-            for (let i = 0; i < 50; i++) { // Maximum 50 itérations
-                let middle = Math.floor((min + max) / 2);
-                let scenario = calculateScenario(middle, config);
-                
-                // Si on trouve un profit très proche de 0 (± 50€)
-                if (Math.abs(scenario.netProfit) < 50) {
-                    return middle;
-                }
-                
-                // Garder le plus proche de 0
+            // Recherche grossière d'abord (par 100)
+            for (let tickets = 100; tickets <= 10000; tickets += 100) {
+                let scenario = calculateScenario(tickets, config);
                 if (Math.abs(scenario.netProfit) < Math.abs(bestProfit)) {
                     bestProfit = scenario.netProfit;
-                    bestTickets = middle;
+                    bestTickets = tickets;
+                }
+            }
+            
+            if (bestTickets === null) return null;
+            
+            // Recherche fine autour du meilleur résultat (par 1)
+            let start = Math.max(1, bestTickets - 100);
+            let end = bestTickets + 100;
+            
+            for (let tickets = start; tickets <= end; tickets++) {
+                let scenario = calculateScenario(tickets, config);
+                if (Math.abs(scenario.netProfit) < Math.abs(bestProfit)) {
+                    bestProfit = scenario.netProfit;
+                    bestTickets = tickets;
                 }
                 
-                // Ajuster la recherche
-                if (scenario.netProfit < 0) {
-                    min = middle + 1;
-                } else {
-                    max = middle - 1;
+                // Si on trouve exactement 0, on s'arrête
+                if (Math.abs(scenario.netProfit) < 1) {
+                    return tickets;
                 }
-                
-                // Si la plage devient trop petite, on arrête
-                if (max <= min) break;
             }
             
             return bestTickets;
@@ -540,15 +539,14 @@ class WS_Scenarios {
             
             const revenueHT = tickets * ticketPriceHT;
             
-            // Calcul des coûts produits selon le stock tampon
+            // LOGIQUE CORRECTE : Stock tampon = coût minimum même si on vend moins
             let productCosts;
             if (tickets <= config.stockBuffer) {
-                // On vend moins que le stock tampon : coût du stock tampon complet
+                // Si on vend moins que le stock : on paie quand même tout le stock
                 productCosts = config.stockBuffer * productCostPerTicket;
             } else {
-                // On vend plus que le stock : coût du stock + coût des ventes supplémentaires
-                const additionalUnits = tickets - config.stockBuffer;
-                productCosts = (config.stockBuffer * productCostPerTicket) + (additionalUnits * productCostPerTicket);
+                // Si on vend plus que le stock : on paie ce qu'on vend réellement
+                productCosts = tickets * productCostPerTicket;
             }
             
             // Transport : seulement pour ce qui est vendu et expédié
@@ -744,21 +742,47 @@ class WS_Scenarios {
         
         // Fonction principale de mise à jour
         function updateSimulation() {
+            // CORRECTION: Lecture explicite des valeurs avec vérification
+            const ticketPriceValue = document.getElementById('ticketPrice').value;
+            const tshirtCostValue = document.getElementById('tshirtCost').value;
+            const printCostValue = document.getElementById('printCost').value;
+            const bagCostValue = document.getElementById('bagCost').value;
+            const shippingCostValue = document.getElementById('shippingCost').value;
+            const stockBufferValue = document.getElementById('stockBuffer').value;
+            const fixedCostsValue = document.getElementById('fixedCosts').value;
+            const prizeValueValue = document.getElementById('prizeValue').value;
+            const tvaRateValue = document.getElementById('tvaRate').value;
+            const refundValueValue = document.getElementById('refundValue').value;
+            const objectiveTicketsValue = document.getElementById('objectiveTickets').value;
+            const actualSoldValue = document.getElementById('actualSold').value;
+            const refundEnabledValue = document.getElementById('refundEnabled').checked;
+            
+            // DEBUG: Log des valeurs lues
+            console.log('Valeurs lues:', {
+                fixedCosts: fixedCostsValue,
+                prizeValue: prizeValueValue,
+                refundEnabled: refundEnabledValue,
+                refundValue: refundValueValue
+            });
+            
             const config = {
-                ticketPrice: parseFloat(document.getElementById('ticketPrice').value) || 20,
-                tshirtCost: parseFloat(document.getElementById('tshirtCost').value) || 2,
-                printCost: parseFloat(document.getElementById('printCost').value) || 2,
-                bagCost: parseFloat(document.getElementById('bagCost').value) || 0.5,
-                shippingCost: parseFloat(document.getElementById('shippingCost').value) || 0.17,
-                stockBuffer: parseFloat(document.getElementById('stockBuffer').value) || 50,
-                fixedCosts: parseFloat(document.getElementById('fixedCosts').value) || 17360,
-                prizeValue: parseFloat(document.getElementById('prizeValue').value) || 0,
-                tvaRate: parseFloat(document.getElementById('tvaRate').value) || 20,
-                refundEnabled: document.getElementById('refundEnabled').checked,
-                refundValue: parseFloat(document.getElementById('refundValue').value) || 5,
-                objectiveTickets: parseFloat(document.getElementById('objectiveTickets').value) || 5000,
-                actualSold: parseFloat(document.getElementById('actualSold').value) || 0
+                ticketPrice: parseFloat(ticketPriceValue) || 0,
+                tshirtCost: parseFloat(tshirtCostValue) || 0,
+                printCost: parseFloat(printCostValue) || 0,
+                bagCost: parseFloat(bagCostValue) || 0,
+                shippingCost: parseFloat(shippingCostValue) || 0,
+                stockBuffer: parseFloat(stockBufferValue) || 0,
+                fixedCosts: parseFloat(fixedCostsValue) || 0,
+                prizeValue: parseFloat(prizeValueValue) || 0,
+                tvaRate: parseFloat(tvaRateValue) || 20,
+                refundEnabled: refundEnabledValue,
+                refundValue: parseFloat(refundValueValue) || 0,
+                objectiveTickets: parseFloat(objectiveTicketsValue) || 1000,
+                actualSold: parseFloat(actualSoldValue) || 0
             };
+            
+            // DEBUG: Log de la config finale
+            console.log('Config finale:', config);
             
             // Calculer le point d'équilibre
             const breakEvenTickets = calculateBreakEven(config);
@@ -787,6 +811,10 @@ class WS_Scenarios {
             // Créer les scénarios
             const scenarios = ticketCounts.map(count => {
                 const scenario = calculateScenario(count, config);
+                // DEBUG: Log du premier scénario
+                if (count === ticketCounts[0]) {
+                    console.log('Premier scénario:', scenario);
+                }
                 // Marquer le break-even
                 if (count === breakEvenTickets) {
                     scenario.isBreakEven = true;
