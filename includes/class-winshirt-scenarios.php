@@ -198,13 +198,15 @@ class WS_Scenarios {
                     
                     <div class="winshirt-results-panel">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-                            <h2>📊 Scénarios de Rentabilité</h2>
-                            <div style="display: flex; gap: 10px;">
-                                <button id="saveScenario" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">💾 Sauvegarder</button>
-                                <select id="loadScenario" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
-                                    <option value="">📂 Charger un modèle...</option>
-                                </select>
-                                <button id="deleteScenario" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">🗑️ Supprimer</button>
+                            <h2>Scénarios de Rentabilité</h2>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button class="scenario-btn" data-prize="500">Lot 500€</button>
+                                <button class="scenario-btn" data-prize="1000">Lot 1K€</button>
+                                <button class="scenario-btn" data-prize="2000">Lot 2K€</button>
+                                <button class="scenario-btn" data-prize="5000">Lot 5K€</button>
+                                <button class="scenario-btn" data-prize="10000">Lot 10K€</button>
+                                <button class="scenario-btn" data-prize="15000">Lot 15K€</button>
+                                <button class="scenario-btn" data-prize="20000">Lot 20K€</button>
                             </div>
                         </div>
                         
@@ -213,7 +215,7 @@ class WS_Scenarios {
                         </div>
                         
                         <div class="winshirt-summary-container" style="background: #f8fafc; padding: 20px; border-radius: 10px; margin-top: 30px;">
-                            <h3 style="margin: 0 0 15px 0; color: #2d3748;">📈 Résumé Exécutif</h3>
+                            <h3 style="margin: 0 0 15px 0; color: #2d3748;">Résumé Exécutif</h3>
                             <div id="executiveSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 <!-- Résumé automatique -->
                             </div>
@@ -455,6 +457,28 @@ class WS_Scenarios {
         .winshirt-form-group small {
             display: block;
             margin-top: 3px;
+        }
+        
+        .scenario-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: transform 0.2s ease;
+        }
+        
+        .scenario-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .scenario-btn.active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            transform: translateY(-1px);
         }
         
         .winshirt-scenario-card.break-even-special {
