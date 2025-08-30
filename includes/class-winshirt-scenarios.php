@@ -129,54 +129,54 @@ class WS_Scenarios {
                         
                         <div class="winshirt-form-group">
                             <label for="ticketPrice">💰 Prix de vente du produit TTC (€)</label>
-                            <input type="number" id="ticketPrice" value="20" step="0.01">
+                            <input type="number" id="ticketPrice" value="" step="0.01" placeholder="Ex: 25">
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="tshirtCost">👕 Prix d'achat du produit TTC (€)</label>
-                            <input type="number" id="tshirtCost" value="2" step="0.01">
+                            <input type="number" id="tshirtCost" value="" step="0.01" placeholder="Ex: 4">
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="printCost">🎨 Coût personnalisation/impression TTC (€)</label>
-                            <input type="number" id="printCost" value="2" step="0.01">
+                            <input type="number" id="printCost" value="" step="0.01" placeholder="Ex: 2">
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="bagCost">🛍️ Coût emballage/sac TTC (€)</label>
-                            <input type="number" id="bagCost" value="0.5" step="0.01">
+                            <input type="number" id="bagCost" value="" step="0.01" placeholder="Ex: 0.5">
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="shippingCost">📦 Coût expédition unitaire TTC (€)</label>
-                            <input type="number" id="shippingCost" value="0.17" step="0.01">
+                            <input type="number" id="shippingCost" value="" step="0.01" placeholder="Ex: 5">
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="stockBuffer">📦 Stock tampon (unités)</label>
-                            <input type="number" id="stockBuffer" value="50" step="1">
+                            <input type="number" id="stockBuffer" value="" step="1" placeholder="Ex: 50">
                             <small style="color: #666; font-size: 0.8rem;">Produits déjà imprimés en stock</small>
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="fixedCosts">🏢 Charges fixes totales (€)</label>
-                            <input type="number" id="fixedCosts" value="17360" step="0.01">
+                            <label for="fixedCosts">🏢 Charges fixes totales TTC (€)</label>
+                            <input type="number" id="fixedCosts" value="" step="0.01" placeholder="Ex: 500">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="prizeValue">🎁 Coût du lot à gagner (€)</label>
-                            <input type="number" id="prizeValue" value="0" step="0.01">
+                            <label for="prizeValue">🎁 Coût du lot à gagner TTC (€)</label>
+                            <input type="number" id="prizeValue" value="" step="0.01" placeholder="Ex: 1500">
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="objectiveTickets">🎯 Objectif minimum de tickets</label>
-                            <input type="number" id="objectiveTickets" value="5000" step="1">
+                            <input type="number" id="objectiveTickets" value="" step="1" placeholder="Ex: 300">
                             <small style="color: #666; font-size: 0.8rem;">Seuil pour éviter les remboursements</small>
                         </div>
                         
                         <div class="winshirt-form-group">
                             <label for="actualSold">📈 Tickets déjà vendus (simulation)</label>
-                            <input type="number" id="actualSold" value="0" step="1">
+                            <input type="number" id="actualSold" value="" step="1" placeholder="Ex: 120">
                             <small style="color: #666; font-size: 0.8rem;">Pour voir votre position actuelle</small>
                         </div>
                         
@@ -186,13 +186,13 @@ class WS_Scenarios {
                         </div>
                         
                         <div class="winshirt-checkbox-group">
-                            <input type="checkbox" id="refundEnabled" checked>
+                            <input type="checkbox" id="refundEnabled">
                             <label for="refundEnabled">🔄 Remboursement si objectif non atteint</label>
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="refundValue">💸 Montant remboursement par ticket (€)</label>
-                            <input type="number" id="refundValue" value="5" step="0.01">
+                            <label for="refundValue">💸 Montant remboursement par ticket TTC (€)</label>
+                            <input type="number" id="refundValue" value="" step="0.01" placeholder="Ex: 5">
                         </div>
                     </div>
                     
@@ -816,8 +816,18 @@ class WS_Scenarios {
             // Calculer le point d'équilibre
             const breakEvenTickets = calculateBreakEven(config);
             
-            // Générer différents scénarios
-            let ticketCounts = [1000, 2000, 3000, 4000, 5000, 6000];
+            // Nouvelle progression: 50 en 50 jusqu'à 500, puis 1000 en 1000
+            let ticketCounts = [];
+            
+            // 50 en 50 jusqu'à 500
+            for (let i = 50; i <= 500; i += 50) {
+                ticketCounts.push(i);
+            }
+            
+            // 1000 en 1000 après 500
+            for (let i = 1000; i <= 10000; i += 1000) {
+                ticketCounts.push(i);
+            }
             
             // Ajouter le point d'équilibre
             if (breakEvenTickets && breakEvenTickets > 0) {
