@@ -204,8 +204,20 @@ class WS_Scenarios {
                         </div>
                         
                         <div class="winshirt-chart-container">
-                            <h3>📈 Évolution du Bénéfice par Nombre de Tickets</h3>
-                            <canvas id="profitChart" width="400" height="200"></canvas>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+                                <div>
+                                    <h3 style="text-align: center; margin-bottom: 15px; color: #2d3748;">Évolution des Bénéfices</h3>
+                                    <canvas id="profitChart" width="400" height="300"></canvas>
+                                </div>
+                                <div>
+                                    <h3 style="text-align: center; margin-bottom: 15px; color: #2d3748;">Répartition des Coûts</h3>
+                                    <canvas id="costsChart" width="400" height="300"></canvas>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 style="text-align: center; margin-bottom: 15px; color: #2d3748;">Comparaison CA vs Charges par Scénario</h3>
+                                <canvas id="comparisonChart" width="800" height="400"></canvas>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -855,8 +867,8 @@ class WS_Scenarios {
             const grid = document.getElementById('scenariosGrid');
             grid.innerHTML = scenarios.map(createScenarioCard).join('');
             
-            // Mettre à jour le graphique
-            updateChart(scenarios);
+            // Mettre à jour les graphiques
+            updateCharts(scenarios);
         }
         
         // Initialisation
