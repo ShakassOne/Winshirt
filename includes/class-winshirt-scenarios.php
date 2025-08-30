@@ -816,18 +816,8 @@ class WS_Scenarios {
             // Calculer le point d'équilibre
             const breakEvenTickets = calculateBreakEven(config);
             
-            // Nouvelle progression: 50 en 50 jusqu'à 500, puis 1000 en 1000
-            let ticketCounts = [];
-            
-            // 50 en 50 jusqu'à 500
-            for (let i = 50; i <= 500; i += 50) {
-                ticketCounts.push(i);
-            }
-            
-            // 1000 en 1000 après 500
-            for (let i = 1000; i <= 10000; i += 1000) {
-                ticketCounts.push(i);
-            }
+            // Nouvelle progression simplifiée: seulement 8-10 scénarios
+            let ticketCounts = [100, 250, 500, 750, 1000, 2000, 3000, 5000];
             
             // Ajouter le point d'équilibre
             if (breakEvenTickets && breakEvenTickets > 0) {
@@ -835,7 +825,7 @@ class WS_Scenarios {
             }
             
             // Ajouter l'objectif s'il est différent des valeurs par défaut
-            if (config.objectiveTickets && !ticketCounts.includes(config.objectiveTickets)) {
+            if (config.objectiveTickets && config.objectiveTickets > 0 && !ticketCounts.includes(config.objectiveTickets)) {
                 ticketCounts.push(config.objectiveTickets);
             }
             
