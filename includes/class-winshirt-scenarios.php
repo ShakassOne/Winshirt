@@ -250,6 +250,7 @@ class WS_Scenarios {
         }
         
         .winshirt-header h1 {
+            color: white;
             font-size: 2rem;
             margin: 0 0 10px 0;
             font-weight: 700;
