@@ -133,22 +133,22 @@ class WS_Scenarios {
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="tshirtCost">👕 Prix d'achat du produit (€)</label>
+                            <label for="tshirtCost">👕 Prix d'achat du produit TTC (€)</label>
                             <input type="number" id="tshirtCost" value="2" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="printCost">🎨 Coût personnalisation/impression (€)</label>
+                            <label for="printCost">🎨 Coût personnalisation/impression TTC (€)</label>
                             <input type="number" id="printCost" value="2" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="bagCost">🛍️ Coût emballage/sac (€)</label>
+                            <label for="bagCost">🛍️ Coût emballage/sac TTC (€)</label>
                             <input type="number" id="bagCost" value="0.5" step="0.01">
                         </div>
                         
                         <div class="winshirt-form-group">
-                            <label for="shippingCost">📦 Coût expédition unitaire (€)</label>
+                            <label for="shippingCost">📦 Coût expédition unitaire TTC (€)</label>
                             <input type="number" id="shippingCost" value="0.17" step="0.01">
                         </div>
                         
@@ -503,8 +503,8 @@ class WS_Scenarios {
             // Recherche grossière d'abord (par 100)
             for (let tickets = 100; tickets <= 10000; tickets += 100) {
                 let scenario = calculateScenario(tickets, config);
-                if (Math.abs(scenario.netProfit) < Math.abs(bestProfit)) {
-                    bestProfit = scenario.netProfit;
+                if (Math.abs(scenario.netProfitTTC) < Math.abs(bestProfit)) {
+                    bestProfit = scenario.netProfitTTC;
                     bestTickets = tickets;
                 }
             }
@@ -517,13 +517,13 @@ class WS_Scenarios {
             
             for (let tickets = start; tickets <= end; tickets++) {
                 let scenario = calculateScenario(tickets, config);
-                if (Math.abs(scenario.netProfit) < Math.abs(bestProfit)) {
-                    bestProfit = scenario.netProfit;
+                if (Math.abs(scenario.netProfitTTC) < Math.abs(bestProfit)) {
+                    bestProfit = scenario.netProfitTTC;
                     bestTickets = tickets;
                 }
                 
                 // Si on trouve exactement 0, on s'arrête
-                if (Math.abs(scenario.netProfit) < 1) {
+                if (Math.abs(scenario.netProfitTTC) < 1) {
                     return tickets;
                 }
             }
@@ -533,41 +533,68 @@ class WS_Scenarios {
         
         // Fonction pour calculer les métriques d'un scénario
         function calculateScenario(tickets, config) {
-            const ticketPriceHT = config.ticketPrice / (1 + config.tvaRate / 100);
-            const productCostPerTicket = config.tshirtCost + config.printCost + config.bagCost;
-            const shippingCostPerTicket = config.shippingCost;
+            // TOUT EN TTC PUIS CONVERSION HT
+            const ticketPriceTTC = config.ticketPrice;
+            const ticketPriceHT = ticketPriceTTC / (1 + config.tvaRate / 100);
             
+            // Coûts unitaires TTC puis conversion HT
+            const productCostTTCPerTicket = config.tshirtCost + config.printCost + config.bagCost;
+            const productCostHTPerTicket = productCostTTCPerTicket / (1 + config.tvaRate / 100);
+            const shippingCostTTCPerTicket = config.shippingCost;
+            const shippingCostHTPerTicket = shippingCostTTCPerTicket / (1 + config.tvaRate / 100);
+            
+            // Revenus
+            const revenueTTC = tickets * ticketPriceTTC;
             const revenueHT = tickets * ticketPriceHT;
             
-            // LOGIQUE CORRECTE : Stock tampon = coût minimum même si on vend moins
-            let productCosts;
+            // Calcul des coûts produits avec stock tampon
+            let productCostsTTC, productCostsHT;
             if (tickets <= config.stockBuffer) {
-                // Si on vend moins que le stock : on paie quand même tout le stock
-                productCosts = config.stockBuffer * productCostPerTicket;
+                productCostsTTC = config.stockBuffer * productCostTTCPerTicket;
+                productCostsHT = config.stockBuffer * productCostHTPerTicket;
             } else {
-                // Si on vend plus que le stock : on paie ce qu'on vend réellement
-                productCosts = tickets * productCostPerTicket;
+                productCostsTTC = tickets * productCostTTCPerTicket;
+                productCostsHT = tickets * productCostHTPerTicket;
             }
             
-            // Transport : seulement pour ce qui est vendu et expédié
-            const shippingCosts = tickets * shippingCostPerTicket;
+            // Transport (seulement sur les ventes)
+            const shippingCostsTTC = tickets * shippingCostTTCPerTicket;
+            const shippingCostsHT = tickets * shippingCostHTPerTicket;
             
-            // Remboursement seulement si objectif non atteint ET remboursement activé
+            // Remboursements (en TTC comme saisi)
             const needsRefund = config.refundEnabled && tickets < config.objectiveTickets;
-            const refundCosts = needsRefund ? tickets * config.refundValue : 0;
+            const refundCostsTTC = needsRefund ? tickets * config.refundValue : 0;
+            const refundCostsHT = needsRefund ? refundCostsTTC / (1 + config.tvaRate / 100) : 0;
             
-            const totalCosts = config.fixedCosts + productCosts + shippingCosts + refundCosts + config.prizeValue;
-            const netProfit = revenueHT - totalCosts;
+            // Charges fixes et lot (traités comme TTC)
+            const fixedCostsTTC = config.fixedCosts;
+            const fixedCostsHT = fixedCostsTTC / (1 + config.tvaRate / 100);
+            const prizeValueTTC = config.prizeValue;
+            const prizeValueHT = prizeValueTTC / (1 + config.tvaRate / 100);
+            
+            // Totaux
+            const totalCostsTTC = fixedCostsTTC + productCostsTTC + shippingCostsTTC + refundCostsTTC + prizeValueTTC;
+            const totalCostsHT = fixedCostsHT + productCostsHT + shippingCostsHT + refundCostsHT + prizeValueHT;
+            
+            const netProfitTTC = revenueTTC - totalCostsTTC;
+            const netProfitHT = revenueHT - totalCostsHT;
             
             return {
                 tickets: tickets,
+                revenueTTC: revenueTTC,
                 revenueHT: revenueHT,
-                fixedCosts: config.fixedCosts,
-                productCosts: productCosts,
-                shippingCosts: shippingCosts,
-                refundCosts: refundCosts,
-                totalCosts: totalCosts,
-                netProfit: netProfit,
+                fixedCostsTTC: fixedCostsTTC,
+                fixedCostsHT: fixedCostsHT,
+                productCostsTTC: productCostsTTC,
+                productCostsHT: productCostsHT,
+                shippingCostsTTC: shippingCostsTTC,
+                shippingCostsHT: shippingCostsHT,
+                refundCostsTTC: refundCostsTTC,
+                refundCostsHT: refundCostsHT,
+                totalCostsTTC: totalCostsTTC,
+                totalCostsHT: totalCostsHT,
+                netProfitTTC: netProfitTTC,
+                netProfitHT: netProfitHT,
                 isRefunded: needsRefund,
                 objectiveReached: tickets >= config.objectiveTickets,
                 stockBuffer: config.stockBuffer
@@ -592,7 +619,7 @@ class WS_Scenarios {
         
         // Fonction pour créer une card de scénario
         function createScenarioCard(scenario) {
-            const status = getScenarioStatus(scenario.netProfit);
+            const status = getScenarioStatus(scenario.netProfitHT);
             
             // Cas spécial pour le break-even
             if (scenario.isBreakEven) {
@@ -602,25 +629,26 @@ class WS_Scenarios {
                     '<div class=\"winshirt-objective-badge\">⚖️ Break-Even</div>' +
                     '<div class=\"winshirt-scenario-metrics\">' +
                         '<div class=\"winshirt-metric\">' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.revenueTTC) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">CA TTC</div>' +
+                        '</div>' +
+                        '<div class=\"winshirt-metric\">' +
                             '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.revenueHT) + '</div>' +
                             '<div class=\"winshirt-metric-label\">CA HT</div>' +
                         '</div>' +
                         '<div class=\"winshirt-metric\">' +
-                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCosts) + '</div>' +
-                            '<div class=\"winshirt-metric-label\">Total Charges</div>' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCostsTTC) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">Charges TTC</div>' +
                         '</div>' +
                         '<div class=\"winshirt-metric\">' +
-                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.productCosts) + '</div>' +
-                            '<div class=\"winshirt-metric-label\">Prod. + Stock</div>' +
-                        '</div>' +
-                        '<div class=\"winshirt-metric\">' +
-                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.shippingCosts) + '</div>' +
-                            '<div class=\"winshirt-metric-label\">Transport</div>' +
+                            '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCostsHT) + '</div>' +
+                            '<div class=\"winshirt-metric-label\">Charges HT</div>' +
                         '</div>' +
                     '</div>' +
                     '<div class=\"winshirt-result-summary\">' +
                         '<div class=\"winshirt-result-value neutral\">' +
-                            formatEuro(scenario.netProfit) +
+                            '<div>' + formatEuro(scenario.netProfitTTC) + ' TTC</div>' +
+                            '<div>' + formatEuro(scenario.netProfitHT) + ' HT</div>' +
                         '</div>' +
                         '<div style=\"font-size: 0.9rem; color: #718096;\">Seuil de rentabilité</div>' +
                     '</div>' +
@@ -636,8 +664,8 @@ class WS_Scenarios {
             var refundHtml = '';
             if (scenario.isRefunded) {
                 refundHtml = '<div class=\"winshirt-metric warning\">' +
-                    '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.refundCosts) + '</div>' +
-                    '<div class=\"winshirt-metric-label\">Remboursements</div>' +
+                    '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.refundCostsTTC) + ' / ' + formatEuro(scenario.refundCostsHT) + '</div>' +
+                    '<div class=\"winshirt-metric-label\">Remb. TTC/HT</div>' +
                 '</div>';
             }
             
@@ -645,8 +673,8 @@ class WS_Scenarios {
                 '<div class=\"winshirt-objective-badge\">✅ Objectif OK</div>' : 
                 '<div class=\"winshirt-objective-badge warning\">❌ Sous objectif</div>';
             
-            var resultClass = scenario.netProfit > 1000 ? 'positive' : 
-                             scenario.netProfit >= -1000 ? 'neutral' : 'negative';
+            var resultClass = scenario.netProfitHT > 1000 ? 'positive' : 
+                             scenario.netProfitHT >= -1000 ? 'neutral' : 'negative';
             
             var cardClass = status + (scenario.objectiveReached ? ' objective-reached' : '');
             
@@ -656,26 +684,27 @@ class WS_Scenarios {
                 objectiveBadge +
                 '<div class=\"winshirt-scenario-metrics\">' +
                     '<div class=\"winshirt-metric\">' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.revenueTTC) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">CA TTC</div>' +
+                    '</div>' +
+                    '<div class=\"winshirt-metric\">' +
                         '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.revenueHT) + '</div>' +
                         '<div class=\"winshirt-metric-label\">CA HT</div>' +
                     '</div>' +
                     '<div class=\"winshirt-metric\">' +
-                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCosts) + '</div>' +
-                        '<div class=\"winshirt-metric-label\">Total Charges</div>' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCostsTTC) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">Charges TTC</div>' +
                     '</div>' +
                     '<div class=\"winshirt-metric\">' +
-                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.productCosts) + '</div>' +
-                        '<div class=\"winshirt-metric-label\">Prod. + Stock</div>' +
-                    '</div>' +
-                    '<div class=\"winshirt-metric\">' +
-                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.shippingCosts) + '</div>' +
-                        '<div class=\"winshirt-metric-label\">Transport</div>' +
+                        '<div class=\"winshirt-metric-value\">' + formatEuro(scenario.totalCostsHT) + '</div>' +
+                        '<div class=\"winshirt-metric-label\">Charges HT</div>' +
                     '</div>' +
                     refundHtml +
                 '</div>' +
                 '<div class=\"winshirt-result-summary\">' +
                     '<div class=\"winshirt-result-value ' + resultClass + '\">' +
-                        formatEuro(scenario.netProfit) +
+                        '<div style=\"font-weight: bold; margin-bottom: 2px;\">' + formatEuro(scenario.netProfitTTC) + ' TTC</div>' +
+                        '<div style=\"font-size: 0.9em; opacity: 0.8;\">' + formatEuro(scenario.netProfitHT) + ' HT</div>' +
                     '</div>' +
                     '<div style=\"font-size: 0.9rem; color: #718096;\">Résultat net</div>' +
                 '</div>' +
