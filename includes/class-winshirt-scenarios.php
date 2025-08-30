@@ -798,14 +798,6 @@ class WS_Scenarios {
             const actualSoldValue = document.getElementById('actualSold').value;
             const refundEnabledValue = document.getElementById('refundEnabled').checked;
             
-            // DEBUG: Log des valeurs lues
-            console.log('Valeurs lues:', {
-                fixedCosts: fixedCostsValue,
-                prizeValue: prizeValueValue,
-                refundEnabled: refundEnabledValue,
-                refundValue: refundValueValue
-            });
-            
             const config = {
                 ticketPrice: parseFloat(ticketPriceValue) || 0,
                 tshirtCost: parseFloat(tshirtCostValue) || 0,
@@ -822,8 +814,11 @@ class WS_Scenarios {
                 actualSold: parseFloat(actualSoldValue) || 0
             };
             
-            // DEBUG: Log de la config finale
-            console.log('Config finale:', config);
+            // Vérifier si les champs essentiels sont remplis
+            if (config.ticketPrice <= 0) {
+                document.getElementById('scenariosGrid').innerHTML = '<div style=\"text-align: center; padding: 40px; color: #666;\">Veuillez saisir un prix de vente pour voir les simulations</div>';
+                return;
+            }
             
             // Calculer le point d'équilibre
             const breakEvenTickets = calculateBreakEven(config);
@@ -852,10 +847,6 @@ class WS_Scenarios {
             // Créer les scénarios
             const scenarios = ticketCounts.map(count => {
                 const scenario = calculateScenario(count, config);
-                // DEBUG: Log du premier scénario
-                if (count === ticketCounts[0]) {
-                    console.log('Premier scénario:', scenario);
-                }
                 // Marquer le break-even
                 if (count === breakEvenTickets) {
                     scenario.isBreakEven = true;
@@ -867,8 +858,10 @@ class WS_Scenarios {
             const grid = document.getElementById('scenariosGrid');
             grid.innerHTML = scenarios.map(createScenarioCard).join('');
             
-            // Mettre à jour les graphiques
-            updateCharts(scenarios);
+            // Mettre à jour les graphiques seulement s'il y a des données
+            if (scenarios.length > 0 && config.ticketPrice > 0) {
+                updateCharts(scenarios);
+            }
         }
         
         // Initialisation
