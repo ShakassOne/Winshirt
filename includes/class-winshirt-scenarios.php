@@ -197,26 +197,25 @@ class WS_Scenarios {
                     </div>
                     
                     <div class="winshirt-results-panel">
-                        <h2>📊 Scénarios de Rentabilité</h2>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                            <h2>📊 Scénarios de Rentabilité</h2>
+                            <div style="display: flex; gap: 10px;">
+                                <button id="saveScenario" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">💾 Sauvegarder</button>
+                                <select id="loadScenario" style="padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;">
+                                    <option value="">📂 Charger un modèle...</option>
+                                </select>
+                                <button id="deleteScenario" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">🗑️ Supprimer</button>
+                            </div>
+                        </div>
                         
                         <div class="winshirt-scenarios-grid" id="scenariosGrid">
                             <!-- Les scénarios seront générés ici -->
                         </div>
                         
-                        <div class="winshirt-chart-container">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
-                                <div>
-                                    <h3 style="text-align: center; margin-bottom: 15px; color: #2d3748;">Évolution des Bénéfices</h3>
-                                    <canvas id="profitChart" width="400" height="300"></canvas>
-                                </div>
-                                <div>
-                                    <h3 style="text-align: center; margin-bottom: 15px; color: #2d3748;">Répartition des Coûts</h3>
-                                    <canvas id="costsChart" width="400" height="300"></canvas>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 style="text-align: center; margin-bottom: 15px; color: #2d3748;">Comparaison CA vs Charges par Scénario</h3>
-                                <canvas id="comparisonChart" width="800" height="400"></canvas>
+                        <div class="winshirt-summary-container" style="background: #f8fafc; padding: 20px; border-radius: 10px; margin-top: 30px;">
+                            <h3 style="margin: 0 0 15px 0; color: #2d3748;">📈 Résumé Exécutif</h3>
+                            <div id="executiveSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                                <!-- Résumé automatique -->
                             </div>
                         </div>
                     </div>
@@ -858,10 +857,8 @@ class WS_Scenarios {
             const grid = document.getElementById('scenariosGrid');
             grid.innerHTML = scenarios.map(createScenarioCard).join('');
             
-            // Mettre à jour les graphiques seulement s'il y a des données
-            if (scenarios.length > 0 && config.ticketPrice > 0) {
-                updateCharts(scenarios);
-            }
+            // Générer le résumé exécutif
+            generateExecutiveSummary(scenarios);
         }
         
         // Initialisation
